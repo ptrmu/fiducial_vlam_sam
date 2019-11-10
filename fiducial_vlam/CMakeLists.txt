@@ -35,6 +35,7 @@ find_package(ament_cmake REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fiducial_vlam_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(GTSAM REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ros2_shared REQUIRED)
@@ -47,8 +48,11 @@ find_package(yaml_cpp_vendor REQUIRED)
 # Local includes
 include_directories(
   include
+  ${cv_bridge_INCLUDE_DIRS}
   ${fiducial_vlam_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
+  ${GTSAM_INCLUDE_DIR}
+  ${GTSAM_INCLUDE_DIR}/gtsam/3rdparty/Eigen
   ${nav_msgs_INCLUDE_DIRS}
   ${ros2_shared_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
@@ -56,18 +60,8 @@ include_directories(
   ${tf2_msgs_INCLUDE_DIRS}
   ${visualization_msgs_INCLUDE_DIRS}
   ${yaml_cpp_vendor_INCLUDE_DIRS}
-  ${cv_bridge_INCLUDE_DIRS}
 )
 
-# Debugging: set _dump_all_variables to true
-set(_dump_all_variables false)
-if(_dump_all_variables)
-  get_cmake_property(_variable_names VARIABLES)
-  list(SORT _variable_names)
-  foreach(_variable_name ${_variable_names})
-    message(STATUS "${_variable_name}=${${_variable_name}}")
-  endforeach()
-endif()
 
 #=============
 # vloc node
@@ -83,6 +77,7 @@ add_executable(vloc_node
 
 ament_target_dependencies(vloc_node
   cv_bridge
+  GTSAM
   fiducial_vlam_msgs
   OpenCV
   rclcpp
@@ -92,6 +87,29 @@ ament_target_dependencies(vloc_node
   std_msgs
   tf2_msgs
   )
+
+#target_link_libraries(vloc_node
+#  PRIVATE cv_bridge
+#  PRIVATE fiducial_vlam_msgs
+#  PRIVATE GTSAM
+#  PRIVATE nav_msgs
+#  PRIVATE OpenCV
+#  PRIVATE rclcpp
+#  PRIVATE ros2_shared
+#  PRIVATE sensor_msgs
+#  PRIVATE std_msgs
+#  PRIVATE tf2_msgs
+#  )
+
+# Debugging: set _dump_all_variables to true
+set(_dump_all_variables true)
+if(_dump_all_variables)
+  get_cmake_property(_variable_names VARIABLES)
+  list(SORT _variable_names)
+  foreach(_variable_name ${_variable_names})
+    message(STATUS "${_variable_name}=${${_variable_name}}")
+  endforeach()
+endif()
 
 #=============
 # vmap node

@@ -8,6 +8,11 @@
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 
+#include "gtsam/inference/Symbol.h"
+#include <gtsam/nonlinear/NonlinearFactorGraph.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/Marginals.h>
+
 namespace fiducial_vlam
 {
 // ==============================================================================
@@ -112,9 +117,9 @@ namespace fiducial_vlam
 
   class FiducialMath::CvFiducialMath
   {
+  public:
     const CameraInfo ci_;
 
-  public:
     explicit CvFiducialMath(const CameraInfo &camera_info)
       : ci_(camera_info)
     {}
@@ -340,16 +345,51 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// FiducialMath::SamFiducialMath class
+// ==============================================================================
+
+  class FiducialMath::SamFiducialMath
+  {
+    CvFiducialMath &cv_;
+
+  public:
+    explicit SamFiducialMath(CvFiducialMath &cv)
+      : cv_(cv)
+    {}
+
+    TransformWithCovariance solve_t_camera_marker(
+      const Observation &observation,
+      double marker_length)
+    {
+      /* 1. create graph */
+      gtsam::NonlinearFactorGraph graph;
+
+      return TransformWithCovariance{};
+    }
+
+    TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                               const std::vector<TransformWithCovariance> &t_map_markers,
+                                               double marker_length)
+    {
+      return TransformWithCovariance{};
+    }
+  };
+
+// ==============================================================================
 // FiducialMath class
 // ==============================================================================
 
-  FiducialMath::FiducialMath(const CameraInfo &camera_info)
-    : cv_(std::make_shared<CvFiducialMath>(camera_info))
+  FiducialMath::FiducialMath(const CameraInfo &camera_info) :
+    cv_{std::make_unique<CvFiducialMath>(camera_info)},
+    sam_{std::make_unique<SamFiducialMath>(*cv_)}
   {}
 
-  FiducialMath::FiducialMath(const sensor_msgs::msg::CameraInfo &camera_info_msg)
-    : cv_(std::make_shared<CvFiducialMath>(camera_info_msg))
+  FiducialMath::FiducialMath(const sensor_msgs::msg::CameraInfo &camera_info_msg) :
+    cv_{std::make_unique<CvFiducialMath>(camera_info_msg)},
+    sam_{std::make_unique<SamFiducialMath>(*cv_)}
   {}
+
+  FiducialMath::~FiducialMath() = default;
 
   TransformWithCovariance FiducialMath::solve_t_camera_marker(
     const Observation &observation,

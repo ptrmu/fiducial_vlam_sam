@@ -1,6 +1,25 @@
 # fiducial_vlam
 ![rviz image](images/rviz_in_out_path.png)
 
+### Install GTSAM
+
+cd ~
+mkdir lib
+cd lib
+mkdir gtsam
+cd gtsam
+git clone git@github.com:borglab/gtsam.git
+git checkout 4.0.2
+mkdir build
+mkdir install
+cd build
+cmake ../gtsam -DCMAKE_INSTALL_PREFIX=~/lib/gtsam/install
+make -j 8
+make install
+
+export CMAKE_PREFIX_PATH=~/lib/gtsam/install/lib/cmake/GTSAM:$CMAKE_PREFIX_PATH
+export LD_LIBRARY_PATH=~/lib/gtsam/install/lib/:$LD_LIBRARY_PATH
+
 ### The map of marker poses.
 
 The map is a list of marker poses in the map frame. Each entry in the map list contains the id of
