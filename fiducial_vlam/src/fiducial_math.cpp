@@ -364,6 +364,19 @@ namespace fiducial_vlam
       /* 1. create graph */
       gtsam::NonlinearFactorGraph graph;
 
+      // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame
+      std::vector<cv::Point3d> all_corners_f_map;
+      std::vector<cv::Point2f> all_corners_f_image;
+
+//      for (int i = 0; i < observations.size(); i += 1) {
+//        auto &observation = observations.observations()[i];
+//        auto &t_map_marker = t_map_markers[i];
+//        if (t_map_marker.is_valid()) {
+//          append_corners_f_map(all_corners_f_map, t_map_marker, marker_length);
+//          append_corners_f_image(all_corners_f_image, observation);
+//        }
+//      }
+
       return TransformWithCovariance{};
     }
 

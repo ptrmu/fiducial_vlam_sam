@@ -1,8 +1,9 @@
 # fiducial_vlam
 ![rviz image](images/rviz_in_out_path.png)
 
-### Install GTSAM
+# Install GTSAM
 
+~~~
 cd ~
 mkdir lib
 cd lib
@@ -19,8 +20,9 @@ make install
 
 export CMAKE_PREFIX_PATH=~/lib/gtsam/install/lib/cmake/GTSAM:$CMAKE_PREFIX_PATH
 export LD_LIBRARY_PATH=~/lib/gtsam/install/lib/:$LD_LIBRARY_PATH
+~~~
 
-### The map of marker poses.
+# The map of marker poses.
 
 The map is a list of marker poses in the map frame. Each entry in the map list contains the id of
 the marker and the pose (x,y,z,roll,pitch,yaw) of the marker in the map frame.
@@ -42,7 +44,7 @@ using an existing predefined map. (make_not_use_map==0)
 `marker_map_save_full_filename` the name (+path) of the file that vmap_node a discovered map to
 when vmap_node is discovering a new map. (make_not_use_map==1)
 
-#### Anchoring a map
+# Anchoring a map
 
 vmap_node creates/discovers a map by calculating the relative poses of the markers
 from images that contain multiple markers. These relative measurements are anchored

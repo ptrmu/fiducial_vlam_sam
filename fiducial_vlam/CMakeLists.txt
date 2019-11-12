@@ -6,22 +6,22 @@ project(fiducial_vlam)
 #=============
 
 # Default to C99
-if(NOT CMAKE_C_STANDARD)
+if (NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
-endif()
+endif ()
 
 # Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
+if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
-endif()
+endif ()
 
 # Emulate colcon
-if($ENV{CLION_IDE})
+if ($ENV{CLION_IDE})
   message("Running inside CLion")
   set(fiducial_vlam_msgs_DIR "${PROJECT_SOURCE_DIR}/../../../install/fiducial_vlam_msgs/share/fiducial_vlam_msgs/cmake")
   set(ros2_shared_DIR "${PROJECT_SOURCE_DIR}/../../../install/ros2_shared/share/ros2_shared/cmake")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRUN_INSIDE_CLION")
-endif()
+endif ()
 
 # Try for OpenCV 4.X, but settle for whatever is installed
 find_package(OpenCV 4 QUIET)
@@ -73,11 +73,11 @@ add_executable(vloc_node
   src/convert_util.cpp
   src/transform_with_covariance.cpp
   src/fiducial_math.cpp
-  src/vloc_context.cpp)
+  src/vloc_context.cpp
+  )
 
 ament_target_dependencies(vloc_node
   cv_bridge
-  GTSAM
   fiducial_vlam_msgs
   OpenCV
   rclcpp
@@ -88,28 +88,20 @@ ament_target_dependencies(vloc_node
   tf2_msgs
   )
 
-#target_link_libraries(vloc_node
-#  PRIVATE cv_bridge
-#  PRIVATE fiducial_vlam_msgs
-#  PRIVATE GTSAM
-#  PRIVATE nav_msgs
-#  PRIVATE OpenCV
-#  PRIVATE rclcpp
-#  PRIVATE ros2_shared
-#  PRIVATE sensor_msgs
-#  PRIVATE std_msgs
-#  PRIVATE tf2_msgs
-#  )
+# ?? Why can't I put this in ament_target_dependencies
+target_link_libraries(vloc_node
+  gtsam
+  )
 
 # Debugging: set _dump_all_variables to true
-set(_dump_all_variables true)
-if(_dump_all_variables)
+set(_dump_all_variables false)
+if (_dump_all_variables)
   get_cmake_property(_variable_names VARIABLES)
   list(SORT _variable_names)
-  foreach(_variable_name ${_variable_names})
+  foreach (_variable_name ${_variable_names})
     message(STATUS "${_variable_name}=${${_variable_name}}")
-  endforeach()
-endif()
+  endforeach ()
+endif ()
 
 #=============
 # vmap node
@@ -136,25 +128,28 @@ ament_target_dependencies(vmap_node
   yaml_cpp_vendor
   )
 
+# ?? Why can't I put this in ament_target_dependencies
+target_link_libraries(vmap_node
+  gtsam
+  )
+
 #=============
 # Install
 #=============
 
 # Install targets
-install(
-  TARGETS
+install(TARGETS
   vloc_node
   vmap_node
   DESTINATION lib/fiducial_vlam
-)
+  )
 
 # Install various directories
-install(
-  DIRECTORY
+install(DIRECTORY
   cfg
   launch
   DESTINATION share/fiducial_vlam
-)
+  )
 
 #=============
 # Run ament macros
