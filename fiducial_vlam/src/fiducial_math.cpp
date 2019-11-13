@@ -8,6 +8,10 @@
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 
+#include <gtsam/geometry/Cal3DS2.h>
+#include <gtsam/geometry/PinholeCamera.h>
+#include <gtsam/geometry/Point3.h>
+#include <gtsam/geometry/Pose3.h>
 #include "gtsam/inference/Symbol.h"
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
@@ -121,7 +125,7 @@ namespace fiducial_vlam
     const CameraInfo ci_;
 
     explicit CvFiducialMath(const CameraInfo &camera_info)
-      : ci_(camera_info)
+      : ci_{camera_info}
     {}
 
     explicit CvFiducialMath(const sensor_msgs::msg::CameraInfo &camera_info_msg)
@@ -255,17 +259,35 @@ namespace fiducial_vlam
                           rvec, tvec, 0.1);
     }
 
+    std::vector<cv::Point3d> get_corners_f_map(const TransformWithCovariance &t_map_marker,
+                                               double marker_length)
+    {
+      std::vector<cv::Point3d> corners_f_map{};
+      append_corners_f_map(corners_f_map,
+                           t_map_marker,
+                           marker_length);
+      return corners_f_map;
+    }
+
+    std::vector<cv::Point2f> get_corners_f_image(const Observation &observation)
+    {
+      std::vector<cv::Point2f> corners_f_image{};
+      append_corners_f_image(corners_f_image, observation);
+      return corners_f_image;
+    }
+
   private:
     void append_corners_f_map(std::vector<cv::Point3d> &corners_f_map,
                               const TransformWithCovariance &t_map_marker,
                               double marker_length)
     {
-      // Build up a list of the corner locations in the map frame.
+      // Build up a list of the corner locations in the marker frame.
       tf2::Vector3 corner0_f_marker(-marker_length / 2.f, marker_length / 2.f, 0.f);
       tf2::Vector3 corner1_f_marker(marker_length / 2.f, marker_length / 2.f, 0.f);
       tf2::Vector3 corner2_f_marker(marker_length / 2.f, -marker_length / 2.f, 0.f);
       tf2::Vector3 corner3_f_marker(-marker_length / 2.f, -marker_length / 2.f, 0.f);
 
+      // Transform the corners to the map frame.
       const auto &t_map_marker_tf = t_map_marker.transform();
       auto corner0_f_map = t_map_marker_tf * corner0_f_marker;
       auto corner1_f_map = t_map_marker_tf * corner1_f_marker;
@@ -278,9 +300,10 @@ namespace fiducial_vlam
       corners_f_map.emplace_back(cv::Point3d(corner3_f_map.x(), corner3_f_map.y(), corner3_f_map.z()));
     }
 
+
     void append_corners_f_marker(std::vector<cv::Point3d> &corners_f_marker, double marker_length)
     {
-      // Add to the list of the corner locations in the map frame.
+      // Add to the list of the corner locations in the marker frame.
       corners_f_marker.emplace_back(cv::Point3d(-marker_length / 2.f, marker_length / 2.f, 0.f));
       corners_f_marker.emplace_back(cv::Point3d(marker_length / 2.f, marker_length / 2.f, 0.f));
       corners_f_marker.emplace_back(cv::Point3d(marker_length / 2.f, -marker_length / 2.f, 0.f));
@@ -312,6 +335,7 @@ namespace fiducial_vlam
       return observations;
     }
 
+  public:
     tf2::Transform to_tf2_transform(const cv::Vec3d &rvec, const cv::Vec3d &tvec)
     {
       tf2::Vector3 t(tvec[0], tvec[1], tvec[2]);
@@ -351,32 +375,92 @@ namespace fiducial_vlam
   class FiducialMath::SamFiducialMath
   {
     CvFiducialMath &cv_;
+    gtsam::Cal3DS2 cal3ds2_;
+    gtsam::Key X1_{gtsam::Symbol('x', 1)};
+
+
+    class ResectioningFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3>
+    {
+      const gtsam::Cal3DS2 cal3ds2_;
+      const gtsam::Point3 P_;       ///< 3D point on the calibration rig
+      const gtsam::Point2 p_;       ///< 2D measurement of the 3D point
+
+    public:
+      /// Construct factor given known point P and its projection p
+      ResectioningFactor(const gtsam::SharedNoiseModel &model,
+                         const gtsam::Key key,
+                         const gtsam::Cal3DS2 &cal3ds2,
+                         gtsam::Point2 p,
+                         gtsam::Point3 P) :
+        NoiseModelFactor1<gtsam::Pose3>(model, key),
+        cal3ds2_{cal3ds2},
+        P_(std::move(P)),
+        p_(std::move(p))
+      {}
+
+      /// evaluate the error
+      gtsam::Vector evaluateError(const gtsam::Pose3 &pose,
+                                  boost::optional<gtsam::Matrix &> H) const override
+      {
+        auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose, cal3ds2_};
+        return camera.project(P_, H) - p_;
+      }
+    };
+
+    TransformWithCovariance cv_t_map_camera(const Observations &observations,
+                                            const std::vector<TransformWithCovariance> &t_map_markers,
+                                            double marker_length)
+    {
+      // Run through the observations and find one that refers to a marker
+      // with known pose. Then use opencv's SolvePnp to find the pose
+      // of the camera.
+      int i_found = -1;
+      for (int i = 0; i < observations.size(); i += 1) {
+        auto &t_map_marker = t_map_markers[i];
+        if (t_map_marker.is_valid()) {
+          i_found = i;
+          break;
+        }
+      }
+
+      // If there were no known markers, then we can't localize the camera.
+      if (i_found == -1) {
+        return TransformWithCovariance{};
+      }
+
+      // Figure out camera location.
+      cv::Vec3d rvec, tvec;
+      cv::solvePnP(cv_.get_corners_f_map(t_map_markers[i_found], marker_length),
+                   cv_.get_corners_f_image(observations.observations()[i_found]),
+                   cv_.ci_.cv()->camera_matrix(),
+                   cv_.ci_.cv()->dist_coeffs(),
+                   rvec, tvec);
+
+      // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
+      // camera coordinate system". In this case the map frame is the model coordinate system.
+      // So rvec, tvec are the transformation t_camera_map.
+      auto tf2_t_map_camera = cv_.to_tf2_transform(rvec, tvec).inverse();
+      return TransformWithCovariance(tf2_t_map_camera);
+    }
 
   public:
-    explicit SamFiducialMath(CvFiducialMath &cv)
-      : cv_(cv)
+    explicit SamFiducialMath(CvFiducialMath &cv) :
+      cv_{cv}, cal3ds2_{
+      cv.ci_.cv()->camera_matrix().at<double>(0, 0),  // fx
+      cv.ci_.cv()->camera_matrix().at<double>(1, 1),  // fy
+      1.0, // s
+      cv.ci_.cv()->camera_matrix().at<double>(0, 2),  // u0
+      cv.ci_.cv()->camera_matrix().at<double>(1, 2),  // v0
+      cv.ci_.cv()->dist_coeffs().at<double>(0), // k1
+      cv.ci_.cv()->dist_coeffs().at<double>(1), // k2
+      cv.ci_.cv()->dist_coeffs().at<double>(2), // p1
+      cv.ci_.cv()->dist_coeffs().at<double>(3)} // p2
     {}
 
     TransformWithCovariance solve_t_camera_marker(
       const Observation &observation,
       double marker_length)
     {
-      /* 1. create graph */
-      gtsam::NonlinearFactorGraph graph;
-
-      // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame
-      std::vector<cv::Point3d> all_corners_f_map;
-      std::vector<cv::Point2f> all_corners_f_image;
-
-//      for (int i = 0; i < observations.size(); i += 1) {
-//        auto &observation = observations.observations()[i];
-//        auto &t_map_marker = t_map_markers[i];
-//        if (t_map_marker.is_valid()) {
-//          append_corners_f_map(all_corners_f_map, t_map_marker, marker_length);
-//          append_corners_f_image(all_corners_f_image, observation);
-//        }
-//      }
-
       return TransformWithCovariance{};
     }
 
@@ -384,7 +468,45 @@ namespace fiducial_vlam
                                                const std::vector<TransformWithCovariance> &t_map_markers,
                                                double marker_length)
     {
-      return TransformWithCovariance{};
+      // Get an estimate of camera_f_map.
+      auto estimate_t_map_camera = cv_t_map_camera(observations,
+                                                   t_map_markers,
+                                                   marker_length);
+
+      // If we could not find an estimate, then there are no known markers in the image.
+      if (!estimate_t_map_camera.is_valid()) {
+        return estimate_t_map_camera;
+      }
+
+      // Do the GTSAM camera resectioning process.
+      // 1. create graph
+      gtsam::NonlinearFactorGraph graph;
+
+      // 2. add factors to the graph
+      const gtsam::SharedNoiseModel measurement_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(0.5, 0.5));
+      for (int i = 0; i < observations.size(); i += 1) {
+        auto &t_map_marker = t_map_markers[i];
+        if (t_map_marker.is_valid()) {
+
+          auto corners_f_map{cv_.get_corners_f_map(t_map_markers[i], marker_length)};
+          auto corners_f_image{cv_.get_corners_f_image(observations.observations()[i])};
+
+          for (size_t j = 0; i < corners_f_image.size(); j += 1) {
+            gtsam::Point2 corner_f_image{corners_f_image[i].x, corners_f_image[i].y};
+            gtsam::Point3 corner_f_map{corners_f_map[i].x, corners_f_map[i].y, corners_f_map[i].z};
+            graph.emplace_shared<ResectioningFactor>(measurement_noise, X1_,
+                                                     cal3ds2_,
+                                                     corner_f_image,
+                                                     corner_f_map);
+          }
+        }
+      }
+
+
+      // For now just return the approximate camera pose.
+      return cv_t_map_camera(observations,
+                             t_map_markers,
+                             marker_length);
     }
   };
 
@@ -415,6 +537,8 @@ namespace fiducial_vlam
                                                            const std::vector<TransformWithCovariance> &t_map_markers,
                                                            double marker_length)
   {
+    auto cv_t_map_camera = cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
+    auto sam_t_map_camera = sam_->solve_t_map_camera(observations, t_map_markers, marker_length);
     return cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
   }
 
