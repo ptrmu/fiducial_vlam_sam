@@ -495,9 +495,9 @@ namespace fiducial_vlam
           auto corners_f_map{cv_.get_corners_f_map(t_map_markers[i], marker_length)};
           auto corners_f_image{cv_.get_corners_f_image(observations.observations()[i])};
 
-          for (size_t j = 0; i < corners_f_image.size(); j += 1) {
-            gtsam::Point2 corner_f_image{corners_f_image[i].x, corners_f_image[i].y};
-            gtsam::Point3 corner_f_map{corners_f_map[i].x, corners_f_map[i].y, corners_f_map[i].z};
+          for (size_t j = 0; j < corners_f_image.size(); j += 1) {
+            gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
+            gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
             graph_.emplace_shared<ResectioningFactor>(measurement_noise, X1_,
                                                       cal3ds2_,
                                                       corner_f_image,
@@ -521,10 +521,15 @@ namespace fiducial_vlam
       gtsam::Marginals marginals(graph_, result);
       auto camera_f_marker_covariance = marginals.marginalCovariance(X1_);
 
+      auto q1 = camera_f_marker.rotation().toQuaternion().coeffs();
+      auto &t1 = camera_f_marker.translation();
+      TransformWithCovariance sam_t_map_camera{
+        tf2::Transform{tf2::Quaternion{q1[0], q1[1], q1[2], q1[3]},
+                       tf2::Vector3{t1.x(), t1.y(), t1.z()}}
+      };
+
       // For now just return the approximate camera pose.
-      return calc_cv_t_map_camera(observations,
-                             t_map_markers,
-                             marker_length);
+      return cv_t_map_camera;
     }
   };
 
