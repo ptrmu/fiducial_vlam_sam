@@ -376,6 +376,9 @@ namespace fiducial_vlam
   {
     CvFiducialMath &cv_;
     gtsam::Cal3DS2 cal3ds2_;
+
+    gtsam::NonlinearFactorGraph graph_{};
+    gtsam::Values initial_{};
     gtsam::Key X1_{gtsam::Symbol('x', 1)};
 
 
@@ -407,9 +410,9 @@ namespace fiducial_vlam
       }
     };
 
-    TransformWithCovariance cv_t_map_camera(const Observations &observations,
-                                            const std::vector<TransformWithCovariance> &t_map_markers,
-                                            double marker_length)
+    TransformWithCovariance calc_cv_t_map_camera(const Observations &observations,
+                                                 const std::vector<TransformWithCovariance> &t_map_markers,
+                                                 double marker_length)
     {
       // Run through the observations and find one that refers to a marker
       // with known pose. Then use opencv's SolvePnp to find the pose
@@ -469,18 +472,19 @@ namespace fiducial_vlam
                                                double marker_length)
     {
       // Get an estimate of camera_f_map.
-      auto estimate_t_map_camera = cv_t_map_camera(observations,
-                                                   t_map_markers,
-                                                   marker_length);
+      auto cv_t_map_camera = calc_cv_t_map_camera(observations,
+                                                  t_map_markers,
+                                                  marker_length);
 
       // If we could not find an estimate, then there are no known markers in the image.
-      if (!estimate_t_map_camera.is_valid()) {
-        return estimate_t_map_camera;
+      if (!cv_t_map_camera.is_valid()) {
+        return cv_t_map_camera;
       }
 
       // Do the GTSAM camera resectioning process.
-      // 1. create graph
-      gtsam::NonlinearFactorGraph graph;
+      // 1. clear the graph and initial estimate
+      graph_.resize(0);
+      initial_.clear();
 
       // 2. add factors to the graph
       const gtsam::SharedNoiseModel measurement_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(0.5, 0.5));
@@ -494,17 +498,31 @@ namespace fiducial_vlam
           for (size_t j = 0; i < corners_f_image.size(); j += 1) {
             gtsam::Point2 corner_f_image{corners_f_image[i].x, corners_f_image[i].y};
             gtsam::Point3 corner_f_map{corners_f_map[i].x, corners_f_map[i].y, corners_f_map[i].z};
-            graph.emplace_shared<ResectioningFactor>(measurement_noise, X1_,
-                                                     cal3ds2_,
-                                                     corner_f_image,
-                                                     corner_f_map);
+            graph_.emplace_shared<ResectioningFactor>(measurement_noise, X1_,
+                                                      cal3ds2_,
+                                                      corner_f_image,
+                                                      corner_f_map);
           }
         }
       }
 
+      // 3. Add the initial estimate for the camera pose
+      auto q = cv_t_map_camera.transform().getRotation();
+      auto t = cv_t_map_camera.transform().getOrigin();
+      gtsam::Pose3 t_map_camera{gtsam::Rot3{q.w(), q.x(), q.y(), q.z()},
+                                gtsam::Vector3{t.x(), t.y(), t.z()}};
+      initial_.insert(X1_, t_map_camera);
+
+      /* 4. Optimize the graph using Levenberg-Marquardt*/
+      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_).optimize();
+
+      // 5. Get the answer
+      auto camera_f_marker = result.at<gtsam::Pose3>(X1_);
+      gtsam::Marginals marginals(graph_, result);
+      auto camera_f_marker_covariance = marginals.marginalCovariance(X1_);
 
       // For now just return the approximate camera pose.
-      return cv_t_map_camera(observations,
+      return calc_cv_t_map_camera(observations,
                              t_map_markers,
                              marker_length);
     }
