@@ -20,7 +20,7 @@ namespace fiducial_vlam
   {
     geometry_msgs::msg::PoseWithCovariance msg;
     msg.pose = to_Pose_msg(twc);
-    //msg.set__covariance() // ToDo move over the covariance
+    msg.covariance = twc.cov();
     return msg;
   }
 
