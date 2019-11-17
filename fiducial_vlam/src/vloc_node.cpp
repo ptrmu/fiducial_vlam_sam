@@ -316,13 +316,16 @@ namespace fiducial_vlam
 
     void add_fixed_covariance(geometry_msgs::msg::PoseWithCovariance &pwc)
     {
+      return; // don't change covariance.
       // A hack for now.
-      pwc.covariance[0] = 6e-3;
-      pwc.covariance[7] = 6e-3;
-      pwc.covariance[14] = 6e-3;
-      pwc.covariance[21] = 2e-3;
-      pwc.covariance[28] = 2e-3;
-      pwc.covariance[35] = 2e-3;
+      // Seeing how rviz2 interprets these values, allows me to confirm which columns represent
+      // which variables.
+      pwc.covariance[0] = 96e-3; // along fixed x axis
+      pwc.covariance[7] = 24e-3; // along fixed y axis
+      pwc.covariance[14] = 6e-3; // along fixed z axis
+      pwc.covariance[21] = 36e-3; // Not quite sure how rotation works. ??
+      pwc.covariance[28] = 12e-3; //
+      pwc.covariance[35] = 4e-3; //
     }
   };
 }
