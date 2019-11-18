@@ -487,7 +487,7 @@ namespace fiducial_vlam
       initial_.clear();
 
       // 2. add factors to the graph
-      const gtsam::SharedNoiseModel measurement_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(0.5, 0.5));
+      const gtsam::SharedNoiseModel measurement_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(1, 1));
       for (int i = 0; i < observations.size(); i += 1) {
         auto &t_map_marker = t_map_markers[i];
         if (t_map_marker.is_valid()) {
@@ -509,27 +509,38 @@ namespace fiducial_vlam
       // 3. Add the initial estimate for the camera pose
       auto q = cv_t_map_camera.transform().getRotation();
       auto t = cv_t_map_camera.transform().getOrigin();
-      gtsam::Pose3 t_map_camera{gtsam::Rot3{q.w(), q.x(), q.y(), q.z()},
-                                gtsam::Vector3{t.x(), t.y(), t.z()}};
-      initial_.insert(X1_, t_map_camera);
+      gtsam::Pose3 initial_t_map_camera{gtsam::Rot3{q.w(), q.x(), q.y(), q.z()},
+                                        gtsam::Vector3{t.x(), t.y(), t.z()}};
+      initial_.insert(X1_, initial_t_map_camera);
 
       /* 4. Optimize the graph using Levenberg-Marquardt*/
       auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_).optimize();
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+//      std::cout << "final error = " << graph_.error(result) << std::endl;
 
       // 5. Get the answer
       auto camera_f_marker = result.at<gtsam::Pose3>(X1_);
       gtsam::Marginals marginals(graph_, result);
       auto camera_f_marker_covariance = marginals.marginalCovariance(X1_);
 
+      // Convert covariance
+      TransformWithCovariance::cov_type cov;
+      for (int r = 0; r < 6; r += 1) {
+        for (int c = 0; c < 6; c += 1) {
+          static int ro[] = {3, 4, 5, 0, 1, 2};
+          cov[r * 6 + c] = camera_f_marker_covariance(ro[r], ro[c]);
+        }
+      }
+
       auto q1 = camera_f_marker.rotation().toQuaternion().coeffs();
       auto &t1 = camera_f_marker.translation();
       TransformWithCovariance sam_t_map_camera{
         tf2::Transform{tf2::Quaternion{q1[0], q1[1], q1[2], q1[3]},
-                       tf2::Vector3{t1.x(), t1.y(), t1.z()}}
-      };
+                       tf2::Vector3{t1.x(), t1.y(), t1.z()}},
+        cov};
 
       // For now just return the approximate camera pose.
-      return cv_t_map_camera;
+      return sam_t_map_camera;
     }
   };
 
@@ -562,7 +573,7 @@ namespace fiducial_vlam
   {
     auto cv_t_map_camera = cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
     auto sam_t_map_camera = sam_->solve_t_map_camera(observations, t_map_markers, marker_length);
-    return cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
+    return sam_t_map_camera;
   }
 
   Observations FiducialMath::detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
