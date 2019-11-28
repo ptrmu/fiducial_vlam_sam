@@ -219,88 +219,28 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// Mapper class
+// VmapNode class
 // ==============================================================================
 
-  class Mapper
+  class VmapNode : public rclcpp::Node
   {
-  protected:
-    const VmapContext &cxt_;
-    const std::unique_ptr<Map> &map_;
+    VmapContext cxt_;
+    std::unique_ptr<Map> map_{};
 
-  public:
-    explicit Mapper(const VmapContext &cxt, std::unique_ptr<Map> &map)
-      : cxt_(cxt), map_(map)
+    int callbacks_processed_{0};
+
+    // ROS publishers
+    rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr fiducial_map_pub_{};
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fiducial_markers_pub_{};
+    rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf_message_pub_{};
+
+    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
+    rclcpp::TimerBase::SharedPtr map_pub_timer_{};
+
+
+    // Special "initialize map from camera location" mode
+    void initialize_map_from_observations(const Observations &observations, FiducialMath &fm)
     {
-    }
-
-    Mapper() = delete;
-
-    virtual ~Mapper() = default;
-
-    virtual void
-    update_map(const TransformWithCovariance &camera_pose_f_map,
-               const Observations &observations,
-               FiducialMath &fm) = 0;
-
-    virtual std::unique_ptr<Map>
-    initialize_map_from_observations(const Observations &observations,
-                                     FiducialMath &fm) = 0;
-  };
-
-// ==============================================================================
-// MapperSimpleAverage class
-// ==============================================================================
-
-  class MapperSimpleAverage : public Mapper
-  {
-  public:
-    explicit MapperSimpleAverage(const VmapContext &cxt, std::unique_ptr<Map> &map)
-      : Mapper(cxt, map)
-    {
-    }
-
-    void
-    update_map(const TransformWithCovariance &t_map_camera,
-               const Observations &observations,
-               FiducialMath &fm) override
-    {
-      // For all observations estimate the marker location and update the map
-      for (auto &observation : observations.observations()) {
-
-        auto t_camera_marker = fm.solve_t_camera_marker(observation, map_->marker_length());
-        auto t_map_marker = TransformWithCovariance(t_map_camera.transform() * t_camera_marker.transform());
-
-        // Update an existing marker or add a new one.
-        auto marker_ptr = map_->find_marker(observation.id());
-        if (marker_ptr) {
-          auto &marker = *marker_ptr;
-          update_marker_simple_average(marker, t_map_marker);
-
-        } else {
-          map_->add_marker(Marker(observation.id(), t_map_marker));
-        }
-      }
-    }
-
-    void update_marker_simple_average(Marker &existing, const TransformWithCovariance &another_twc)
-    {
-      if (!existing.is_fixed()) {
-        auto t_map_marker = existing.t_map_marker();  // Make a copy
-        auto update_count = existing.update_count();
-        t_map_marker.update_simple_average(another_twc, update_count);
-        existing.set_t_map_marker(t_map_marker);
-        existing.set_update_count(update_count + 1);
-      }
-    }
-
-    std::unique_ptr<Map> initialize_map_from_observations(const Observations &observations, FiducialMath &fm) override
-    {
-      std::unique_ptr<Map> map_unique{};
-      if (observations.size() < 1) {
-        return map_unique;
-      }
-
       // Find the marker with the lowest id
       int min_id = std::numeric_limits<int>::max();
       const Observation *min_obs;
@@ -319,34 +259,10 @@ namespace fiducial_vlam
 
       // Figure t_map_marker and add a marker to the map.
       auto t_map_marker = TransformWithCovariance(t_map_camera.transform() * t_camera_marker.transform());
-      map_unique->add_marker(Marker(min_id, std::move(t_map_marker)));
-
-      return map_unique;
+      map_->add_marker(Marker(min_id, std::move(t_map_marker)));
     }
-  };
-
-// ==============================================================================
-// VmapNode class
-// ==============================================================================
-
-  class VmapNode : public rclcpp::Node
-  {
-    VmapContext cxt_;
-    std::unique_ptr<Map> map_{};
-    std::unique_ptr<Mapper> mapper_{};
-
-    int callbacks_processed_{0};
-
-    // ROS publishers
-    rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr fiducial_map_pub_{};
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fiducial_markers_pub_{};
-    rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf_message_pub_{};
-
-    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
-    rclcpp::TimerBase::SharedPtr map_pub_timer_{};
 
   public:
-
     VmapNode()
       : Node("vmap_node"), cxt_{*this}
     {
@@ -358,9 +274,6 @@ namespace fiducial_vlam
 
 //      auto s = to_YAML_string(*map_, "test");
 //      auto m = from_YAML_string(s, "test");
-
-      // construct a map builder.
-      mapper_ = std::make_unique<MapperSimpleAverage>(cxt_, map_);
 
       // ROS publishers.
       fiducial_map_pub_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
@@ -417,8 +330,9 @@ namespace fiducial_vlam
       Observations observations(*msg);
 
       // If the map has not yet been initialized, then initialize it with these observations.
-      if (!map_) {
-        map_ = mapper_->initialize_map_from_observations(observations, fm);
+      // This is only used for the special camera based map initialization
+      if (!map_ && observations.size() > 0) {
+        initialize_map_from_observations(observations, fm);
       }
 
       // There is nothing to do at this point unless we have more than one observation.
@@ -434,7 +348,7 @@ namespace fiducial_vlam
       if (t_map_camera.is_valid()) {
 
         // Update our map with the observations
-        mapper_->update_map(t_map_camera, observations, fm);
+        fm.update_map(t_map_camera, observations, *map_);
       }
     }
 

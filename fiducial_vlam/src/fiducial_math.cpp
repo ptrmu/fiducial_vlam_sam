@@ -1,6 +1,7 @@
 
 #include "fiducial_math.hpp"
 
+#include "map.hpp"
 #include "observation.hpp"
 #include "transform_with_covariance.hpp"
 
@@ -257,6 +258,40 @@ namespace fiducial_vlam
       cv::aruco::drawAxis(color_marked->image,
                           ci_.cv()->camera_matrix(), ci_.cv()->dist_coeffs(),
                           rvec, tvec, 0.1);
+    }
+
+    void update_marker_simple_average(Marker &existing, const TransformWithCovariance &another_twc)
+    {
+      if (!existing.is_fixed()) {
+        auto t_map_marker = existing.t_map_marker();  // Make a copy
+        auto update_count = existing.update_count();
+        t_map_marker.update_simple_average(another_twc, update_count);
+        existing.set_t_map_marker(t_map_marker);
+        existing.set_update_count(update_count + 1);
+      }
+    }
+
+    void update_map(const TransformWithCovariance &t_map_camera,
+                    const Observations &observations,
+                    Map &map)
+    {
+      // For all observations estimate the marker location and update the map
+      for (auto &observation : observations.observations()) {
+
+        auto t_camera_marker = solve_t_camera_marker(observation, map.marker_length());
+        auto t_map_marker = TransformWithCovariance(t_map_camera.transform() * t_camera_marker.transform());
+
+        // Update an existing marker or add a new one.
+        auto marker_ptr = map.find_marker(observation.id());
+        if (marker_ptr) {
+          auto &marker = *marker_ptr;
+          update_marker_simple_average(marker, t_map_marker);
+
+        } else {
+          map.add_marker(Marker(observation.id(), t_map_marker));
+        }
+      }
+
     }
 
     std::vector<cv::Point3d> get_corners_f_map(const TransformWithCovariance &t_map_marker,
@@ -587,4 +622,12 @@ namespace fiducial_vlam
   {
     cv_->annotate_image_with_marker_axis(color_marked, t_camera_marker);
   }
+
+  void FiducialMath::update_map(const TransformWithCovariance &t_map_camera,
+                                const Observations &observations,
+                                Map &map)
+  {
+    cv_->update_map(t_map_camera, observations, map);
+  }
+
 }

@@ -19,6 +19,8 @@ namespace fiducial_vlam
 
   class TransformWithCovariance;
 
+  class Map;
+
 // ==============================================================================
 // CameraInfo class
 // ==============================================================================
@@ -72,6 +74,10 @@ namespace fiducial_vlam
 
     void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color,
                                          const TransformWithCovariance &t_camera_marker);
+
+    void update_map(const TransformWithCovariance &t_map_camera,
+                    const Observations &observations,
+                    Map &map);
   };
 }
 
