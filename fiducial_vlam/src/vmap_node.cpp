@@ -333,7 +333,6 @@ namespace fiducial_vlam
   {
     VmapContext cxt_;
     std::unique_ptr<Map> map_{};
-    Localizer localizer_{map_};
     std::unique_ptr<Mapper> mapper_{};
 
     int callbacks_processed_{0};
@@ -413,7 +412,6 @@ namespace fiducial_vlam
 
       CameraInfo ci{msg->camera_info};
       FiducialMath fm{ci};
-      std::shared_ptr<cv_bridge::CvImage> color_marked; //  No image to annotate
 
       // Get observations from the message.
       Observations observations(*msg);
@@ -430,7 +428,7 @@ namespace fiducial_vlam
 
       // Estimate the camera pose using the latest map estimate
       auto t_map_markers = map_->find_t_map_markers(observations);
-      auto t_map_camera = localizer_.simultaneous_t_map_camera(observations, t_map_markers, color_marked, fm);
+      auto t_map_camera = fm.solve_t_map_camera(observations, t_map_markers, map_->marker_length());
 
       // We get an invalid pose if none of the visible markers pose's are known.
       if (t_map_camera.is_valid()) {

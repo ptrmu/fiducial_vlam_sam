@@ -103,33 +103,6 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// Localizer class
-// ==============================================================================
-
-  class Localizer
-  {
-    const std::unique_ptr<Map> &map_;
-
-  public:
-    explicit Localizer(const std::unique_ptr<Map> &map);
-
-    TransformWithCovariance average_t_map_camera(const Observations &observations,
-                                                 const std::vector<TransformWithCovariance> &t_map_markers,
-                                                 std::shared_ptr<cv_bridge::CvImage> &color_marked,
-                                                 FiducialMath &fm);
-
-    TransformWithCovariance simultaneous_t_map_camera(const Observations &observations,
-                                                      const std::vector<TransformWithCovariance> &t_map_markers,
-                                                      std::shared_ptr<cv_bridge::CvImage> &color_marked,
-                                                      FiducialMath &fm);
-
-    std::vector<TransformWithCovariance> markers_t_map_cameras(
-      const Observations &observations,
-      const std::vector<TransformWithCovariance> &t_map_markers,
-      FiducialMath &fm);
-  };
-
-// ==============================================================================
 // Utility
 // ==============================================================================
 
