@@ -201,7 +201,7 @@ namespace fiducial_vlam
         color_marked = color;
       }
 
-      FiducialMath fm(*camera_info_);
+      FiducialMath fm(cxt_.sam_not_cv_, cxt_.corner_measurement_sigma_, *camera_info_);
 
       // Detect the markers in this image and create a list of
       // observations.

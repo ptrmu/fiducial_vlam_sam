@@ -100,6 +100,12 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */ \
   sub_camera_info_best_effort_not_reliable, \
   int, 0) \
+  CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
+  sam_not_cv, \
+  int, 1) \
+  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
+  corner_measurement_sigma, \
+  double, 0.5) \
   /* End of list */
 
 #define VLOC_ALL_OTHERS \

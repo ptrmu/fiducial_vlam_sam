@@ -53,13 +53,18 @@ namespace fiducial_vlam
 
     class SamFiducialMath;
 
+    const bool sam_not_cv_;
     std::unique_ptr<CvFiducialMath> cv_;
     std::unique_ptr<SamFiducialMath> sam_;
 
   public:
-    explicit FiducialMath(const CameraInfo &camera_info);
+    explicit FiducialMath(const bool sam_not_cv,
+                          double corner_measurement_sigma,
+                          const CameraInfo &camera_info);
 
-    explicit FiducialMath(const sensor_msgs::msg::CameraInfo &camera_info_msg);
+    explicit FiducialMath(const bool sam_not_cv,
+                          double corner_measurement_sigma,
+                          const sensor_msgs::msg::CameraInfo &camera_info_msg);
 
     ~FiducialMath();
 

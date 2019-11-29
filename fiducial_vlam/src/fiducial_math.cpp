@@ -116,6 +116,7 @@ namespace fiducial_vlam
 
     }
   }
+
 // ==============================================================================
 // FiducialMath::CvFiducialMath class
 // ==============================================================================
@@ -291,7 +292,6 @@ namespace fiducial_vlam
           map.add_marker(Marker(observation.id(), t_map_marker));
         }
       }
-
     }
 
     std::vector<cv::Point3d> get_corners_f_map(const TransformWithCovariance &t_map_marker,
@@ -411,6 +411,7 @@ namespace fiducial_vlam
   {
     CvFiducialMath &cv_;
     gtsam::Cal3DS2 cal3ds2_;
+    const gtsam::SharedNoiseModel corner_measurement_noise_;
 
     gtsam::NonlinearFactorGraph graph_{};
     gtsam::Values initial_{};
@@ -482,7 +483,7 @@ namespace fiducial_vlam
     }
 
   public:
-    explicit SamFiducialMath(CvFiducialMath &cv) :
+    explicit SamFiducialMath(CvFiducialMath &cv, double corner_measurement_sigma) :
       cv_{cv}, cal3ds2_{
       cv.ci_.cv()->camera_matrix().at<double>(0, 0),  // fx
       cv.ci_.cv()->camera_matrix().at<double>(1, 1),  // fy
@@ -492,7 +493,9 @@ namespace fiducial_vlam
       cv.ci_.cv()->dist_coeffs().at<double>(0), // k1
       cv.ci_.cv()->dist_coeffs().at<double>(1), // k2
       cv.ci_.cv()->dist_coeffs().at<double>(2), // p1
-      cv.ci_.cv()->dist_coeffs().at<double>(3)} // p2
+      cv.ci_.cv()->dist_coeffs().at<double>(3)},// p2
+      corner_measurement_noise_{gtsam::noiseModel::Diagonal::Sigmas(
+        gtsam::Vector2(corner_measurement_sigma, corner_measurement_sigma))}
     {}
 
     TransformWithCovariance solve_t_camera_marker(
@@ -522,7 +525,6 @@ namespace fiducial_vlam
       initial_.clear();
 
       // 2. add factors to the graph
-      const gtsam::SharedNoiseModel measurement_noise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector2(1, 1));
       for (int i = 0; i < observations.size(); i += 1) {
         auto &t_map_marker = t_map_markers[i];
         if (t_map_marker.is_valid()) {
@@ -533,7 +535,7 @@ namespace fiducial_vlam
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
             gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
             gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
-            graph_.emplace_shared<ResectioningFactor>(measurement_noise, X1_,
+            graph_.emplace_shared<ResectioningFactor>(corner_measurement_noise_, X1_,
                                                       cal3ds2_,
                                                       corner_f_image,
                                                       corner_f_map);
@@ -577,20 +579,32 @@ namespace fiducial_vlam
       // For now just return the approximate camera pose.
       return sam_t_map_camera;
     }
+
+    void update_map(const TransformWithCovariance &t_map_camera,
+                    const Observations &observations,
+                    Map &map)
+    {
+    }
   };
 
 // ==============================================================================
 // FiducialMath class
 // ==============================================================================
 
-  FiducialMath::FiducialMath(const CameraInfo &camera_info) :
+  FiducialMath::FiducialMath(bool sam_not_cv,
+                             double corner_measurement_sigma,
+                             const CameraInfo &camera_info) :
+    sam_not_cv_{sam_not_cv},
     cv_{std::make_unique<CvFiducialMath>(camera_info)},
-    sam_{std::make_unique<SamFiducialMath>(*cv_)}
+    sam_{std::make_unique<SamFiducialMath>(*cv_, corner_measurement_sigma)}
   {}
 
-  FiducialMath::FiducialMath(const sensor_msgs::msg::CameraInfo &camera_info_msg) :
+  FiducialMath::FiducialMath(bool sam_not_cv,
+                             double corner_measurement_sigma,
+                             const sensor_msgs::msg::CameraInfo &camera_info_msg) :
+    sam_not_cv_{sam_not_cv},
     cv_{std::make_unique<CvFiducialMath>(camera_info_msg)},
-    sam_{std::make_unique<SamFiducialMath>(*cv_)}
+    sam_{std::make_unique<SamFiducialMath>(*cv_, corner_measurement_sigma)}
   {}
 
   FiducialMath::~FiducialMath() = default;
@@ -599,16 +613,18 @@ namespace fiducial_vlam
     const Observation &observation,
     double marker_length)
   {
-    return cv_->solve_t_camera_marker(observation, marker_length);
+    return sam_not_cv_ ?
+           sam_->solve_t_camera_marker(observation, marker_length) :
+           cv_->solve_t_camera_marker(observation, marker_length);
   }
 
   TransformWithCovariance FiducialMath::solve_t_map_camera(const Observations &observations,
                                                            const std::vector<TransformWithCovariance> &t_map_markers,
                                                            double marker_length)
   {
-    auto cv_t_map_camera = cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
-    auto sam_t_map_camera = sam_->solve_t_map_camera(observations, t_map_markers, marker_length);
-    return sam_t_map_camera;
+    return sam_not_cv_ ?
+           sam_->solve_t_map_camera(observations, t_map_markers, marker_length) :
+           cv_->solve_t_map_camera(observations, t_map_markers, marker_length);
   }
 
   Observations FiducialMath::detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
@@ -627,7 +643,11 @@ namespace fiducial_vlam
                                 const Observations &observations,
                                 Map &map)
   {
-    cv_->update_map(t_map_camera, observations, map);
+    if (sam_not_cv_) {
+      sam_->update_map(t_map_camera, observations, map);
+    } else {
+      cv_->update_map(t_map_camera, observations, map);
+    }
   }
 
 }

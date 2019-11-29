@@ -76,6 +76,12 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* length of a side of a marker in meters */ \
   marker_length,  \
   double, 0.1627) \
+  CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
+  sam_not_cv, \
+  int, 1) \
+  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
+  corner_measurement_sigma, \
+  double, 0.5) \
   /* End of list */
 
 #define VMAP_ALL_OTHERS \
