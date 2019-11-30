@@ -18,6 +18,8 @@ rviz_config_filename = os.path.join(package_cfg_directory, package_name + '.rviz
 print ("map_filename: ", map_filename)
 print ("rviz_config_filename: ", rviz_config_filename)
 
+sam_not_cv = 1
+corner_measurement_sigma = 0.5
 
 vloc_args = [{
     'use_sim_time': False,  # Use /clock if available
@@ -29,6 +31,7 @@ vloc_args = [{
     # 'base_odometry_pub_topic': 'filtered_odom',
     # 'sub_camera_info_best_effort_not_reliable': 1,
     'publish_image_marked': 1,
+    'sam_not_cv': sam_not_cv,
 }]
 
 vmap_args = [{
@@ -36,7 +39,9 @@ vmap_args = [{
     'publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1627,  # Marker length
     'marker_map_save_full_filename': map_filename,  # Puts the new map in cfg directory
-    'make_not_use_map': 1  # Don't save a map to disk
+    'make_not_use_map': 1,  # Don't save a map to disk
+    'sam_not_cv': sam_not_cv,
+    'corner_measurement_sigma': corner_measurement_sigma,
 }]
 
 
@@ -48,8 +53,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', node_executable='vloc_node', output='screen',
              parameters=vloc_args),
-        Node(package='fiducial_vlam', node_executable='vmap_node', output='screen',
-             parameters=vmap_args),
+        # Node(package='fiducial_vlam', node_executable='vmap_node', output='screen',
+        #      parameters=vmap_args),
 
     ]
 
