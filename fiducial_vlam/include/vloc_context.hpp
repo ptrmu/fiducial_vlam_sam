@@ -64,7 +64,7 @@ namespace fiducial_vlam
   int, 1) \
   CXT_MACRO_MEMBER(       /* non-zero => publish the camera tf/pose as determined by each visible marker  */ \
   publish_tfs_per_marker,  \
-  int, 1) \
+  int, 0) \
   CXT_MACRO_MEMBER(       /* non-zero => publish the odometry of the camera at every frame  */ \
   publish_camera_odom,  \
   int, 1) \
@@ -105,7 +105,7 @@ namespace fiducial_vlam
   int, 1) \
   CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
   corner_measurement_sigma, \
-  double, 0.5) \
+  double, 1.0) \
   /* End of list */
 
 #define VLOC_ALL_OTHERS \

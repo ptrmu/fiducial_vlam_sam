@@ -40,7 +40,7 @@ namespace fiducial_vlam
   {
     tf2::Transform tf;
     fromMsg(pwc.pose, tf);
-    return TransformWithCovariance(tf);
+    return TransformWithCovariance(tf, pwc.covariance);
   }
 }
 

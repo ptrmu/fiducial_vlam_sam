@@ -53,14 +53,13 @@ namespace fiducial_vlam
 // Map class
 // ==============================================================================
 
-  Map::Map(double marker_length)
-  {
-    marker_length_ = marker_length;
-  }
+  Map::Map(MapStyles map_style, double marker_length) :
+    map_style_{map_style}, marker_length_{marker_length}
+  {}
 
-  Map::Map(const fiducial_vlam_msgs::msg::Map &msg)
+  Map::Map(const fiducial_vlam_msgs::msg::Map &msg) :
+    map_style_{static_cast<Map::MapStyles>(msg.map_style)}, marker_length_{msg.marker_length}
   {
-    marker_length_ = msg.marker_length;
     for (int i = 0; i < msg.ids.size(); i += 1) {
       Marker marker(msg.ids[i], to_TransformWithCovariance(msg.poses[i]));
       marker.set_is_fixed(msg.fixed_flags[i] != 0);
@@ -69,7 +68,7 @@ namespace fiducial_vlam
   }
 
   std::unique_ptr<fiducial_vlam_msgs::msg::Map>
-  Map::to_map_msg(const std_msgs::msg::Header &header_msg, double marker_length)
+  Map::to_map_msg(const std_msgs::msg::Header &header_msg)
   {
     auto map_msg_unique = std::make_unique<fiducial_vlam_msgs::msg::Map>();
     auto &map_msg = *map_msg_unique;
@@ -80,7 +79,8 @@ namespace fiducial_vlam
       map_msg.fixed_flags.emplace_back(marker.is_fixed() ? 1 : 0);
     }
     map_msg.header = header_msg;
-    map_msg.marker_length = marker_length;
+    map_msg.marker_length = marker_length_;
+    map_msg.map_style = map_style_;
     return map_msg_unique;
   }
 
@@ -106,7 +106,6 @@ namespace fiducial_vlam
     }
     return t_map_markers;
   }
-
 
 // ==============================================================================
 // Utility

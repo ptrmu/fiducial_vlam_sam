@@ -58,11 +58,11 @@ namespace fiducial_vlam
     std::unique_ptr<SamFiducialMath> sam_;
 
   public:
-    explicit FiducialMath(const bool sam_not_cv,
+    explicit FiducialMath(bool sam_not_cv,
                           double corner_measurement_sigma,
                           const CameraInfo &camera_info);
 
-    explicit FiducialMath(const bool sam_not_cv,
+    explicit FiducialMath(bool sam_not_cv,
                           double corner_measurement_sigma,
                           const sensor_msgs::msg::CameraInfo &camera_info_msg);
 
@@ -71,8 +71,7 @@ namespace fiducial_vlam
     TransformWithCovariance solve_t_camera_marker(const Observation &observation, double marker_length);
 
     TransformWithCovariance solve_t_map_camera(const Observations &observations,
-                                               const std::vector<TransformWithCovariance> &t_map_markers,
-                                               double marker_length);
+                                               Map &map);
 
     Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
                                 std::shared_ptr<cv_bridge::CvImage> &color_marked);

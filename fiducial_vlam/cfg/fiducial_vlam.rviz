@@ -3,7 +3,8 @@ Panels:
     Help Height: 78
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Odometry1
       Splitter Ratio: 0.5
     Tree Height: 713
   - Class: rviz_common/Selection
@@ -69,45 +70,9 @@ Visualization Manager:
           Value: true
         camera:
           Value: true
-        camera_m001:
-          Value: true
-        camera_m003:
-          Value: true
-        camera_m005:
-          Value: true
-        camera_m006:
-          Value: true
-        camera_m007:
-          Value: true
-        camera_m008:
-          Value: true
-        camera_m009:
-          Value: true
         map:
           Value: true
         marker_001:
-          Value: true
-        marker_002:
-          Value: true
-        marker_003:
-          Value: true
-        marker_004:
-          Value: true
-        marker_005:
-          Value: true
-        marker_006:
-          Value: true
-        marker_007:
-          Value: true
-        marker_008:
-          Value: true
-        marker_009:
-          Value: true
-        marker_010:
-          Value: true
-        marker_011:
-          Value: true
-        marker_012:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -120,45 +85,43 @@ Visualization Manager:
             {}
           camera:
             {}
-          camera_m001:
-            {}
-          camera_m003:
-            {}
-          camera_m005:
-            {}
-          camera_m006:
-            {}
-          camera_m007:
-            {}
-          camera_m008:
-            {}
-          camera_m009:
-            {}
           marker_001:
             {}
-          marker_002:
-            {}
-          marker_003:
-            {}
-          marker_004:
-            {}
-          marker_005:
-            {}
-          marker_006:
-            {}
-          marker_007:
-            {}
-          marker_008:
-            {}
-          marker_009:
-            {}
-          marker_010:
-            {}
-          marker_011:
-            {}
-          marker_012:
-            {}
       Update Interval: 0
+      Value: true
+    - Angle Tolerance: 9.999999974752427e-7
+      Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 1
+      Name: Odometry
+      Position Tolerance: 9.999999974752427e-7
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 255; 25; 0
+        Head Length: 0.30000001192092896
+        Head Radius: 0.10000000149011612
+        Shaft Length: 1
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /camera_odom
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:
@@ -186,7 +149,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 5.760660648345947
+      Distance: 4.461055278778076
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

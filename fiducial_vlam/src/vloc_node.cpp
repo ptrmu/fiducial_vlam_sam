@@ -44,25 +44,18 @@ namespace fiducial_vlam
 
   static std::vector<TransformWithCovariance> markers_t_map_cameras(
     const Observations &observations,
-    const std::vector<TransformWithCovariance> &t_map_markers,
-    double marker_length,
+    Map &map,
     FiducialMath &fm)
   {
     std::vector<TransformWithCovariance> t_map_cameras;
 
-    for (int i = 0; i < observations.size(); i += 1) {
-      TransformWithCovariance t_map_camera{};
-      auto &t_map_marker = t_map_markers[i];
-
-      if (t_map_marker.is_valid()) {
-        Observations single_observation{};
-        single_observation.add(observations.observations()[i]);
-        std::vector<TransformWithCovariance> single_t_map_markers{};
-        single_t_map_markers.emplace_back(t_map_marker);
-        t_map_camera = fm.solve_t_map_camera(single_observation, single_t_map_markers, marker_length);
+    for (auto &observation : observations.observations()) {
+      Observations single_observation{};
+      single_observation.add(observation);
+      auto t_map_camera = fm.solve_t_map_camera(single_observation, map);
+      if (t_map_camera.is_valid()) {
+        t_map_cameras.emplace_back(t_map_camera);
       }
-
-      t_map_cameras.emplace_back(t_map_camera);
     }
 
     return t_map_cameras;
@@ -216,8 +209,6 @@ namespace fiducial_vlam
       // color_marked are outlined but they have no axes drawn, then vmap_node
       // is not running or has not been able to find the starting node.
       if (map_) {
-        auto t_map_markers = map_->find_t_map_markers(observations);
-
         TransformWithCovariance t_map_camera;
 
         // Only try to determine the location if markers were detected.
@@ -234,12 +225,13 @@ namespace fiducial_vlam
 //        }
 
           // Find the camera pose from the observations.
-          t_map_camera = fm.solve_t_map_camera(observations, t_map_markers, map_->marker_length());
+          t_map_camera = fm.solve_t_map_camera(observations, *map_);
 
           if (t_map_camera.is_valid()) {
 
             // If annotated images have been requested, then add the annotations now.
             if (color_marked) {
+              auto t_map_markers = map_->find_t_map_markers(observations);
               annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, fm);
             }
 
@@ -280,7 +272,7 @@ namespace fiducial_vlam
 
             // if requested, publish the camera tf as determined from each marker.
             if (cxt_.publish_tfs_per_marker_) {
-              auto t_map_cameras = markers_t_map_cameras(observations, t_map_markers, map_->marker_length(), fm);
+              auto t_map_cameras = markers_t_map_cameras(observations, *map_, fm);
               auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
               if (!tf_message.transforms.empty()) {
                 tf_message_pub_->publish(tf_message);

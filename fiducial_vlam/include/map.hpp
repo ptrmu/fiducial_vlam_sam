@@ -19,8 +19,6 @@ namespace cv_bridge
 
 namespace fiducial_vlam
 {
-  class FiducialMath;
-
   class Observations;
 
 // ==============================================================================
@@ -76,13 +74,22 @@ namespace fiducial_vlam
 
   class Map
   {
-    std::map<int, Marker> markers_;
-    double marker_length_;
+  public:
+    enum MapStyles {
+      pose = 0,
+      covariance,
+      corners
+    };
+
+  private:
+    const enum MapStyles map_style_;
+    const double marker_length_;
+    std::map<int, Marker> markers_{};
 
   public:
     Map() = delete;
 
-    explicit Map(double marker_length_);
+    explicit Map(MapStyles map_style, double marker_length_);
 
     explicit Map(const fiducial_vlam_msgs::msg::Map &msg);
 
@@ -92,12 +99,15 @@ namespace fiducial_vlam
     auto marker_length() const
     { return marker_length_; }
 
+    auto map_style() const
+    { return map_style_; }
+
     Marker *find_marker(int id);
 
     void add_marker(Marker marker);
 
     std::unique_ptr<fiducial_vlam_msgs::msg::Map>
-    to_map_msg(const std_msgs::msg::Header &header_msg, double marker_length);
+    to_map_msg(const std_msgs::msg::Header &header_msg);
 
     std::vector<TransformWithCovariance> find_t_map_markers(const Observations &observations);
   };
