@@ -450,8 +450,20 @@ namespace fiducial_vlam
       return cov_sam;
     }
 
-    TransformWithCovariance::cov_type to_cov_type(const gtsam::Matrix6 &cov_sam)
+    TransformWithCovariance::cov_type to_cov_type(const gtsam::Pose3 &sam_pose, const gtsam::Matrix6 &cov_sam)
     {
+      // Try to rotate the position part of the covariance
+//      gtsam::Matrix6 rot6{};
+//      rot6.setZero();
+//      gtsam::Matrix3 rot3 = sam_pose.rotation().matrix();
+//      for (int r = 0; r < 3; r += 1) {
+//        for (int c = 0; c < 3; c += 1) {
+//          rot6(r, c) = rot3(r, c);
+//          rot6(r + 3, c + 3) = rot3(r, c);
+//        }
+//      }
+//      gtsam::Matrix6 cov_sam_r = rot6 * cov_sam * rot6.transpose();
+
       // Convert covariance
       TransformWithCovariance::cov_type cov;
       for (int r = 0; r < 6; r += 1) {
@@ -470,7 +482,7 @@ namespace fiducial_vlam
       return TransformWithCovariance{
         tf2::Transform{tf2::Quaternion{q1[0], q1[1], q1[2], q1[3]},
                        tf2::Vector3{t.x(), t.y(), t.z()}},
-        to_cov_type(sam_cov)};
+        to_cov_type(sam_pose, sam_cov)};
     }
 
     TransformWithCovariance extract_transform_with_covariance(gtsam::NonlinearFactorGraph &graph,
