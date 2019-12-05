@@ -24,15 +24,15 @@ vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
     'publish_tfs': 1,  # Publish drone and camera /tf
     'stamp_msgs_with_current_time': 1,  # Stamp with now()
-    'map_init_pose_z': -0.035,
+    'map_init_pose_z': 0,
     'sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
     'publish_image_marked': 1,
     'sam_not_cv': sam_not_cv,
     'camera_frame_id': 'forward_camera',
     'publish_base_pose': 1,
-    'publish_camera_odom': 0,
-    'publish_base_odom': 1,
+    'publish_camera_odom': 1,
+    'publish_base_odom': 0,
 }]
 
 vmap_args = [{
