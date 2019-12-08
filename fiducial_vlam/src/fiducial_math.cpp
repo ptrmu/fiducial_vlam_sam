@@ -229,9 +229,9 @@ namespace fiducial_vlam
       auto detectorParameters = cv::aruco::DetectorParameters::create();
 #if (CV_VERSION_MAJOR == 4)
       // Use the new AprilTag 2 corner algorithm, much better but much slower
-      detectorParameters->cornerRefinementMethod = cv::aruco::CornerRefineMethod::CORNER_REFINE_APRILTAG;
+      detectorParameters->cornerRefinementMethod = cv::aruco::CornerRefineMethod::CORNER_REFINE_CONTOUR;
 #else
-      detectorParameters->doCornerRefinement = true;
+      detectorParameters->doCornerRefinement = false;
 #endif
 
       // Color to gray for detection
@@ -450,20 +450,8 @@ namespace fiducial_vlam
       return cov_sam;
     }
 
-    TransformWithCovariance::cov_type to_cov_type(const gtsam::Pose3 &sam_pose, const gtsam::Matrix6 &cov_sam)
+    TransformWithCovariance::cov_type to_cov_type(const gtsam::Matrix6 &cov_sam)
     {
-      // Try to rotate the position part of the covariance
-//      gtsam::Matrix6 rot6{};
-//      rot6.setZero();
-//      gtsam::Matrix3 rot3 = sam_pose.rotation().matrix();
-//      for (int r = 0; r < 3; r += 1) {
-//        for (int c = 0; c < 3; c += 1) {
-//          rot6(r, c) = rot3(r, c);
-//          rot6(r + 3, c + 3) = rot3(r, c);
-//        }
-//      }
-//      gtsam::Matrix6 cov_sam_r = rot6 * cov_sam * rot6.transpose();
-
       // Convert covariance
       TransformWithCovariance::cov_type cov;
       for (int r = 0; r < 6; r += 1) {
@@ -475,14 +463,14 @@ namespace fiducial_vlam
       return cov;
     }
 
-    TransformWithCovariance to_transform_with_covariance(const gtsam::Pose3 &sam_pose, const gtsam::Matrix6 &sam_cov)
+    TransformWithCovariance to_transform_with_covariance(const gtsam::Pose3 &pose_sam, const gtsam::Matrix6 &sam_cov)
     {
-      auto q1 = sam_pose.rotation().toQuaternion().coeffs();
-      auto &t = sam_pose.translation();
+      auto q1 = pose_sam.rotation().toQuaternion().coeffs();
+      auto &t = pose_sam.translation();
       return TransformWithCovariance{
         tf2::Transform{tf2::Quaternion{q1[0], q1[1], q1[2], q1[3]},
                        tf2::Vector3{t.x(), t.y(), t.z()}},
-        to_cov_type(sam_pose, sam_cov)};
+        to_cov_type(sam_cov)};
     }
 
     TransformWithCovariance extract_transform_with_covariance(gtsam::NonlinearFactorGraph &graph,
@@ -492,6 +480,18 @@ namespace fiducial_vlam
       gtsam::Marginals marginals(graph, result);
       return to_transform_with_covariance(result.at<gtsam::Pose3>(key),
                                           marginals.marginalCovariance(key));
+    }
+
+    TransformWithCovariance to_cov_f_world(const TransformWithCovariance &twc)
+    {
+      auto pose_sam = to_pose3(twc.transform());
+      auto cov_sam = to_cov_sam(twc.cov());
+
+      // Rotate the covariance from the body frame to the world frame.
+      gtsam::Matrix6 adjoint_map = pose_sam.AdjointMap();
+      gtsam::Matrix6 cov_f_world = adjoint_map * cov_sam * adjoint_map.transpose();
+
+      return to_transform_with_covariance(pose_sam, cov_f_world);
     }
 
     TransformWithCovariance solve_camera_f_marker(
@@ -713,7 +713,10 @@ namespace fiducial_vlam
 //      std::cout << "final error = " << graph.error(result) << std::endl;
 
       // 5. Extract the result
-      return extract_transform_with_covariance(graph, result, camera_key_);
+      auto t_map_camera = extract_transform_with_covariance(graph, result, camera_key_);
+
+      // 6. Rotate the covariance into the world frame
+      return to_cov_f_world(t_map_camera);
     }
 
     void update_map(const TransformWithCovariance &t_map_camera,

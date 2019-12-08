@@ -172,6 +172,8 @@ namespace fiducial_vlam
           map_ = std::make_unique<Map>(*msg);
         });
 
+      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
+
       (void) camera_info_sub_;
       (void) image_raw_sub_;
       (void) map_sub_;
@@ -235,8 +237,12 @@ namespace fiducial_vlam
               annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, fm);
             }
 
-            // Find the transform from the base of the robot to the map.
-            TransformWithCovariance t_map_base{t_map_camera.transform() * cxt_.t_camera_base_.transform()};
+            // Find the transform from the base of the robot to the map. Also include the covariance.
+            // Note: the covariance values are with respect to the map frame so both t_map_camera and
+            // t_map_base have the same covariance.
+            TransformWithCovariance t_map_base{
+              t_map_camera.transform() * cxt_.t_camera_base_.transform(),
+              t_map_camera.cov()};
 
             // Publish the camera an/or base pose in the map frame
             if (cxt_.publish_camera_pose_) {

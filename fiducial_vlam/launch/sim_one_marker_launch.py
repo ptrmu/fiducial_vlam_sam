@@ -18,7 +18,7 @@ forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 
 sam_not_cv = 1
 make_not_use_map = 0
-corner_measurement_sigma = 1.0
+corner_measurement_sigma = 0.7
 
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
@@ -32,7 +32,7 @@ vloc_args = [{
     'camera_frame_id': 'forward_camera',
     'publish_base_pose': 1,
     'publish_camera_odom': 1,
-    'publish_base_odom': 0,
+    'publish_base_odom': 1,
 }]
 
 vmap_args = [{
