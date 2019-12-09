@@ -1,0 +1,14 @@
+/**:
+  ros__parameters:
+    camera_frame_id: forward_camera
+    map_init_pose_z: 0
+    publish_base_odom: 1
+    publish_base_pose: 1
+    publish_camera_odom: 1
+    publish_image_marked: 1
+    publish_tfs: 1
+    publish_tfs_per_marker: 0
+    sam_not_cv: 1
+    stamp_msgs_with_current_time: 1
+    sub_camera_info_best_effort_not_reliable: 1
+    use_sim_time: false

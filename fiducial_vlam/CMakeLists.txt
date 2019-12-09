@@ -33,12 +33,15 @@ message(STATUS "Found OpenCV version ${OpenCV_VERSION}")
 
 # Find packages
 find_package(ament_cmake REQUIRED)
+find_package(class_loader REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fiducial_vlam_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(GTSAM REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(ros2_shared REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(sim_fiducial REQUIRED)
@@ -64,37 +67,6 @@ include_directories(
   ${yaml_cpp_vendor_INCLUDE_DIRS}
 )
 
-
-#=============
-# vloc node
-#=============
-
-add_executable(vloc_node
-  src/vloc_node.cpp
-  src/map.cpp
-  src/convert_util.cpp
-  src/transform_with_covariance.cpp
-  src/fiducial_math.cpp
-  src/vloc_context.cpp
-  )
-
-ament_target_dependencies(vloc_node
-  cv_bridge
-  fiducial_vlam_msgs
-  OpenCV
-  rclcpp
-  nav_msgs
-  ros2_shared
-  sensor_msgs
-  std_msgs
-  tf2_msgs
-  )
-
-# ?? Why can't I put this in ament_target_dependencies
-target_link_libraries(vloc_node
-  gtsam
-  )
-
 # Debugging: set _dump_all_variables to true
 set(_dump_all_variables false)
 if (_dump_all_variables)
@@ -105,20 +77,76 @@ if (_dump_all_variables)
   endforeach ()
 endif ()
 
+# Create ament index resource which references the libraries in the binary dir
+set(node_plugins "")
+
+#=============
+# vloc node
+#=============
+
+set(VLOC_NODE_SOURCES
+  src/convert_util.cpp
+  src/fiducial_math.cpp
+  src/map.cpp
+  src/transform_with_covariance.cpp
+  src/vloc_context.cpp
+  src/vloc_node.cpp
+  )
+
+set(VLOC_NODE_DEPS
+  class_loader
+  cv_bridge
+  fiducial_vlam_msgs
+  nav_msgs
+  OpenCV
+  rclcpp
+  ros2_shared
+  sensor_msgs
+  std_msgs
+  tf2_msgs
+  )
+
+add_library(vloc_node SHARED
+  ${VLOC_NODE_SOURCES})
+
+target_compile_definitions(vloc_node
+  PRIVATE "COMPOSITION_BUILDING_DLL")
+
+ament_target_dependencies(vloc_node
+  ${VLOC_NODE_DEPS})
+
+rclcpp_components_register_nodes(vloc_node "fiducial_vlam::VlocNode")
+set(node_plugins "${node_plugins}fiducial_vlam::VlocNode;$<TARGET_FILE:vloc_node>\n")
+
+add_executable(vloc_main
+  src/vloc_main.cpp
+  ${VLOC_NODE_SOURCES})
+
+ament_target_dependencies(vloc_main
+  ${VLOC_NODE_DEPS})
+
+# ?? Why can't I put this in ament_target_dependencies
+target_link_libraries(vloc_main
+  gtsam
+  )
+
+
 #=============
 # vmap node
 #=============
 
-add_executable(vmap_node
-  src/vmap_node.cpp
-  src/map.cpp
+set(VMAP_NODE_SOURCES
   src/convert_util.cpp
-  src/transform_with_covariance.cpp
   src/fiducial_math.cpp
+  src/map.cpp
+  src/transform_with_covariance.cpp
   src/vmap_context.cpp
+  src/vmap_main.cpp
+  src/vmap_node.cpp
   )
 
-ament_target_dependencies(vmap_node
+set(VMAP_NODE_DEPS
+  class_loader
   fiducial_vlam_msgs
   geometry_msgs
   OpenCV
@@ -130,8 +158,27 @@ ament_target_dependencies(vmap_node
   yaml_cpp_vendor
   )
 
+add_library(vmap_node SHARED
+  ${VMAP_NODE_SOURCES})
+
+target_compile_definitions(vmap_node
+  PRIVATE "COMPOSITION_BUILDING_DLL")
+
+ament_target_dependencies(vmap_node
+  ${VMAP_NODE_DEPS})
+
+rclcpp_components_register_nodes(vmap_node "fiducial_vlam::VmapNode")
+set(node_plugins "${node_plugins}fiducial_vlam::VmapNode;$<TARGET_FILE:vmap_node>\n")
+
+add_executable(vmap_main
+  src/vmap_main.cpp
+  ${VMAP_NODE_SOURCES})
+
+ament_target_dependencies(vmap_main
+  ${VMAP_NODE_DEPS})
+
 # ?? Why can't I put this in ament_target_dependencies
-target_link_libraries(vmap_node
+target_link_libraries(vmap_main
   gtsam
   )
 
@@ -141,8 +188,8 @@ target_link_libraries(vmap_node
 
 # Install targets
 install(TARGETS
-  vloc_node
-  vmap_node
+  vloc_main
+  vmap_main
   DESTINATION lib/fiducial_vlam
   )
 
@@ -152,6 +199,11 @@ install(DIRECTORY
   launch
   DESTINATION share/fiducial_vlam
   )
+
+ament_export_include_directories(include)
+
+install(DIRECTORY include/
+  DESTINATION include)
 
 #=============
 # Run ament macros
