@@ -231,7 +231,7 @@ namespace fiducial_vlam
       // Use the new AprilTag 2 corner algorithm, much better but much slower
       detectorParameters->cornerRefinementMethod = cv::aruco::CornerRefineMethod::CORNER_REFINE_CONTOUR;
 #else
-      detectorParameters->doCornerRefinement = false;
+      detectorParameters->doCornerRefinement = true;
 #endif
 
       // Detect markers
