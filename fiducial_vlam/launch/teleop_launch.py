@@ -56,9 +56,9 @@ def generate_launch_description():
         Node(package='tello_driver', node_executable='tello_driver', output='screen',
              parameters=tello_ros_args),
 
-        Node(package='fiducial_vlam', node_executable='vloc_node', output='screen',
+        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args),
-        Node(package='fiducial_vlam', node_executable='vmap_node', output='screen',
+        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              parameters=vmap_args),
 
     ]

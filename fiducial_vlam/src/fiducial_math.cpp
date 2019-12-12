@@ -221,7 +221,7 @@ namespace fiducial_vlam
       return TransformWithCovariance(tf2_t_map_camera);
     }
 
-    Observations detect_markers(cv_bridge::CvImagePtr &color,
+    Observations detect_markers(cv_bridge::CvImagePtr &gray,
                                 std::shared_ptr<cv_bridge::CvImage> &color_marked)
     {
       // Todo: make the dictionary a parameter
@@ -231,17 +231,13 @@ namespace fiducial_vlam
       // Use the new AprilTag 2 corner algorithm, much better but much slower
       detectorParameters->cornerRefinementMethod = cv::aruco::CornerRefineMethod::CORNER_REFINE_CONTOUR;
 #else
-      detectorParameters->doCornerRefinement = false;
+      detectorParameters->doCornerRefinement = true;
 #endif
-
-      // Color to gray for detection
-      cv::Mat gray;
-      cv::cvtColor(color->image, gray, cv::COLOR_BGR2GRAY);
 
       // Detect markers
       std::vector<int> ids;
       std::vector<std::vector<cv::Point2f>> corners;
-      cv::aruco::detectMarkers(gray, dictionary, corners, ids, detectorParameters);
+      cv::aruco::detectMarkers(gray->image, dictionary, corners, ids, detectorParameters);
 
       // Annotate the markers
       if (color_marked) {
@@ -525,6 +521,8 @@ namespace fiducial_vlam
 
       // 4. Optimize the graph using Levenberg-Marquardt
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
+//      std::cout << "initial error = " << graph.error(initial) << std::endl;
+//      std::cout << "final error = " << graph.error(result) << std::endl;
 
       // 5. Extract the result
       return extract_transform_with_covariance(graph, result, camera_key_);
