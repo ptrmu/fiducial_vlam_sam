@@ -141,7 +141,7 @@ namespace fiducial_vlam
 
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
         cxt_.image_raw_sub_topic_,
-        rclcpp::ServicesQoS(),
+        rclcpp::ServicesQoS(rclcpp::KeepLast(1)),
         [this](sensor_msgs::msg::Image::UniquePtr msg) -> void
         {
           // the stamp to use for all published messages derived from this image message.
@@ -191,7 +191,6 @@ namespace fiducial_vlam
       // then just make an empty image pointer. The routines need to check
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImagePtr color_marked;
-      cv::Mat mat_with_msg_data;
       if (cxt_.publish_image_marked_ &&
           count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
         // The toCvShare only makes ConstCvImage because they don't want
@@ -200,7 +199,7 @@ namespace fiducial_vlam
         // image data.
         std::shared_ptr<void const> tracked_object;
         auto const_color_marked = cv_bridge::toCvShare(*image_msg, tracked_object);
-        mat_with_msg_data = const_color_marked->image; // opencv does not copy the image data on assignment
+        cv::Mat mat_with_msg_data = const_color_marked->image; // opencv does not copy the image data on assignment
         color_marked = cv_bridge::CvImagePtr{
           new cv_bridge::CvImage{const_color_marked->header,
                                  const_color_marked->encoding,
