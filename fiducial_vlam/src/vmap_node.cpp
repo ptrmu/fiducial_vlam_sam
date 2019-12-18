@@ -382,7 +382,7 @@ namespace fiducial_vlam
       callbacks_processed_ += 1;
 
       CameraInfo ci{msg->camera_info};
-      FiducialMath fm{cxt_.sam_not_cv_, cxt_.corner_measurement_sigma_, ci};
+      FiducialMath fm{cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_, ci};
 
       // Get observations from the message.
       Observations observations(*msg);

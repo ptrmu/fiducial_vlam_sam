@@ -12,8 +12,8 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-map_filename = os.path.join(worlds_directory, 'one_marker_map.yaml')
-world_filename = os.path.join(worlds_directory, 'one_marker.world')
+map_filename = os.path.join(worlds_directory, 'yz_plane_of_markers_map.yaml')
+world_filename = os.path.join(worlds_directory, 'yz_plane_of_markers.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 
 sam_not_cv = 1

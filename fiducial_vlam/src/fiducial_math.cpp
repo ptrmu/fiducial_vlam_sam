@@ -19,6 +19,7 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/ProjectionFactor.h>
 
 namespace fiducial_vlam
 {
@@ -392,15 +393,17 @@ namespace fiducial_vlam
   class FiducialMath::SamFiducialMath
   {
     CvFiducialMath &cv_;
-    gtsam::Cal3DS2 cal3ds2_;
+    const boost::shared_ptr<gtsam::Cal3DS2> cal3ds2_;
     const gtsam::SharedNoiseModel corner_measurement_noise_;
 
+    const gtsam::SharedNoiseModel corner_3D_constrained_noise_{
+      gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_3x1)};
     gtsam::Key camera_key_{gtsam::Symbol('c', 1)};
 
 
     class ResectioningFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3>
     {
-      const gtsam::Cal3DS2 cal3ds2_;
+      const boost::shared_ptr<gtsam::Cal3DS2> &cal3ds2_;
       const gtsam::Point3 P_;       ///< 3D point on the calibration rig
       const gtsam::Point2 p_;       ///< 2D measurement of the 3D point
 
@@ -408,7 +411,7 @@ namespace fiducial_vlam
       /// Construct factor given known point P and its projection p
       ResectioningFactor(const gtsam::SharedNoiseModel &model,
                          const gtsam::Key key,
-                         const gtsam::Cal3DS2 &cal3ds2,
+                         const boost::shared_ptr<gtsam::Cal3DS2> &cal3ds2,
                          gtsam::Point2 p,
                          gtsam::Point3 P) :
         NoiseModelFactor1<gtsam::Pose3>(model, key),
@@ -421,7 +424,7 @@ namespace fiducial_vlam
       gtsam::Vector evaluateError(const gtsam::Pose3 &pose,
                                   boost::optional<gtsam::Matrix &> H) const override
       {
-        auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose, cal3ds2_};
+        auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose, *cal3ds2_};
         return camera.project(P_, H) - p_;
       }
     };
@@ -490,6 +493,15 @@ namespace fiducial_vlam
       return to_transform_with_covariance(pose_sam, cov_f_world);
     }
 
+    std::array<gtsam::Symbol, 4> to_corner_keys(int id)
+    {
+      return std::array<gtsam::Symbol, 4>{
+        gtsam::Symbol{'i', static_cast<std::uint64_t>(id)},
+        gtsam::Symbol{'j', static_cast<std::uint64_t>(id)},
+        gtsam::Symbol{'k', static_cast<std::uint64_t>(id)},
+        gtsam::Symbol{'l', static_cast<std::uint64_t>(id)}};
+    }
+
     TransformWithCovariance solve_camera_f_marker(
       const Observation &observation,
       double marker_length)
@@ -530,7 +542,7 @@ namespace fiducial_vlam
 
   public:
     explicit SamFiducialMath(CvFiducialMath &cv, double corner_measurement_sigma) :
-      cv_{cv}, cal3ds2_{
+      cv_{cv}, cal3ds2_{boost::shared_ptr<gtsam::Cal3DS2>{new gtsam::Cal3DS2{
       cv.ci_.cv()->camera_matrix().at<double>(0, 0),  // fx
       cv.ci_.cv()->camera_matrix().at<double>(1, 1),  // fy
       1.0, // s
@@ -539,10 +551,71 @@ namespace fiducial_vlam
       cv.ci_.cv()->dist_coeffs().at<double>(0), // k1
       cv.ci_.cv()->dist_coeffs().at<double>(1), // k2
       cv.ci_.cv()->dist_coeffs().at<double>(2), // p1
-      cv.ci_.cv()->dist_coeffs().at<double>(3)},// p2
+      cv.ci_.cv()->dist_coeffs().at<double>(3)}}},// p2
       corner_measurement_noise_{gtsam::noiseModel::Diagonal::Sigmas(
         gtsam::Vector2(corner_measurement_sigma, corner_measurement_sigma))}
     {}
+
+
+    void load_graph_from_observations_sfm(const Observations &observations, Map &map,
+                                          const TransformWithCovariance &t_map_camera_initial,
+                                          gtsam::Key camera_key, bool add_unknown_markers,
+                                          gtsam::NonlinearFactorGraph &graph, gtsam::Values &initial)
+    {
+      // 1. clear the graph and initial estimate
+      graph.resize(0);
+      initial.clear();
+
+      // 2. add measurement factors, known marker priors, and marker initial estimates to the graph
+      for (auto &observation : observations.observations()) {
+
+        // See if this is a known marker by looking it up in the map.
+        auto marker_ptr = map.find_marker(observation.id());
+
+        // Add the measurement and initial value if this is a known marker or if we are supposed to add unknown markers.
+        if (marker_ptr != nullptr || add_unknown_markers) {
+          auto corner_keys = to_corner_keys(observation.id());
+
+          // get the measurements (image locations) for the 4 corner points.
+          std::vector<cv::Point2f> corners_f_image{};
+          cv_.append_corners_f_image(observation, corners_f_image);
+
+          // add these measurements as a general projection factor
+          for (size_t j = 0; j < corners_f_image.size(); j += 1) {
+            gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
+            graph.emplace_shared<gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3DS2> >(
+              corner_f_image, corner_measurement_noise_,
+              camera_key, corner_keys[j], cal3ds2_);
+          }
+
+          // Add the initial values of the 3D loocation of the corner points. If this is a known marker,
+          // then use values from the map and also add a prior. Otherwise use opencv, the observation
+          // and the estimated camera location.
+          if (marker_ptr != nullptr) {
+
+            // Get the corner locations from the map.
+            std::vector<cv::Point3d> corners_f_map{};
+            cv_.append_corners_f_map(marker_ptr->t_map_marker(), map.marker_length(), corners_f_map);
+
+            // Add the initial value and the prior.
+            for (size_t j = 0; j < corners_f_image.size(); j += 1) {
+              gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
+              // Add the estimated value
+              initial.insert(corner_keys[j], corner_f_map);
+              // Add the prior with a constrained noise model
+              graph.emplace_shared<gtsam::PriorFactor<gtsam::Point3> >(
+                corner_keys[j], corner_f_map, corner_3D_constrained_noise_);
+            }
+
+          } else {
+
+          }
+        }
+      }
+
+      // Add the camera initial value.
+      initial.insert(camera_key, to_pose3(t_map_camera_initial.transform()));
+    }
 
     TransformWithCovariance solve_t_map_camera_sfm(const Observations &observations,
                                                    Map &map)
@@ -563,29 +636,32 @@ namespace fiducial_vlam
       gtsam::Values initial{};
 
       // 2. add factors to the graph
-      for (int i = 0; i < observations.size(); i += 1) {
-        auto &t_map_marker = t_map_markers[i];
-        if (t_map_marker.is_valid()) {
-
-          std::vector<cv::Point3d> corners_f_map{};
-          std::vector<cv::Point2f> corners_f_image{};
-
-          cv_.append_corners_f_map(t_map_markers[i], map.marker_length(), corners_f_map);
-          cv_.append_corners_f_image(observations.observations()[i], corners_f_image);
-
-          for (size_t j = 0; j < corners_f_image.size(); j += 1) {
-            gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
-            gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
-            graph.emplace_shared<ResectioningFactor>(corner_measurement_noise_, camera_key_,
-                                                     cal3ds2_,
-                                                     corner_f_image,
-                                                     corner_f_map);
-          }
-        }
-      }
-
-      // 3. Add the initial estimate for the camera pose
-      initial.insert(camera_key_, to_pose3(cv_t_map_camera.transform()));
+      load_graph_from_observations_sfm(observations, map,
+                                       cv_t_map_camera, camera_key_, false,
+                                       graph, initial);
+//      for (int i = 0; i < observations.size(); i += 1) {
+//        auto &t_map_marker = t_map_markers[i];
+//        if (t_map_marker.is_valid()) {
+//
+//          std::vector<cv::Point3d> corners_f_map{};
+//          std::vector<cv::Point2f> corners_f_image{};
+//
+//          cv_.append_corners_f_map(t_map_markers[i], map.marker_length(), corners_f_map);
+//          cv_.append_corners_f_image(observations.observations()[i], corners_f_image);
+//
+//          for (size_t j = 0; j < corners_f_image.size(); j += 1) {
+//            gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
+//            gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
+//            graph.emplace_shared<ResectioningFactor>(corner_measurement_noise_, camera_key_,
+//                                                     cal3ds2_,
+//                                                     corner_f_image,
+//                                                     corner_f_map);
+//          }
+//        }
+//      }
+//
+//      // 3. Add the initial estimate for the camera pose
+//      initial.insert(camera_key_, to_pose3(cv_t_map_camera.transform()));
 
       // 4. Optimize the graph using Levenberg-Marquardt
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
@@ -593,14 +669,24 @@ namespace fiducial_vlam
 //      std::cout << "final error = " << graph.error(result) << std::endl;
 
       // 5. Extract the result
-      return extract_transform_with_covariance(graph, result, camera_key_);
+      auto t_map_camera = extract_transform_with_covariance(graph, result, camera_key_);
+
+      // 6. Rotate the covariance into the world frame
+      return to_cov_f_world(t_map_camera);
     }
 
-    void load_graph_from_observations(const TransformWithCovariance &t_map_camera,
-                                      const Observations &observations,
-                                      Map &map,
-                                      gtsam::Key camera_key, bool add_unknown_markers,
-                                      gtsam::NonlinearFactorGraph &graph, gtsam::Values &initial)
+    void update_map_sfm(const TransformWithCovariance &t_map_camera,
+                        const Observations &observations,
+                        Map &map)
+    {
+
+    }
+
+    void load_graph_from_observations_slam(const TransformWithCovariance &t_map_camera,
+                                           const Observations &observations,
+                                           Map &map,
+                                           gtsam::Key camera_key, bool add_unknown_markers,
+                                           gtsam::NonlinearFactorGraph &graph, gtsam::Values &initial)
     {
       // 1. clear the graph and initial estimate
       graph.resize(0);
@@ -682,8 +768,8 @@ namespace fiducial_vlam
       initial.insert(camera_key, to_pose3(t_map_camera.transform()));
     }
 
-    TransformWithCovariance solve_t_map_camera(const Observations &observations,
-                                               Map &map)
+    TransformWithCovariance solve_t_map_camera_slam(const Observations &observations,
+                                                    Map &map)
     {
       // Get an estimate of camera_f_map.
       auto cv_t_map_camera = cv_.solve_t_map_camera(observations,
@@ -699,11 +785,11 @@ namespace fiducial_vlam
       gtsam::Values initial{};
 
       // 2. add factors to the graph
-      load_graph_from_observations(cv_t_map_camera,
-                                   observations,
-                                   map,
-                                   camera_key_, false,
-                                   graph, initial);
+      load_graph_from_observations_slam(cv_t_map_camera,
+                                        observations,
+                                        map,
+                                        camera_key_, false,
+                                        graph, initial);
 
       // 4. Optimize the graph using Levenberg-Marquardt
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
@@ -717,26 +803,26 @@ namespace fiducial_vlam
       return to_cov_f_world(t_map_camera);
     }
 
-    void update_map(const TransformWithCovariance &t_map_camera,
-                    const Observations &observations,
-                    Map &map)
+    void update_map_slam(const TransformWithCovariance &t_map_camera,
+                         const Observations &observations,
+                         Map &map)
     {
       // Have to have a valid camera pose and see at least two markers before this routine can do anything.
       if (!t_map_camera.is_valid() || observations.size() < 2) {
         return;
       }
 
-//      std::cout << "update_map known markers: " << map.markers().size() << std::endl;
+//      std::cout << "update_map_slam known markers: " << map.markers().size() << std::endl;
 
       gtsam::NonlinearFactorGraph graph{};
       gtsam::Values initial{};
       gtsam::Symbol camera_key{'c', 0};
 
-      load_graph_from_observations(t_map_camera,
-                                   observations,
-                                   map,
-                                   camera_key, true,
-                                   graph, initial);
+      load_graph_from_observations_slam(t_map_camera,
+                                        observations,
+                                        map,
+                                        camera_key, true,
+                                        graph, initial);
 
       // Now optimize this graph
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
@@ -772,18 +858,18 @@ namespace fiducial_vlam
 // FiducialMath class
 // ==============================================================================
 
-  FiducialMath::FiducialMath(bool sam_not_cv,
+  FiducialMath::FiducialMath(bool sam_not_cv, bool sfm_not_slam,
                              double corner_measurement_sigma,
                              const CameraInfo &camera_info) :
-    sam_not_cv_{sam_not_cv},
+    sam_not_cv_{sam_not_cv}, sfm_not_slam_{sfm_not_slam},
     cv_{std::make_unique<CvFiducialMath>(camera_info)},
     sam_{std::make_unique<SamFiducialMath>(*cv_, corner_measurement_sigma)}
   {}
 
-  FiducialMath::FiducialMath(bool sam_not_cv,
+  FiducialMath::FiducialMath(bool sam_not_cv, bool sfm_not_slam,
                              double corner_measurement_sigma,
                              const sensor_msgs::msg::CameraInfo &camera_info_msg) :
-    sam_not_cv_{sam_not_cv},
+    sam_not_cv_{sam_not_cv}, sfm_not_slam_{sfm_not_slam},
     cv_{std::make_unique<CvFiducialMath>(camera_info_msg)},
     sam_{std::make_unique<SamFiducialMath>(*cv_, corner_measurement_sigma)}
   {}
@@ -800,9 +886,11 @@ namespace fiducial_vlam
   TransformWithCovariance FiducialMath::solve_t_map_camera(const Observations &observations,
                                                            Map &map)
   {
-    return sam_not_cv_ ?
-           sam_->solve_t_map_camera(observations, map) :
-           cv_->solve_t_map_camera(observations, map);
+    return !sam_not_cv_ ?
+           cv_->solve_t_map_camera(observations, map) :
+           sfm_not_slam_ ?
+           sam_->solve_t_map_camera_sfm(observations, map) :
+           sam_->solve_t_map_camera_slam(observations, map);
   }
 
   Observations FiducialMath::detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
@@ -822,7 +910,11 @@ namespace fiducial_vlam
                                 Map &map)
   {
     if (sam_not_cv_) {
-      sam_->update_map(t_map_camera, observations, map);
+      if (sfm_not_slam_) {
+        sam_->update_map_sfm(t_map_camera, observations, map);
+      } else {
+        sam_->update_map_slam(t_map_camera, observations, map);
+      }
     } else {
       cv_->update_map(t_map_camera, observations, map);
     }

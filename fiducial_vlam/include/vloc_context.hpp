@@ -103,6 +103,9 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
   sam_not_cv, \
   int, 1) \
+  CXT_MACRO_MEMBER(       /* use gtsam in Structure From Motion rather than Simultaneous Localization And Mapping mode */ \
+  sfm_not_slam, \
+  int, 1) \
   CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
   corner_measurement_sigma, \
   double, 1.0) \

@@ -33,6 +33,9 @@ namespace fiducial_vlam
     // The pose of the marker in the map frame
     TransformWithCovariance t_map_marker_;
 
+    // If not empty then 3D locations of corners.
+    std::vector<Point3WithCovariance> corners_f_map_;
+
     // Prevent modification if true
     bool is_fixed_{false};
 
@@ -42,8 +45,12 @@ namespace fiducial_vlam
   public:
     Marker() = default;
 
-    Marker(int id, TransformWithCovariance t_map_marker)
-      : id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1)
+    Marker(int id, TransformWithCovariance t_map_marker) :
+      id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{}
+    {}
+
+    Marker(int id, TransformWithCovariance t_map_marker, std::vector<Point3WithCovariance> &corners_f_map) :
+      id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{corners_f_map}
     {}
 
     auto id() const
@@ -66,6 +73,15 @@ namespace fiducial_vlam
 
     void set_t_map_marker(TransformWithCovariance t_map_marker)
     { t_map_marker_ = std::move(t_map_marker); }
+
+    const auto &corners_f_map() const
+    { return corners_f_map_; }
+
+    void set_corners_f_map(const std::vector<Point3WithCovariance> &corners_f_map)
+    { corners_f_map_ = corners_f_map; }
+
+    bool has_corners()
+    { return corners_f_map_.size() == 4; }
   };
 
 // ==============================================================================
@@ -75,7 +91,8 @@ namespace fiducial_vlam
   class Map
   {
   public:
-    enum MapStyles {
+    enum MapStyles
+    {
       pose = 0,
       covariance,
       corners

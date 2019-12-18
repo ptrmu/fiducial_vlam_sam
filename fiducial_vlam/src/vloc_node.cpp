@@ -206,7 +206,7 @@ namespace fiducial_vlam
                                  mat_with_msg_data}};
       }
 
-      FiducialMath fm(cxt_.sam_not_cv_, cxt_.corner_measurement_sigma_, *camera_info_);
+      FiducialMath fm(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_, *camera_info_);
 
       // Detect the markers in this image and create a list of
       // observations.
