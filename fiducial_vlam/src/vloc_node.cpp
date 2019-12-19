@@ -20,6 +20,7 @@ namespace fiducial_vlam
     std::shared_ptr<cv_bridge::CvImage> &color_marked,
     const TransformWithCovariance &t_map_camera,
     const std::vector<TransformWithCovariance> &t_map_markers,
+    const CameraInfo & camera_info,
     FiducialMath &fm)
   {
     // Annotate the image by drawing axes on each marker that was used for the location
@@ -37,13 +38,14 @@ namespace fiducial_vlam
       if (t_map_marker.is_valid()) {
         // Calculalte t_camera_marker and draw the axis.
         auto t_camera_marker = TransformWithCovariance(tf_t_camera_map * t_map_marker.transform());
-        fm.annotate_image_with_marker_axis(color_marked, t_camera_marker);
+        fm.annotate_image_with_marker_axis(color_marked, t_camera_marker, camera_info);
       }
     }
   }
 
   static std::vector<TransformWithCovariance> markers_t_map_cameras(
     const Observations &observations,
+    const CameraInfo &camera_info,
     Map &map,
     FiducialMath &fm)
   {
@@ -52,7 +54,7 @@ namespace fiducial_vlam
     for (auto &observation : observations.observations()) {
       Observations single_observation{};
       single_observation.add(observation);
-      auto t_map_camera = fm.solve_t_map_camera(single_observation, map);
+      auto t_map_camera = fm.solve_t_map_camera(single_observation, camera_info, map);
       if (t_map_camera.is_valid()) {
         t_map_cameras.emplace_back(t_map_camera);
       }
@@ -69,6 +71,7 @@ namespace fiducial_vlam
   class VlocNode : public rclcpp::Node
   {
     VlocContext cxt_;
+    FiducialMath fm_;
     std::unique_ptr<Map> map_{};
     std::unique_ptr<CameraInfo> camera_info_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
@@ -88,8 +91,9 @@ namespace fiducial_vlam
 
 
   public:
-    VlocNode(const rclcpp::NodeOptions &options)
-      : Node("vloc_node", options), cxt_{*this}
+    VlocNode(const rclcpp::NodeOptions &options) :
+      Node("vloc_node", options), cxt_{*this},
+      fm_(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_)
     {
       // Get parameters from the command line
       cxt_.load_parameters();
@@ -206,11 +210,9 @@ namespace fiducial_vlam
                                  mat_with_msg_data}};
       }
 
-      FiducialMath fm(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_, *camera_info_);
-
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = fm.detect_markers(gray, color_marked);
+      auto observations = fm_.detect_markers(gray, color_marked);
 
       // If there is a map, find t_map_marker for each detected
       // marker. The t_map_markers has an entry for each element
@@ -237,14 +239,14 @@ namespace fiducial_vlam
 //        }
 
           // Find the camera pose from the observations.
-          t_map_camera = fm.solve_t_map_camera(observations, *map_);
+          t_map_camera = fm_.solve_t_map_camera(observations, *camera_info_, *map_);
 
           if (t_map_camera.is_valid()) {
 
             // If annotated images have been requested, then add the annotations now.
             if (color_marked) {
               auto t_map_markers = map_->find_t_map_markers(observations);
-              annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, fm);
+              annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *camera_info_, fm_);
             }
 
             // Find the transform from the base of the robot to the map. Also include the covariance.
@@ -288,7 +290,7 @@ namespace fiducial_vlam
 
             // if requested, publish the camera tf as determined from each marker.
             if (cxt_.publish_tfs_per_marker_) {
-              auto t_map_cameras = markers_t_map_cameras(observations, *map_, fm);
+              auto t_map_cameras = markers_t_map_cameras(observations, *camera_info_, *map_, fm_);
               auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
               if (!tf_message.transforms.empty()) {
                 tf_message_pub_->publish(tf_message);

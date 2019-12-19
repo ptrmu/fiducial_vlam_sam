@@ -282,6 +282,7 @@ namespace fiducial_vlam
   class VmapNode : public rclcpp::Node
   {
     VmapContext cxt_;
+    FiducialMath fm_;
     std::unique_ptr<Map> map_{};
 
     int callbacks_processed_{0};
@@ -296,7 +297,7 @@ namespace fiducial_vlam
 
 
     // Special "initialize map from camera location" mode
-    void initialize_map_from_observations(const Observations &observations, FiducialMath &fm)
+    void initialize_map_from_observations(const Observations &observations, CameraInfo &ci)
     {
       // Find the marker with the lowest id
       int min_id = std::numeric_limits<int>::max();
@@ -309,7 +310,7 @@ namespace fiducial_vlam
       }
 
       // Find t_camera_marker
-      auto t_camera_marker = fm.solve_t_camera_marker(*min_obs, cxt_.marker_length_);
+      auto t_camera_marker = fm_.solve_t_camera_marker(*min_obs, ci, cxt_.marker_length_);
 
       // And t_map_camera
       auto t_map_camera = cxt_.map_init_transform_;
@@ -321,8 +322,9 @@ namespace fiducial_vlam
 
   public:
 
-    VmapNode(const rclcpp::NodeOptions &options)
-      : Node("vmap_node", options), cxt_{*this}
+    VmapNode(const rclcpp::NodeOptions &options) :
+      Node("vmap_node", options), cxt_{*this},
+      fm_(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_)
     {
       // Get parameters from the command line
       cxt_.load_parameters();
@@ -382,7 +384,6 @@ namespace fiducial_vlam
       callbacks_processed_ += 1;
 
       CameraInfo ci{msg->camera_info};
-      FiducialMath fm{cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_, ci};
 
       // Get observations from the message.
       Observations observations(*msg);
@@ -390,7 +391,7 @@ namespace fiducial_vlam
       // If the map has not yet been initialized, then initialize it with these observations.
       // This is only used for the special camera based map initialization
       if (!map_ && observations.size() > 0) {
-        initialize_map_from_observations(observations, fm);
+        initialize_map_from_observations(observations, ci);
       }
 
       // There is nothing to do at this point unless we have more than one observation.
@@ -398,15 +399,8 @@ namespace fiducial_vlam
         return;
       }
 
-      // Estimate the camera pose using the latest map estimate
-      auto t_map_camera = fm.solve_t_map_camera(observations, *map_);
-
-      // We get an invalid pose if none of the visible markers pose's are known.
-      if (t_map_camera.is_valid()) {
-
-        // Update our map with the observations
-        fm.update_map(t_map_camera, observations, *map_);
-      }
+      // Update our map with the observations
+      fm_.update_map(observations, ci, *map_);
     }
 
     tf2_msgs::msg::TFMessage to_tf_message()

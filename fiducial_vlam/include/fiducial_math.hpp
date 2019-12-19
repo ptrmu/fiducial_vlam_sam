@@ -53,35 +53,34 @@ namespace fiducial_vlam
 
     class SamFiducialMath;
 
-    const bool sam_not_cv_;
-    const bool sfm_not_slam_;
+    int &sam_not_cv_;
+    int &sfm_not_slam_;
     std::unique_ptr<CvFiducialMath> cv_;
     std::unique_ptr<SamFiducialMath> sam_;
 
   public:
-    explicit FiducialMath(bool sam_not_cv, bool sfm_not_slam,
-                          double corner_measurement_sigma,
-                          const CameraInfo &camera_info);
-
-    explicit FiducialMath(bool sam_not_cv, bool sfm_not_slam,
-                          double corner_measurement_sigma,
-                          const sensor_msgs::msg::CameraInfo &camera_info_msg);
+    explicit FiducialMath(int &sam_not_cv, int &sfm_not_slam,
+                          double &corner_measurement_sigma);
 
     ~FiducialMath();
 
-    TransformWithCovariance solve_t_camera_marker(const Observation &observation, double marker_length);
+    TransformWithCovariance solve_t_camera_marker(const Observation &observation,
+                                                  const CameraInfo &camera_info,
+                                                  double marker_length);
 
     TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                               const CameraInfo &camera_info,
                                                Map &map);
 
     Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
                                 std::shared_ptr<cv_bridge::CvImage> &color_marked);
 
     void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color,
-                                         const TransformWithCovariance &t_camera_marker);
+                                         const TransformWithCovariance &t_camera_marker,
+                                         const CameraInfo &camera_info);
 
-    void update_map(const TransformWithCovariance &t_map_camera,
-                    const Observations &observations,
+    void update_map(const Observations &observations,
+                    const CameraInfo &camera_info,
                     Map &map);
   };
 }
