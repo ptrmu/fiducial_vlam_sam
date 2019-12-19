@@ -126,6 +126,11 @@ ament_target_dependencies(vloc_main
   ${VLOC_NODE_DEPS})
 
 # ?? Why can't I put this in ament_target_dependencies
+target_link_libraries(vloc_node
+  gtsam
+  )
+
+# ?? Why can't I put this in ament_target_dependencies
 target_link_libraries(vloc_main
   gtsam
   )
@@ -186,7 +191,16 @@ target_link_libraries(vmap_main
 # Install
 #=============
 
-# Install targets
+# Install composable nodes
+install(TARGETS
+  vloc_node
+  vmap_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  )
+
+# Install executables
 install(TARGETS
   vloc_main
   vmap_main
