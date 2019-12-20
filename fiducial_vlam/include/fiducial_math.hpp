@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "ros2_shared/context_macros.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 
 namespace cv_bridge
@@ -44,6 +45,29 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// FiducialMathContext class
+// ==============================================================================
+
+#define FM_ALL_PARAMS \
+  CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
+  sam_not_cv, \
+  int, 1) \
+  CXT_MACRO_MEMBER(       /* use gtsam in Structure From Motion rather than Simultaneous Localization And Mapping mode */ \
+  sfm_not_slam, \
+  int, 1) \
+  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
+  corner_measurement_sigma, \
+  double, 1.0) \
+  /* End of list */
+
+  struct FiducialMathContext
+  {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
+    FM_ALL_PARAMS
+  };
+
+// ==============================================================================
 // FiducialMath class
 // ==============================================================================
 
@@ -53,14 +77,11 @@ namespace fiducial_vlam
 
     class SamFiducialMath;
 
-    int &sam_not_cv_;
-    int &sfm_not_slam_;
     std::unique_ptr<CvFiducialMath> cv_;
     std::unique_ptr<SamFiducialMath> sam_;
 
   public:
-    explicit FiducialMath(int &sam_not_cv, int &sfm_not_slam,
-                          double &corner_measurement_sigma);
+    explicit FiducialMath(FiducialMathContext &cxt);
 
     ~FiducialMath();
 

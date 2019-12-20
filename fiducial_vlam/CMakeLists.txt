@@ -89,7 +89,6 @@ set(VLOC_NODE_SOURCES
   src/fiducial_math.cpp
   src/map.cpp
   src/transform_with_covariance.cpp
-  src/vloc_context.cpp
   src/vloc_node.cpp
   )
 
@@ -140,7 +139,6 @@ set(VMAP_NODE_SOURCES
   src/fiducial_math.cpp
   src/map.cpp
   src/transform_with_covariance.cpp
-  src/vmap_context.cpp
   src/vmap_main.cpp
   src/vmap_node.cpp
   )

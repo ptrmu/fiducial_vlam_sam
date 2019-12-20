@@ -70,7 +70,8 @@ namespace fiducial_vlam
 
   class VlocNode : public rclcpp::Node
   {
-    VlocContext cxt_;
+    VlocContext cxt_{};
+    FiducialMathContext fm_cxt_{};
     FiducialMath fm_;
     std::unique_ptr<Map> map_{};
     std::unique_ptr<CameraInfo> camera_info_{};
@@ -89,14 +90,63 @@ namespace fiducial_vlam
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_raw_sub_;
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Map>::SharedPtr map_sub_;
 
+    void validate_parameters()
+    {
+      cxt_.t_camera_base_ = TransformWithCovariance(TransformWithCovariance::mu_type{
+        cxt_.t_camera_base_x_, cxt_.t_camera_base_y_, cxt_.t_camera_base_z_,
+        cxt_.t_camera_base_roll_, cxt_.t_camera_base_pitch_, cxt_.t_camera_base_yaw_});
+    }
+
+    void load_parameters()
+    {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(VLOC_ALL_PARAMS, validate_parameters)
+
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
+
+      RCLCPP_INFO(get_logger(), "VmapNode Parameters");
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), cxt_, n, t, d)
+      VLOC_ALL_PARAMS
+    }
+
+    void validate_fm_parameters()
+    {}
+
+    void load_fm_parameters()
+    {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
+
+      RCLCPP_INFO(get_logger(), "FiducialMath Parameters");
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), fm_cxt_, n, t, d)
+      FM_ALL_PARAMS
+    }
+
 
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
-      Node("vloc_node", options), cxt_{*this},
-      fm_(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_)
+      Node("vloc_node", options), fm_(fm_cxt_)
     {
+      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
+
       // Get parameters from the command line
-      cxt_.load_parameters();
+      load_parameters();
+
+      // Set up parameter for FiducialMath
+      load_fm_parameters();
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
@@ -175,8 +225,6 @@ namespace fiducial_vlam
         {
           map_ = std::make_unique<Map>(*msg);
         });
-
-      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
 
       (void) camera_info_sub_;
       (void) image_raw_sub_;

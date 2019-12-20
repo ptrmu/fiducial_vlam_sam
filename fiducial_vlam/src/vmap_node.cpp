@@ -281,10 +281,10 @@ namespace fiducial_vlam
 
   class VmapNode : public rclcpp::Node
   {
-    VmapContext cxt_;
+    VmapContext cxt_{};
+    FiducialMathContext fm_cxt_{};
     FiducialMath fm_;
     std::unique_ptr<Map> map_{};
-
     int callbacks_processed_{0};
 
     // ROS publishers
@@ -295,6 +295,54 @@ namespace fiducial_vlam
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
     rclcpp::TimerBase::SharedPtr map_pub_timer_{};
 
+    void validate_parameters()
+    {
+      if (std::abs(cxt_.marker_map_publish_frequency_hz_) < 1.e-10) {
+        cxt_.marker_map_publish_frequency_hz_ = 30. / 60.;
+      }
+
+      cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
+        cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
+        cxt_.map_init_pose_roll_, cxt_.map_init_pose_pitch_, cxt_.map_init_pose_yaw_});
+    }
+
+    void load_parameters()
+    {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(VMAP_ALL_PARAMS, validate_parameters)
+
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VMAP_ALL_PARAMS, validate_parameters)
+
+      RCLCPP_INFO(get_logger(), "VmapNode Parameters");
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), cxt_, n, t, d)
+      VMAP_ALL_PARAMS
+    }
+
+    void validate_fm_parameters()
+    {}
+
+    void load_fm_parameters()
+    {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
+
+      RCLCPP_INFO(get_logger(), "FiducialMath Parameters");
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), fm_cxt_, n, t, d)
+      FM_ALL_PARAMS
+    }
 
     // Special "initialize map from camera location" mode
     void initialize_map_from_observations(const Observations &observations, CameraInfo &ci)
@@ -321,13 +369,14 @@ namespace fiducial_vlam
     }
 
   public:
-
     VmapNode(const rclcpp::NodeOptions &options) :
-      Node("vmap_node", options), cxt_{*this},
-      fm_(cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.corner_measurement_sigma_)
+      Node("vmap_node", options), fm_(fm_cxt_)
     {
       // Get parameters from the command line
-      cxt_.load_parameters();
+      load_parameters();
+
+      // Set up parameter for FiducialMath
+      load_fm_parameters();
 
       // Initialize the map. Load from file or otherwise.
       map_ = initialize_map();
@@ -508,7 +557,7 @@ namespace fiducial_vlam
 
       // Base the style of the new map on the sam_not_cv parameter. If we are not
       // doing sam, then the map contains only poses.
-      Map::MapStyles new_map_style = cxt_.sam_not_cv_ ?
+      Map::MapStyles new_map_style = fm_cxt_.sam_not_cv_ ?
                                      Map::MapStyles::covariance :
                                      Map::MapStyles::pose;
 

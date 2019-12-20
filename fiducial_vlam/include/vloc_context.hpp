@@ -100,15 +100,6 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */ \
   sub_camera_info_best_effort_not_reliable, \
   int, 0) \
-  CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
-  sam_not_cv, \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* use gtsam in Structure From Motion rather than Simultaneous Localization And Mapping mode */ \
-  sfm_not_slam, \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
-  corner_measurement_sigma, \
-  double, 1.0) \
   /* End of list */
 
 #define VLOC_ALL_OTHERS \
@@ -119,20 +110,10 @@ namespace fiducial_vlam
 
   struct VlocContext
   {
-    rclcpp::Node &node_;
-
-    explicit VlocContext(rclcpp::Node &node) :
-      node_{node}
-    {}
-
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     VLOC_ALL_PARAMS
     VLOC_ALL_OTHERS
-
-    void load_parameters();
-
-    void validate_parameters();
   };
 }
 

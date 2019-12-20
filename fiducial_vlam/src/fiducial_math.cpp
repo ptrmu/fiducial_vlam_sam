@@ -147,6 +147,12 @@ namespace fiducial_vlam
   class FiducialMath::CvFiducialMath
   {
   public:
+    FiducialMathContext &cxt_;
+
+    CvFiducialMath(FiducialMathContext &cxt) :
+      cxt_{cxt}
+    {}
+
     TransformWithCovariance solve_t_camera_marker(
       const Observation &observation,
       const CameraInfo &camera_info,
@@ -355,7 +361,6 @@ namespace fiducial_vlam
         cv::Point2f(static_cast<float>(observation.x3()), static_cast<float>(observation.y3())));
     };
 
-  private:
     Observations to_observations(const std::vector<int> &ids, const std::vector<std::vector<cv::Point2f>> &corners)
     {
       Observations observations;
@@ -369,7 +374,6 @@ namespace fiducial_vlam
       return observations;
     }
 
-  public:
     tf2::Transform to_tf2_transform(const cv::Vec3d &rvec, const cv::Vec3d &tvec)
     {
       tf2::Vector3 t(tvec[0], tvec[1], tvec[2]);
@@ -409,7 +413,6 @@ namespace fiducial_vlam
   class FiducialMath::SamFiducialMath
   {
     CvFiducialMath &cv_;
-    double &corner_measurement_sigma_;
 
     const gtsam::SharedNoiseModel corner_3D_constrained_noise_{
       gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_3x1)};
@@ -537,7 +540,7 @@ namespace fiducial_vlam
         gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
         gtsam::Point3 corner_f_marker{corners_f_marker[j].x, corners_f_marker[j].y, corners_f_marker[j].z};
         graph.emplace_shared<ResectioningFactor>(
-          gtsam::noiseModel::Isotropic::Sigma(2, corner_measurement_sigma_),
+          gtsam::noiseModel::Isotropic::Sigma(2, cv_.cxt_.corner_measurement_sigma_),
           camera_key_,
           camera_info.cv()->cal3ds2(),
           corner_f_image,
@@ -559,8 +562,8 @@ namespace fiducial_vlam
     }
 
   public:
-    explicit SamFiducialMath(CvFiducialMath &cv, double &corner_measurement_sigma) :
-      cv_{cv}, corner_measurement_sigma_{corner_measurement_sigma}
+    explicit SamFiducialMath(CvFiducialMath &cv) :
+      cv_{cv}
     {}
 
 
@@ -591,7 +594,7 @@ namespace fiducial_vlam
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
             gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
             graph.emplace_shared<gtsam::GenericProjectionFactor<gtsam::Pose3, gtsam::Point3, gtsam::Cal3DS2>>(
-              corner_f_image, gtsam::noiseModel::Isotropic::Sigma(2, corner_measurement_sigma_),
+              corner_f_image, gtsam::noiseModel::Isotropic::Sigma(2, cv_.cxt_.corner_measurement_sigma_),
               camera_key, corner_keys[j], camera_info.cv()->cal3ds2());
           }
 
@@ -871,11 +874,9 @@ namespace fiducial_vlam
 // FiducialMath class
 // ==============================================================================
 
-  FiducialMath::FiducialMath(int &sam_not_cv, int &sfm_not_slam,
-                             double &corner_measurement_sigma) :
-    sam_not_cv_{sam_not_cv}, sfm_not_slam_{sfm_not_slam},
-    cv_{std::make_unique<CvFiducialMath>()},
-    sam_{std::make_unique<SamFiducialMath>(*cv_, corner_measurement_sigma)}
+  FiducialMath::FiducialMath(FiducialMathContext &cxt) :
+    cv_{std::make_unique<CvFiducialMath>(cxt)},
+    sam_{std::make_unique<SamFiducialMath>(*cv_)}
   {}
 
   FiducialMath::~FiducialMath() = default;
@@ -892,9 +893,9 @@ namespace fiducial_vlam
                                                            const CameraInfo &camera_info,
                                                            Map &map)
   {
-    return !sam_not_cv_ ?
+    return !cv_->cxt_.sam_not_cv_ ?
            cv_->solve_t_map_camera(observations, camera_info, map) :
-           sfm_not_slam_ ?
+           cv_->cxt_.sfm_not_slam_ ?
            sam_->solve_t_map_camera_sfm(observations, camera_info, map) :
            sam_->solve_t_map_camera_slam(observations, camera_info, map);
   }
@@ -916,8 +917,8 @@ namespace fiducial_vlam
                                 const CameraInfo &camera_info,
                                 Map &map)
   {
-    if (sam_not_cv_) {
-      if (sfm_not_slam_) {
+    if (cv_->cxt_.sam_not_cv_) {
+      if (cv_->cxt_.sfm_not_slam_) {
         sam_->update_map_sfm(observations, camera_info, map);
       } else {
         sam_->update_map_slam(observations, camera_info, map);

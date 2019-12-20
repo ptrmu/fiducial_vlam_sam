@@ -76,15 +76,6 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* length of a side of a marker in meters */ \
   marker_length,  \
   double, 0.1627) \
-  CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
-  sam_not_cv, \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* use gtsam in Structure From Motion rather than Simultaneous Localization And Mapping mode */ \
-  sfm_not_slam, \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
-  corner_measurement_sigma, \
-  double, 0.5) \
   /* End of list */
 
 #define VMAP_ALL_OTHERS \
@@ -95,20 +86,10 @@ namespace fiducial_vlam
 
   struct VmapContext
   {
-    rclcpp::Node &node_;
-
-    explicit VmapContext(rclcpp::Node &node) :
-      node_{node}
-    {}
-
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     VMAP_ALL_PARAMS
     VMAP_ALL_OTHERS
-
-    void load_parameters();
-
-    void validate_parameters();
   };
 }
 
