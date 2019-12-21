@@ -97,6 +97,7 @@ set(VLOC_NODE_DEPS
   class_loader
   cv_bridge
   fiducial_vlam_msgs
+  GTSAM
   nav_msgs
   OpenCV
   rclcpp
@@ -124,6 +125,11 @@ add_executable(vloc_main
 
 ament_target_dependencies(vloc_main
   ${VLOC_NODE_DEPS})
+
+# ?? Why can't I put this in ament_target_dependencies
+target_link_libraries(vloc_node
+  gtsam
+  )
 
 # ?? Why can't I put this in ament_target_dependencies
 target_link_libraries(vloc_main
@@ -186,7 +192,24 @@ target_link_libraries(vmap_main
 # Install
 #=============
 
-# Install targets
+# Install composable nodes
+install(TARGETS
+  vloc_node
+  EXPORT export_vloc_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  )
+
+install(TARGETS
+  vmap_node
+  EXPORT export_vmap_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  )
+
+# Install executables
 install(TARGETS
   vloc_main
   vmap_main
@@ -200,10 +223,20 @@ install(DIRECTORY
   DESTINATION share/fiducial_vlam
   )
 
-ament_export_include_directories(include)
-
 install(DIRECTORY include/
   DESTINATION include)
+
+#=============
+# Export
+#=============
+
+ament_export_dependencies(class_loader yaml_cpp_vendor)
+
+ament_export_include_directories(include)
+
+ament_export_interfaces(export_vloc_node export_vmap_node)
+
+ament_export_libraries(vloc_node vmap_node)
 
 #=============
 # Run ament macros
