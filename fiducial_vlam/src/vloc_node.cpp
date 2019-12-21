@@ -198,6 +198,12 @@ namespace fiducial_vlam
         rclcpp::ServicesQoS(rclcpp::KeepLast(1)),
         [this](sensor_msgs::msg::Image::UniquePtr msg) -> void
         {
+#undef SHOW_ADDRESS
+#ifdef SHOW_ADDRESS
+          static int count = 0;
+          RCLCPP_INFO(get_logger(), "%d, %p", count++, reinterpret_cast<std::uintptr_t>(msg.get()));
+#endif
+
           // the stamp to use for all published messages derived from this image message.
           auto stamp{msg->header.stamp};
 
