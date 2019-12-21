@@ -14,6 +14,7 @@
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
 #include "gtsam/inference/Symbol.h"
+#include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
@@ -247,10 +248,17 @@ namespace fiducial_vlam
       auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
       auto detectorParameters = cv::aruco::DetectorParameters::create();
 #if (CV_VERSION_MAJOR == 4)
-      // Use the new AprilTag 2 corner algorithm, much better but much slower
-      detectorParameters->cornerRefinementMethod = cv::aruco::CornerRefineMethod::CORNER_REFINE_CONTOUR;
+//     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
+//     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
+//     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
+//     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
+
+        // Use the new AprilTag 2 corner algorithm, much better but much slower
+      detectorParameters->cornerRefinementMethod = cxt_.cv4_corner_refinement_method_;
 #else
-      detectorParameters->doCornerRefinement = true;
+      // 0 = false
+      // 1 = true
+      detectorParameters->doCornerRefinement = cxt_.cv3_do_corner_refinement_;
 #endif
 
       // Detect markers
@@ -407,12 +415,29 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// ISAM2State class
+// ==============================================================================
+
+  struct ISAM2State
+  {
+    gtsam::ISAM2 isam2_;
+    gtsam::NonlinearFactorGraph graph_;
+    gtsam::Values initial_;
+    int i_;
+
+    ISAM2State(const gtsam::ISAM2Params &parameters) :
+    isam2_{parameters}, graph_{}, initial_{}, i_{0}
+    {}
+  };
+
+// ==============================================================================
 // FiducialMath::SamFiducialMath class
 // ==============================================================================
 
   class FiducialMath::SamFiducialMath
   {
     CvFiducialMath &cv_;
+    std::unique_ptr<ISAM2State> isam2_;
 
     const gtsam::SharedNoiseModel corner_3D_constrained_noise_{
       gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_3x1)};
@@ -631,8 +656,6 @@ namespace fiducial_vlam
                                                    const CameraInfo &camera_info,
                                                    Map &map)
     {
-      auto t_map_markers = map.find_t_map_markers(observations);
-
       // Get an estimate of camera_f_map.
       auto cv_t_map_camera = cv_.solve_t_map_camera(observations, camera_info, map);
 
@@ -649,29 +672,6 @@ namespace fiducial_vlam
       load_graph_from_observations_sfm(observations, camera_info, map,
                                        cv_t_map_camera, camera_key_, false,
                                        graph, initial);
-//      for (int i = 0; i < observations.size(); i += 1) {
-//        auto &t_map_marker = t_map_markers[i];
-//        if (t_map_marker.is_valid()) {
-//
-//          std::vector<cv::Point3d> corners_f_map{};
-//          std::vector<cv::Point2f> corners_f_image{};
-//
-//          cv_.append_corners_f_map(t_map_markers[i], map.marker_length(), corners_f_map);
-//          cv_.append_corners_f_image(observations.observations()[i], corners_f_image);
-//
-//          for (size_t j = 0; j < corners_f_image.size(); j += 1) {
-//            gtsam::Point2 corner_f_image{corners_f_image[j].x, corners_f_image[j].y};
-//            gtsam::Point3 corner_f_map{corners_f_map[j].x, corners_f_map[j].y, corners_f_map[j].z};
-//            graph.emplace_shared<ResectioningFactor>(corner_measurement_noise_, camera_key_,
-//                                                     cal3ds2_,
-//                                                     corner_f_image,
-//                                                     corner_f_map);
-//          }
-//        }
-//      }
-//
-//      // 3. Add the initial estimate for the camera pose
-//      initial.insert(camera_key_, to_pose3(cv_t_map_camera.transform()));
 
       // 4. Optimize the graph using Levenberg-Marquardt
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
@@ -688,6 +688,23 @@ namespace fiducial_vlam
     void update_map_sfm(const Observations &observations,
                         const CameraInfo &camera_info,
                         Map &map)
+    {
+      // if no isam2 object, then no work to do.
+      if (isam2_.get() == nullptr) {
+        return;
+      }
+      auto &isam = *isam2_;
+
+
+      isam.i_ += 1;
+    }
+
+    void update_map_sfm_for_publishing(Map &map)
+    {
+
+    }
+
+    std::string update_map_cmd(std::string &cmd)
     {
 
     }
@@ -928,4 +945,18 @@ namespace fiducial_vlam
     }
   }
 
+  void FiducialMath::update_map_for_publishing(Map &map)
+  {
+    if (cv_->cxt_.sam_not_cv_ && cv_->cxt_.sfm_not_slam_) {
+      sam_->update_map_sfm_for_publishing(map);
+    }
+  }
+
+  std::string FiducialMath::update_map_cmd(std::string &cmd)
+  {
+    if (cv_->cxt_.sam_not_cv_ && cv_->cxt_.sfm_not_slam_) {
+      return sam_->update_map_cmd(cmd);
+    }
+    return std::string{};
+  }
 }

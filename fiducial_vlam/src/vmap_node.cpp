@@ -505,6 +505,9 @@ namespace fiducial_vlam
 
     void publish_map_and_visualization()
     {
+      // Update the map from FiducialMath in-case we are doing iterative map creation.
+      fm_.update_map_for_publishing(*map_);
+
       // publish the map
       std_msgs::msg::Header header;
       header.stamp = now();

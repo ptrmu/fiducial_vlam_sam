@@ -49,6 +49,12 @@ namespace fiducial_vlam
 // ==============================================================================
 
 #define FM_ALL_PARAMS \
+  CXT_MACRO_MEMBER(       /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */ \
+  cv3_do_corner_refinement, \
+  int, 1) \
+  CXT_MACRO_MEMBER(       /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */ \
+  cv4_corner_refinement_method, \
+  int, 2) \
   CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
   sam_not_cv, \
   int, 1) \
@@ -103,6 +109,10 @@ namespace fiducial_vlam
     void update_map(const Observations &observations,
                     const CameraInfo &camera_info,
                     Map &map);
+
+    void update_map_for_publishing(Map &map);
+
+    std::string update_map_cmd(std::string &cmd);
   };
 }
 
