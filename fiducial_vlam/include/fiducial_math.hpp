@@ -83,8 +83,11 @@ namespace fiducial_vlam
 
     class SamFiducialMath;
 
+    class UpdateFiducialMath;
+
     std::unique_ptr<CvFiducialMath> cv_;
     std::unique_ptr<SamFiducialMath> sam_;
+    std::unique_ptr<UpdateFiducialMath> update_;
 
   public:
     explicit FiducialMath(FiducialMathContext &cxt);

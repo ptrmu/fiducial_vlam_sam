@@ -74,7 +74,7 @@ namespace fiducial_vlam
     void update_simple_average(const TransformWithCovariance &newVal, int previous_update_count);
   };
 
-  class Point3WithCovariance
+  class Vector3WithCovariance
   {
   public:
     using mu_type = std::array<double, 3>;
@@ -82,7 +82,7 @@ namespace fiducial_vlam
 
   private:
     bool is_valid_{false};
-    tf2::Vector3 point_;
+    tf2::Vector3 vector3_;
     cov_type cov_{{0.}};
 
     static tf2::Vector3 to_point3(const mu_type &mu)
@@ -91,36 +91,36 @@ namespace fiducial_vlam
     }
 
   public:
-    Point3WithCovariance() = default;
+    Vector3WithCovariance() = default;
 
-    Point3WithCovariance(const tf2::Vector3 &point, const cov_type &cov)
-      : is_valid_{true}, point_{point}, cov_{cov}
+    Vector3WithCovariance(const tf2::Vector3 &vector3, const cov_type &cov)
+      : is_valid_{true}, vector3_{vector3}, cov_{cov}
     {}
 
-    explicit Point3WithCovariance(const tf2::Vector3 &point)
-      : is_valid_{true}, point_{point}, cov_{}
+    explicit Vector3WithCovariance(const tf2::Vector3 &vector3)
+      : is_valid_{true}, vector3_{vector3}, cov_{}
     {}
 
-    Point3WithCovariance(const mu_type &mu, const cov_type &cov)
-      : is_valid_{true}, point_{(to_point3(mu))}, cov_{cov}
+    Vector3WithCovariance(const mu_type &mu, const cov_type &cov)
+      : is_valid_{true}, vector3_{(to_point3(mu))}, cov_{cov}
     {}
 
-    explicit Point3WithCovariance(const mu_type &mu)
-      : is_valid_{true}, point_{(to_point3(mu))}, cov_{}
+    explicit Vector3WithCovariance(const mu_type &mu)
+      : is_valid_{true}, vector3_{(to_point3(mu))}, cov_{}
     {}
 
     auto is_valid() const
     { return is_valid_; }
 
-    auto &point3() const
-    { return point_; }
+    auto &vector3() const
+    { return vector3_; }
 
     auto &cov() const
     { return cov_; }
 
     mu_type mu() const
     {
-      return mu_type{point_[0], point_[1], point_[2]};
+      return mu_type{vector3_[0], vector3_[1], vector3_[2]};
     }
   };
 }

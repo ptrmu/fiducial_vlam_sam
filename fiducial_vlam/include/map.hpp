@@ -34,7 +34,7 @@ namespace fiducial_vlam
     TransformWithCovariance t_map_marker_;
 
     // If not empty then 3D locations of corners.
-    std::vector<Point3WithCovariance> corners_f_map_;
+    std::vector<Vector3WithCovariance> corners_f_map_;
 
     // Prevent modification if true
     bool is_fixed_{false};
@@ -49,7 +49,7 @@ namespace fiducial_vlam
       id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{}
     {}
 
-    Marker(int id, TransformWithCovariance t_map_marker, std::vector<Point3WithCovariance> &corners_f_map) :
+    Marker(int id, TransformWithCovariance t_map_marker, std::vector<Vector3WithCovariance> &corners_f_map) :
       id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{corners_f_map}
     {}
 
@@ -77,7 +77,7 @@ namespace fiducial_vlam
     const auto &corners_f_map() const
     { return corners_f_map_; }
 
-    void set_corners_f_map(const std::vector<Point3WithCovariance> &corners_f_map)
+    void set_corners_f_map(const std::vector<Vector3WithCovariance> &corners_f_map)
     { corners_f_map_ = corners_f_map; }
 
     bool has_corners()

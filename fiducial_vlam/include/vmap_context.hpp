@@ -54,16 +54,16 @@ namespace fiducial_vlam
   int, 1) \
   CXT_MACRO_MEMBER(       /* marker id for map initialization */ \
   map_init_id,  \
-  int, 1) \
+  int, 0) \
   CXT_MACRO_MEMBER(       /* pose component for map initialization */ \
   map_init_pose_x,  \
-  double, 0.) \
+  double, 2.) \
   CXT_MACRO_MEMBER(       /* pose component for map initialization */ \
   map_init_pose_y,  \
   double, 0.) \
   CXT_MACRO_MEMBER(       /* pose component for map initialization */ \
   map_init_pose_z, \
-  double, 1.) \
+  double, 0.) \
   CXT_MACRO_MEMBER(       /* pose component for map initialization */ \
   map_init_pose_roll, \
   double, TF2SIMD_HALF_PI) \
@@ -76,6 +76,10 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* length of a side of a marker in meters */ \
   marker_length,  \
   double, 0.1627) \
+  \
+  CXT_MACRO_MEMBER(       /* commands to the update_map system  */  \
+  update_map_cmd, \
+  std::string, "") \
   /* End of list */
 
 #define VMAP_ALL_OTHERS \

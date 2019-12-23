@@ -55,7 +55,7 @@ namespace fiducial_vlam
         for (auto cov_element : marker.t_map_marker().cov()) {
           emitter_ << cov_element;
         }
-        emitter_ << YAML::EndSeq;;
+        emitter_ << YAML::EndSeq;
       }
 
       emitter_ << YAML::EndMap;
@@ -349,7 +349,7 @@ namespace fiducial_vlam
     {
       // Find the marker with the lowest id
       int min_id = std::numeric_limits<int>::max();
-      const Observation *min_obs;
+      const Observation *min_obs{};
       for (auto &obs : observations.observations()) {
         if (obs.id() < min_id) {
           min_id = obs.id();
@@ -369,7 +369,7 @@ namespace fiducial_vlam
     }
 
   public:
-    VmapNode(const rclcpp::NodeOptions &options) :
+    explicit VmapNode(const rclcpp::NodeOptions &options) :
       Node("vmap_node", options), fm_(fm_cxt_)
     {
       // Get parameters from the command line
@@ -405,7 +405,10 @@ namespace fiducial_vlam
           16,
           [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
           {
-            this->observations_callback(msg);
+            // Only process observations if we are making maps
+            if (cxt_.make_not_use_map_) {
+              this->observations_callback(msg);
+            }
           });
       }
 
@@ -419,6 +422,21 @@ namespace fiducial_vlam
           if (map_) {
             this->publish_map_and_visualization();
           }
+
+          // Figure out if there is an update maps command to process.
+          if (!cxt_.update_map_cmd_.empty()) {
+            if (!cxt_.make_not_use_map_) {
+              RCLCPP_INFO(get_logger(), "UpdateMapCmd command ignored because not in make_map mode %s",
+                          cxt_.update_map_cmd_.c_str());
+            } else {
+              auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_);
+              if (!ret.empty()) {
+                RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
+              }
+            }
+            // Reset the cmd_string in preparation for the next command.
+            CXT_MACRO_SET_PARAMETER((*this), cxt_, update_map_cmd, "");
+          }
         });
 
       (void) observations_sub_;
@@ -430,8 +448,6 @@ namespace fiducial_vlam
 
     void observations_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
     {
-      callbacks_processed_ += 1;
-
       CameraInfo ci{msg->camera_info};
 
       // Get observations from the message.
@@ -447,6 +463,8 @@ namespace fiducial_vlam
       if (observations.size() < 2) {
         return;
       }
+
+      callbacks_processed_ += 1;
 
       // Update our map with the observations
       fm_.update_map(observations, ci, *map_);
