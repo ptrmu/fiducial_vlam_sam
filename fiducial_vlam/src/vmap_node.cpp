@@ -286,6 +286,7 @@ namespace fiducial_vlam
     FiducialMath fm_;
     std::unique_ptr<Map> map_{};
     int callbacks_processed_{0};
+    rclcpp::Time exit_timer_;
 
     // ROS publishers
     rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr fiducial_map_pub_{};
@@ -370,7 +371,7 @@ namespace fiducial_vlam
 
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
-      Node("vmap_node", options), fm_(fm_cxt_)
+      Node("vmap_node", options), fm_(fm_cxt_), exit_timer_{now()}
     {
       // Get parameters from the command line
       load_parameters();
@@ -412,15 +413,21 @@ namespace fiducial_vlam
           });
       }
 
+      static const int timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.marker_map_publish_frequency_hz_);
+
       // Timer for publishing map info
       map_pub_timer_ = create_wall_timer(
-        std::chrono::milliseconds(static_cast<int>(1000. / cxt_.marker_map_publish_frequency_hz_)),
+        std::chrono::milliseconds(timer_period_milliseconds_),
         [this]() -> void
         {
           // Only if there is a map. There might not
           // be a map if no markers have been observed.
           if (map_) {
-            this->publish_map_and_visualization();
+            rclcpp::Time enter_publish{now()};
+            if ((enter_publish - exit_timer_) >= std::chrono::milliseconds(timer_period_milliseconds_)) {
+              this->publish_map_and_visualization();
+            }
+            exit_timer_ = now();
           }
 
           // Figure out if there is an update maps command to process.

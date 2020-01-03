@@ -47,6 +47,7 @@ vmap_args = [{
     'sam_not_cv': sam_not_cv,
     'sfm_not_slam': sfm_not_slam,
     'corner_measurement_sigma': corner_measurement_sigma,
+    'update_map_cmd': 'start',
 }]
 
 
@@ -67,8 +68,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args, node_namespace='forward_camera'),
-        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
-             parameters=vmap_args),
+        # Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+        #      parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)

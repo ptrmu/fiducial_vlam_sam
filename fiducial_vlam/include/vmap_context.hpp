@@ -75,11 +75,11 @@ namespace fiducial_vlam
   double, -TF2SIMD_HALF_PI) \
   CXT_MACRO_MEMBER(       /* length of a side of a marker in meters */ \
   marker_length,  \
-  double, 0.1627) \
+  double, 0.1778) \
   \
   CXT_MACRO_MEMBER(       /* commands to the update_map system  */  \
   update_map_cmd, \
-  std::string, "") \
+  std::string, "start") \
   /* End of list */
 
 #define VMAP_ALL_OTHERS \
