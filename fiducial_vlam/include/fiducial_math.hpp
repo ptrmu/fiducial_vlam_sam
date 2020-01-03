@@ -55,15 +55,18 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */ \
   cv4_corner_refinement_method, \
   int, 2) \
+  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
+  corner_measurement_sigma, \
+  double, 1.0) \
   CXT_MACRO_MEMBER(       /* use gtsam for fiducial calculations not opencv */ \
   sam_not_cv, \
   int, 1) \
   CXT_MACRO_MEMBER(       /* use gtsam in Structure From Motion rather than Simultaneous Localization And Mapping mode */ \
   sfm_not_slam, \
+  int, 0) \
+  CXT_MACRO_MEMBER(       /* When making maps, optimize the measurements from multiple frames. */ \
+  multi_frame_optimization, \
   int, 1) \
-  CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
-  corner_measurement_sigma, \
-  double, 1.0) \
   /* End of list */
 
   struct FiducialMathContext
