@@ -241,29 +241,33 @@ namespace fiducial_vlam
 
       // Figure out camera location.
       cv::Vec3d rvec, tvec;
-      cv::solvePnP(all_corners_f_map, all_corners_f_image,
-                   camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
-                   rvec, tvec);
+      try {
+        cv::solvePnP(all_corners_f_map, all_corners_f_image,
+                     camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
+                     rvec, tvec);
 
-      // For certain cases, there is a chance that the multi marker solvePnP will
-      // return the mirror of the correct solution. So try solvePn[Ransac as well.
-      if (all_corners_f_image.size() > 1 * 4 && all_corners_f_image.size() < 4 * 4) {
-        cv::Vec3d rvecRansac, tvecRansac;
-        cv::solvePnPRansac(all_corners_f_map, all_corners_f_image,
-                           camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
-                           rvecRansac, tvecRansac);
+        // For certain cases, there is a chance that the multi marker solvePnP will
+        // return the mirror of the correct solution. So try solvePn[Ransac as well.
+        if (all_corners_f_image.size() > 1 * 4 && all_corners_f_image.size() < 4 * 4) {
+          cv::Vec3d rvecRansac, tvecRansac;
+          cv::solvePnPRansac(all_corners_f_map, all_corners_f_image,
+                             camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
+                             rvecRansac, tvecRansac);
 
-        // If the pose returned from the ransac version is very different from
-        // that returned from the normal version, then use the ransac results.
-        // solvePnp can sometimes pick up the wrong solution (a mirror solution).
-        // solvePnpRansac does a better job in that case. But solvePnp does a
-        // better job smoothing out image noise so it is prefered when it works.
-        if (std::abs(rvec[0] - rvecRansac[0]) > 0.5 ||
-            std::abs(rvec[1] - rvecRansac[1]) > 0.5 ||
-            std::abs(rvec[2] - rvecRansac[2]) > 0.5) {
-          rvec = rvecRansac;
-          tvec = tvecRansac;
+          // If the pose returned from the ransac version is very different from
+          // that returned from the normal version, then use the ransac results.
+          // solvePnp can sometimes pick up the wrong solution (a mirror solution).
+          // solvePnpRansac does a better job in that case. But solvePnp does a
+          // better job smoothing out image noise so it is prefered when it works.
+          if (std::abs(rvec[0] - rvecRansac[0]) > 0.5 ||
+              std::abs(rvec[1] - rvecRansac[1]) > 0.5 ||
+              std::abs(rvec[2] - rvecRansac[2]) > 0.5) {
+            rvec = rvecRansac;
+            tvec = tvecRansac;
+          }
         }
+      } catch (cv::Exception &ex) {
+        return TransformWithCovariance{};
       }
 
       if (tvec[0] < 0) { // specific tests for bad pose determination
@@ -891,7 +895,7 @@ namespace fiducial_vlam
     gtsam::NonlinearFactorGraph graph_;
     gtsam::Values initial_;
     gtsam::ISAM2 isam2_;
-    std::uint64_t iteration_;
+    std::uint64_t frames_processeed_;
     std::map<int, int> marker_seen_counts_{};
 
     static gtsam::ISAM2Params get_isam2_params(FiducialMathContext &cxt)
@@ -993,10 +997,10 @@ namespace fiducial_vlam
         return;
       }
 
-      // Crate a camera key based on the iteration count and then update
-      // the iteration count.
-      gtsam::Symbol camera_key{'c', iteration_};
-      iteration_ += 1;
+      // Crate a camera key based on the frame count and then update
+      // the frame count.
+      gtsam::Symbol camera_key{'c', frames_processeed_};
+      frames_processeed_ += 1;
 
       sam_.load_graph_from_observations_sfm(observations, camera_info, map,
                                             cv_t_map_camera_initial,
@@ -1085,10 +1089,10 @@ namespace fiducial_vlam
         return;
       }
 
-      // Crate a camera key based on the iteration count and then update
-      // the iteration count.
-      gtsam::Symbol camera_key{'c', iteration_};
-      iteration_ += 1;
+      // Crate a camera key based on the frame count and then update
+      // the frame count.
+      gtsam::Symbol camera_key{'c', frames_processeed_};
+      frames_processeed_ += 1;
 
       gtsam::NonlinearFactorGraph graph{};
       gtsam::Values initial{};
@@ -1128,9 +1132,15 @@ namespace fiducial_vlam
       }
 
       // Now optimize this multi-frame graph
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_).optimize();
+      auto params = gtsam::LevenbergMarquardtParams();
+      params.setVerbosityLM("TERMINATION");
+      params.setVerbosity("TERMINATION");
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
       std::cout << "initial error = " << graph_.error(initial_) << std::endl;
       std::cout << "final error = " << graph_.error(result) << std::endl;
+      std::cout << "frames = " << frames_processeed_ << std::endl;
 
       // Push the multi frame optimized marker poses into the map.
       for (auto &pair : marker_seen_counts_) {
@@ -1169,7 +1179,7 @@ namespace fiducial_vlam
       cv_{cv}, sam_{sam}, cxt_{cv_.cxt_},
       graph_{}, initial_{},
       isam2_{get_isam2_params(cv.cxt_)},
-      iteration_{0}
+      frames_processeed_{0}
     {
 
     }

@@ -403,7 +403,7 @@ namespace fiducial_vlam
       if (cxt_.make_not_use_map_) {
         observations_sub_ = create_subscription<fiducial_vlam_msgs::msg::Observations>(
           cxt_.fiducial_observations_sub_topic_,
-          16,
+          512,
           [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
           {
             // Only process observations if we are making maps
@@ -424,7 +424,9 @@ namespace fiducial_vlam
           // be a map if no markers have been observed.
           if (map_) {
             rclcpp::Time enter_publish{now()};
-            if ((enter_publish - exit_timer_) >= std::chrono::milliseconds(timer_period_milliseconds_)) {
+            // Give a little time for other tasks to process. For large optimizations, this timer routine
+            // sucks up CPU cycles and other tasks are starved.
+            if ((enter_publish - exit_timer_) >= std::chrono::milliseconds(timer_period_milliseconds_) / 2) {
               this->publish_map_and_visualization();
             }
             exit_timer_ = now();
