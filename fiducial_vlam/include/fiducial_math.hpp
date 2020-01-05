@@ -67,6 +67,9 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* When making maps, optimize the measurements from multiple frames. */ \
   multi_frame_optimization, \
   int, 1) \
+  CXT_MACRO_MEMBER(       /* When making maps, optimize the measurements from multiple frames. */ \
+  use_isam, \
+  int, 1) \
   /* End of list */
 
   struct FiducialMathContext

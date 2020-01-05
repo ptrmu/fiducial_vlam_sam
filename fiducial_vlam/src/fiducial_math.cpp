@@ -1148,6 +1148,13 @@ namespace fiducial_vlam
       }
     }
 
+    void update_map_slam_isam(const Observations &observations,
+                              const CameraInfo &camera_info,
+                              Map &map)
+    {
+
+    }
+
     void update_map_cv(const Observations &observations,
                        const CameraInfo &camera_info,
                        Map &map)
@@ -1192,7 +1199,11 @@ namespace fiducial_vlam
         if (cxt_.sfm_not_slam_) {
           update_map_sfm(observations, camera_info, map);
         } else {
-          update_map_slam(observations, camera_info, map);
+          if(cxt_.use_isam_) {
+            update_map_slam_isam(observations, camera_info, map)
+          } else {
+            update_map_slam(observations, camera_info, map);
+          }
         }
       } else {
         update_map_cv(observations, camera_info, map);
@@ -1205,7 +1216,9 @@ namespace fiducial_vlam
         if (cxt_.sfm_not_slam_) {
           update_map_for_publishing_sfm(map);
         } else {
-          update_map_for_publishing_slam(map);
+          if (!cxt_.use_isam_) {
+            update_map_for_publishing_slam(map);
+          }
         }
       }
     }
