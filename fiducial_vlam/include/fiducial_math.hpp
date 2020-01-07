@@ -67,7 +67,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* When making maps, optimize the measurements from multiple frames. */ \
   multi_frame_optimization, \
   int, 1) \
-  CXT_MACRO_MEMBER(       /* When making maps, optimize the measurements from multiple frames. */ \
+  CXT_MACRO_MEMBER(       /* When making maps with multiple frames, use ISAM2. */ \
   use_isam, \
   int, 1) \
   /* End of list */
