@@ -877,22 +877,6 @@ namespace fiducial_vlam
         graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3> >(marker_key,
                                                                 initial_marker_f_map,
                                                                 known_noise_model);
-
-//        // A known marker.
-//        if (marker_ptr != nullptr) {
-//          // Get the pose from a marker in the map and add it as the initial value.
-//          auto known_marker_f_map = to_pose3(marker_ptr->t_map_marker().transform());
-//          initial.insert(marker_key, known_marker_f_map);
-//
-//          // Only add priors if this is a fixed marker or if requested.
-//          if (marker_ptr->is_fixed() || add_non_fixed_priors) {
-//          }
-//
-//        } else {
-//          // An unknown marker.
-//          auto unknown_marker_f_map = t_map_camera_initial.transform() * camera_f_marker.transform().inverse();
-//          initial.insert(marker_key, to_pose3(unknown_marker_f_map));
-//        }
       }
 
       // Add the camera initial value.
@@ -955,7 +939,7 @@ namespace fiducial_vlam
     gtsam::NonlinearFactorGraph graph_;
     gtsam::Values initial_;
     gtsam::ISAM2 isam2_;
-    std::uint64_t frames_processeed_;
+    std::uint64_t frames_processed_;
     std::map<int, int> marker_seen_counts_{};
 
     static gtsam::ISAM2Params get_isam2_params(FiducialMathContext &cxt)
@@ -1059,8 +1043,8 @@ namespace fiducial_vlam
 
       // Crate a camera key based on the frame count and then update
       // the frame count.
-      gtsam::Symbol camera_key{'c', frames_processeed_};
-      frames_processeed_ += 1;
+      gtsam::Symbol camera_key{'c', frames_processed_};
+      frames_processed_ += 1;
 
       sam_.load_graph_from_observations_sfm(observations, camera_info, map,
                                             cv_t_map_camera_initial,
@@ -1152,8 +1136,8 @@ namespace fiducial_vlam
 
       // Crate a camera key based on the frame count and then update
       // the frame count.
-      gtsam::Symbol camera_key{'c', frames_processeed_};
-      frames_processeed_ += 1;
+      gtsam::Symbol camera_key{'c', frames_processed_};
+      frames_processed_ += 1;
 
       gtsam::NonlinearFactorGraph graph{};
       gtsam::Values initial{};
@@ -1207,7 +1191,7 @@ namespace fiducial_vlam
       auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
       std::cout << "initial error = " << graph_.error(initial_) << std::endl;
       std::cout << "final error = " << graph_.error(result) << std::endl;
-      std::cout << "frames = " << frames_processeed_ << std::endl;
+      std::cout << "frames = " << frames_processed_ << std::endl;
 
       // Push the multi frame optimized marker poses into the map.
       for (auto &pair : marker_seen_counts_) {
@@ -1229,15 +1213,15 @@ namespace fiducial_vlam
 
       // Crate a camera key based on the frame count and then update
       // the frame count.
-      gtsam::Symbol camera_key{'c', frames_processeed_};
-      frames_processeed_ += 1;
+      gtsam::Symbol camera_key{'c', frames_processed_};
+      frames_processed_ += 1;
 
       gtsam::NonlinearFactorGraph graph{};
       gtsam::Values initial{};
 
       // On the first pass, add all factors, all initials and fixed priors. On subsequent passes add all
       // factors, initials from new markers and no priors.
-      if (frames_processeed_ == 1) {
+      if (frames_processed_ == 1) {
         sam_.load_graph_from_observations_slam(observations, camera_info, map,
                                                cv_t_map_camera_initial,
                                                camera_key,
@@ -1268,7 +1252,7 @@ namespace fiducial_vlam
 
       gtsam::Values currentEstimate = isam2_.calculateEstimate();
       std::cout << "****************************************************" << std::endl;
-      std::cout << "Frame " << frames_processeed_ << ": " << std::endl;
+      std::cout << "Frame " << frames_processed_ << ": " << std::endl;
 //      isam2_.error(currentEstimate);
 //      currentEstimate.print("Current estimate: ");
 //      isam2_.print("---------------isam2");
@@ -1310,7 +1294,7 @@ namespace fiducial_vlam
       cv_{cv}, sam_{sam}, cxt_{cv_.cxt_},
       graph_{}, initial_{},
       isam2_{get_isam2_params(cv.cxt_)},
-      frames_processeed_{0}
+      frames_processed_{0}
     {
 
     }
