@@ -20,7 +20,7 @@ sam_not_cv = 1
 sfm_not_slam = 0
 make_not_use_map = 1
 multi_frame_optimization=1
-use_isam=1
+use_isam=0
 corner_measurement_sigma = 0.7
 
 vloc_args = [{
@@ -42,7 +42,7 @@ vloc_args = [{
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
     'publish_tfs': 1,  # Publish marker /tf
-    'marker_length': 0.1775,  # Marker length
+    'marker_length': 0.1730,  # Marker length
     'marker_map_save_full_filename': map_filename,
     'marker_map_load_full_filename': map_filename,
     'make_not_use_map': make_not_use_map,
@@ -72,8 +72,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args, node_namespace='forward_camera'),
-        # Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)
