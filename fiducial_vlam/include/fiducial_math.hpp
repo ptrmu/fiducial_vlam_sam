@@ -80,20 +80,38 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// UpdateMapInterface class
+// ==============================================================================
+
+  class UpdateMapInterface
+  {
+  public:
+    UpdateMapInterface() = default;
+
+    virtual ~UpdateMapInterface() = default;
+
+    virtual void update_map(const Observations &observations,
+                            const CameraInfo &camera_info,
+                            Map &map) = 0;
+
+    virtual void update_map_for_publishing(Map &map) = 0;
+
+    virtual std::string update_map_cmd(std::string &cmd) = 0;
+  };
+
+// ==============================================================================
 // FiducialMath class
 // ==============================================================================
 
+  class CvFiducialMath;
+
+  class SamFiducialMath;
+
   class FiducialMath
   {
-    class CvFiducialMath;
-
-    class SamFiducialMath;
-
-    class UpdateFiducialMath;
-
     std::unique_ptr<CvFiducialMath> cv_;
     std::unique_ptr<SamFiducialMath> sam_;
-    std::unique_ptr<UpdateFiducialMath> update_;
+    std::unique_ptr<UpdateMapInterface> update_;
 
   public:
     explicit FiducialMath(FiducialMathContext &cxt);

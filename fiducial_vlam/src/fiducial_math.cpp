@@ -178,15 +178,15 @@ namespace fiducial_vlam
   }
 
 // ==============================================================================
-// FiducialMath::CvFiducialMath class
+// CvFiducialMath class
 // ==============================================================================
 
-  class FiducialMath::CvFiducialMath
+  class CvFiducialMath
   {
   public:
     FiducialMathContext &cxt_;
 
-    CvFiducialMath(FiducialMathContext &cxt) :
+    explicit CvFiducialMath(FiducialMathContext &cxt) :
       cxt_{cxt}
     {}
 
@@ -430,10 +430,10 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// FiducialMath::SamFiducialMath class
+// SamFiducialMath class
 // ==============================================================================
 
-  class FiducialMath::SamFiducialMath
+  class SamFiducialMath
   {
     CvFiducialMath &cv_;
 
@@ -924,10 +924,10 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// FiducialMath::UpdateFiducialMath class
+// UpdateFiducialMath class
 // ==============================================================================
 
-  class FiducialMath::UpdateFiducialMath
+  class UpdateFiducialMath : public UpdateMapInterface
   {
     CvFiducialMath &cv_;
     SamFiducialMath &sam_;
@@ -980,7 +980,7 @@ namespace fiducial_vlam
 
       /// evaluate the error
       gtsam::Vector evaluateError(const gtsam::Pose3 &pose,
-                                  boost::optional<gtsam::Matrix &> H = boost::none) const override
+                                  boost::optional<gtsam::Matrix &> H) const override
       {
         return pose.transformFrom(corner_f_marker_, H) - corner_f_world_;
       }
@@ -1301,7 +1301,7 @@ namespace fiducial_vlam
 
     void update_map(const Observations &observations,
                     const CameraInfo &camera_info,
-                    Map &map)
+                    Map &map) override
     {
       if (cxt_.sam_not_cv_) {
         if (cxt_.sfm_not_slam_) {
@@ -1318,7 +1318,7 @@ namespace fiducial_vlam
       }
     }
 
-    void update_map_for_publishing(Map &map)
+    void update_map_for_publishing(Map &map) override
     {
       if (cxt_.sam_not_cv_) {
         if (cxt_.sfm_not_slam_) {
@@ -1331,7 +1331,7 @@ namespace fiducial_vlam
       }
     }
 
-    std::string update_map_cmd(std::string &cmd)
+    std::string update_map_cmd(std::string &cmd) override
     {
       if (cmd == "start") {
         return ros2_shared::string_printf(
