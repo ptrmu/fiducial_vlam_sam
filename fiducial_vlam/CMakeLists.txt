@@ -147,6 +147,7 @@ set(VMAP_NODE_SOURCES
   src/transform_with_covariance.cpp
   src/vmap_main.cpp
   src/vmap_node.cpp
+  src/slam_task.cpp
   )
 
 set(VMAP_NODE_DEPS

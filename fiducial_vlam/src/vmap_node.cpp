@@ -284,7 +284,8 @@ namespace fiducial_vlam
     VmapContext cxt_{};
     FiducialMathContext fm_cxt_{};
     FiducialMath fm_;
-    std::unique_ptr<Map> map_{};
+    std::unique_ptr<Map> map_{}; // Map that gets updated and published.
+    std::unique_ptr<Map> empty_map_{}; // Map that doesn't get updated.
     int callbacks_processed_{0};
     rclcpp::Time exit_timer_;
 
@@ -381,6 +382,7 @@ namespace fiducial_vlam
 
       // Initialize the map. Load from file or otherwise.
       map_ = initialize_map();
+      empty_map_ = std::unique_ptr<Map>{new Map{*map_}};
 
 //      auto s = to_YAML_string(*map_, "test");
 //      auto m = from_YAML_string(s, "test");
@@ -438,7 +440,7 @@ namespace fiducial_vlam
               RCLCPP_INFO(get_logger(), "UpdateMapCmd command ignored because not in make_map mode %s",
                           cxt_.update_map_cmd_.c_str());
             } else {
-              auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_);
+              auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_, *empty_map_);
               if (!ret.empty()) {
                 RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
               }

@@ -70,6 +70,9 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* When making maps with multiple frames, use ISAM2. */ \
   use_isam, \
   int, 1) \
+  CXT_MACRO_MEMBER(       /* When making maps used the SlamTask. */ \
+  use_slam_task, \
+  int, 1) \
   /* End of list */
 
   struct FiducialMathContext
@@ -139,8 +142,15 @@ namespace fiducial_vlam
 
     void update_map_for_publishing(Map &map);
 
-    std::string update_map_cmd(std::string &cmd);
+    std::string update_map_cmd(std::string &cmd, const Map &empty_map_);
   };
+
+// ==============================================================================
+// slam_task_factory
+// ==============================================================================
+
+  std::unique_ptr<UpdateMapInterface> slam_task_factory(FiducialMath &fm, const Map &empty_map);
+
 }
 
 #endif //FIDUCIAL_VLAM_FIDUCIAL_MATH_HPP

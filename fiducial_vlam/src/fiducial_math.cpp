@@ -1402,7 +1402,7 @@ namespace fiducial_vlam
     }
   }
 
-  std::string FiducialMath::update_map_cmd(std::string &cmd)
+  std::string FiducialMath::update_map_cmd(std::string &cmd, const Map &empty_map)
   {
     if (update_) {
       auto ret_str = update_->update_map_cmd(cmd);
@@ -1413,7 +1413,10 @@ namespace fiducial_vlam
     }
 
     if (cmd == "start") {
-      update_ = std::make_unique<UpdateFiducialMath>(*cv_, *sam_);
+      update_ = cv_->cxt_.use_slam_task_ ?
+                slam_task_factory(*this, empty_map) :
+                std::unique_ptr<UpdateMapInterface>{new UpdateFiducialMath{*cv_, *sam_}};
+
       return update_->update_map_cmd(cmd);
     }
 
