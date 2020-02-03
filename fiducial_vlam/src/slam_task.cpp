@@ -63,7 +63,7 @@ namespace fiducial_vlam
 
     std::string update_map_cmd(std::string &cmd) override
     {
-
+      return std::string{};
     }
   };
 
