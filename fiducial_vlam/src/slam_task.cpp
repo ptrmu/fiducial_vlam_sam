@@ -28,7 +28,7 @@ namespace fiducial_vlam
 
     std::unique_ptr<Map> solve_map()
     {
-      return std::unique_ptr<Map>{};
+      return std::make_unique<Map>(*empty_map_);
     }
   };
 
@@ -59,6 +59,7 @@ namespace fiducial_vlam
     void update_map_for_publishing(Map &map) override
     {
       auto new_map = stw_->solve_map();
+      map.reset(*new_map);
     }
 
     std::string update_map_cmd(std::string &cmd) override

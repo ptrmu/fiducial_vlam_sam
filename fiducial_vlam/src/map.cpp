@@ -67,6 +67,16 @@ namespace fiducial_vlam
     }
   }
 
+  void Map::reset(const Map &map)
+  {
+    assert(map_style_ == map.map_style_ && marker_length_ == map.marker_length_);
+    // Copy over all the markers
+    markers_.clear();
+    for (auto &pair : map.markers_) {
+      add_marker(pair.second);
+    }
+  }
+
   std::unique_ptr<fiducial_vlam_msgs::msg::Map>
   Map::to_map_msg(const std_msgs::msg::Header &header_msg)
   {

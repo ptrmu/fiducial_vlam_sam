@@ -110,6 +110,8 @@ namespace fiducial_vlam
 
     explicit Map(const fiducial_vlam_msgs::msg::Map &msg);
 
+    void reset(const Map &map); // Figure out how to remove this function
+
     const auto &markers() const
     { return markers_; }
 

@@ -382,7 +382,7 @@ namespace fiducial_vlam
 
       // Initialize the map. Load from file or otherwise.
       map_ = initialize_map();
-      empty_map_ = std::unique_ptr<Map>{new Map{*map_}};
+      empty_map_.reset(new Map{*map_});
 
 //      auto s = to_YAML_string(*map_, "test");
 //      auto m = from_YAML_string(s, "test");
