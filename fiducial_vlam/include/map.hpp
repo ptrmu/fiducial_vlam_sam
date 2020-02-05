@@ -123,6 +123,8 @@ namespace fiducial_vlam
 
     Marker *find_marker(int id);
 
+    const Marker *find_marker_const(int id) const;
+
     void add_marker(Marker marker);
 
     std::unique_ptr<fiducial_vlam_msgs::msg::Map>

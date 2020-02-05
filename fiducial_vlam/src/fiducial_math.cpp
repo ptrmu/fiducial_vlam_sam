@@ -126,6 +126,11 @@ namespace fiducial_vlam
     : cv_(std::make_shared<CameraInfo::CvCameraInfo>(camera_info_msg))
   {}
 
+  const gtsam::Cal3DS2 &CameraInfo::cal3ds2() const
+  {
+    return *cv_->cal3ds2();
+  }
+
 // ==============================================================================
 // drawDetectedMarkers function
 // ==============================================================================
@@ -1414,7 +1419,7 @@ namespace fiducial_vlam
 
     if (cmd == "start") {
       update_ = cv_->cxt_.use_slam_task_ ?
-                slam_task_factory(*this, empty_map) :
+                slam_task_factory(*this, cv_->cxt_, empty_map) :
                 std::unique_ptr<UpdateMapInterface>{new UpdateFiducialMath{*cv_, *sam_}};
 
       return update_->update_map_cmd(cmd);

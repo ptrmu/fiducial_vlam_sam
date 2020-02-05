@@ -100,6 +100,12 @@ namespace fiducial_vlam
     return marker_pair == markers_.end() ? nullptr : &marker_pair->second;
   }
 
+  const Marker *Map::find_marker_const(int id) const
+  {
+    auto marker_pair = markers_.find(id);
+    return marker_pair == markers_.end() ? nullptr : &marker_pair->second;
+  }
+
   void Map::add_marker(Marker marker)
   {
     assert(markers_.count(marker.id()) == 0);

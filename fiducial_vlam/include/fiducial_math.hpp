@@ -12,6 +12,11 @@ namespace cv_bridge
   class CvImage;
 }
 
+namespace gtsam
+{
+  class Cal3DS2;
+}
+
 namespace fiducial_vlam
 {
   class Observation;
@@ -36,6 +41,8 @@ namespace fiducial_vlam
     CameraInfo();
 
     explicit CameraInfo(const sensor_msgs::msg::CameraInfo &camera_info);
+
+    const gtsam::Cal3DS2 &cal3ds2() const;
 
     auto &cv() const
     { return cv_; }
@@ -149,7 +156,9 @@ namespace fiducial_vlam
 // slam_task_factory
 // ==============================================================================
 
-  std::unique_ptr<UpdateMapInterface> slam_task_factory(FiducialMath &fm, const Map &empty_map);
+  std::unique_ptr<UpdateMapInterface> slam_task_factory(FiducialMath &fm,
+                                                        const FiducialMathContext &cxt,
+                                                        const Map &empty_map);
 
 }
 
