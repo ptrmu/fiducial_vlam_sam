@@ -90,6 +90,7 @@ set(VLOC_NODE_SOURCES
   src/map.cpp
   src/transform_with_covariance.cpp
   src/vloc_node.cpp
+  src/slam_task.cpp
   )
 
 set(VLOC_NODE_DEPS

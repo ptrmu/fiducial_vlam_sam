@@ -135,8 +135,8 @@ namespace fiducial_vlam
     class ResectioningFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3>
     {
       const gtsam::Cal3DS2 &cal3ds2_;
-      const gtsam::Point3 P_;       ///< 3D point on the calibration rig
-      const gtsam::Point2 p_;       ///< 2D measurement of the 3D point
+      const gtsam::Point3 P_;
+      const gtsam::Point2 p_;
 
     public:
       /// Construct factor given known point P and its projection p
@@ -184,18 +184,19 @@ namespace fiducial_vlam
       }
 
       // 3. Add the initial estimate for the camera pose in the marker frame.
-      // For now we use OpenCV to get the initial pose estimage.
+      // For now we use OpenCV to get the initial pose estimate.
       auto cv_t_camera_marker = fm_.solve_t_camera_marker(observation, camera_info, empty_map_.marker_length());
       auto camera_f_marker_initial = GtsamUtil::to_pose3(cv_t_camera_marker.transform().inverse());
       initial.insert(resectioning_camera_key_, camera_f_marker_initial);
 
       // 4. Optimize the graph using Levenberg-Marquardt
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
-//      std::cout << "initial error = " << graph.error(initial) << std::endl;
+//      std::cout << "camera_f_marker initial error = " << graph.error(initial) << std::endl;
 //      std::cout << "final error = " << graph.error(result) << std::endl;
 
       // 5. Extract the result
       camera_f_marker = result.at<gtsam::Pose3>(resectioning_camera_key_);
+//      camera_f_marker.print("\ncamera_f_marker ");
       gtsam::Marginals marginals(graph, result);
       camera_f_marker_cov = marginals.marginalCovariance(resectioning_camera_key_);
     }
@@ -225,7 +226,7 @@ namespace fiducial_vlam
           marker_key,
           GtsamUtil::camera_key(frames_processed_),
           camera_f_marker,
-          gtsam::noiseModel::Gaussian::Covariance(camera_f_marker_cov));
+          gtsam::noiseModel::Gaussian::Covariance(camera_f_marker_cov * 4.));
 
         // Update the marker seen counts
         auto pair = marker_seen_counts_.find(marker_key);
@@ -265,6 +266,8 @@ namespace fiducial_vlam
       // Find some appropriate initial values
       auto initial = gtsam::InitializePose3::initialize(graph_);
 
+//      initial.print("initial\n");
+
       // Optimize the graph
       auto params = gtsam::LevenbergMarquardtParams();
       params.setVerbosityLM("TERMINATION");
@@ -282,7 +285,7 @@ namespace fiducial_vlam
         auto marker_key{pair.first};
         auto marker_id{static_cast<int>(gtsam::Symbol{marker_key}.index())};
 
-       auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, result, marker_key);
+        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, result, marker_key);
 
         // update an existing marker or add a new one.
         auto marker_ptr = new_map->find_marker(marker_id);
@@ -365,6 +368,9 @@ namespace fiducial_vlam
 
     std::string update_map_cmd(std::string &cmd) override
     {
+      if (cmd == "start") {
+        return std::string{"SlamTask Start map creation"};
+      }
       return std::string{};
     }
   };
