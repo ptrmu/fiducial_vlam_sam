@@ -382,9 +382,9 @@ namespace fiducial_vlam
 
           // Add the initial estimate.
           initial_.insert(marker_key, marker_f_world);
-
-          // Update the marker seen count.
-          marker_seen_counts_.emplace(marker_key, UINT64_MAX);
+//
+//          // Update the marker seen count.
+//          marker_seen_counts_.emplace(marker_key, UINT64_MAX);
         }
       }
     }
@@ -392,25 +392,31 @@ namespace fiducial_vlam
     void process_observations(const Observations &observations,
                               const CameraInfo &camera_info)
     {
-      // Loop through the observations and figure out which marker measurement
+      // Loop through the observations and figure out which marker observation
       // should be used to figure out where the camera is.
-      int found_marker = -1;
+      const Observation *best_observation = nullptr;
       std::uint64_t max_counts = 0;
-      for (int i = 0; i < observations.observations().size(); i += 1) {
-        auto &observation{observations.observations()[i]};
+      for (auto &observation : observations.observations()) {
+        // A fixed marker will always be the best
+        auto marker_ptr = empty_map_.find_marker_const(observation.id());
+        if (marker_ptr != nullptr && marker_ptr->is_fixed()) {
+          best_observation = &observation;
+          break;
+        }
+        // Otherwise search for the marker that has been viewed in the most frames.
         auto marker_key{GtsamUtil::marker_key(observation.id())};
         auto pair = marker_seen_counts_.find(marker_key);
         if (pair != marker_seen_counts_.end()) {
           if (pair->second > max_counts) {
             max_counts = pair->second;
-            found_marker = i;
+            best_observation = &observation;
           }
         }
       }
 
       // If we didn't find a marker, then we have no way to process these
       // observations so just return.
-      if (found_marker == -1) {
+      if (best_observation == nullptr) {
         return;
       }
 
