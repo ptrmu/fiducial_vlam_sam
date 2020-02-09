@@ -363,6 +363,36 @@ namespace fiducial_vlam
       camera_f_marker_cov = marginals.marginalCovariance(resectioning_camera_key_);
     }
 
+    void add_between_factor(
+      const Observation &observation,
+      const CameraInfo &camera_info,
+      gtsam::Pose3 &camera_f_marker)
+    {
+      gtsam::Pose3::Jacobian camera_f_marker_cov;
+
+      // From the observation, figure out the pose of the camera in the
+      // marker frame.
+      solve_camera_f_marker(observation, camera_info,
+                            camera_f_marker, camera_f_marker_cov);
+
+      // Add the measurement factor.
+      auto marker_key{GtsamUtil::marker_key(observation.id())};
+      graph_.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
+        marker_key,
+        GtsamUtil::camera_key(frames_processed_),
+        camera_f_marker,
+        gtsam::noiseModel::Gaussian::Covariance(camera_f_marker_cov * 4.));
+
+      // Update the marker seen counts
+      auto pair = marker_seen_counts_.find(marker_key);
+      bool first_time = (pair == marker_seen_counts_.end());
+      if (first_time) {
+        marker_seen_counts_.emplace(marker_key, 1);
+      } else {
+        pair->second += 1;
+      }
+    }
+
   public:
     BatchSlamTaskWork(FiducialMath &fm, const FiducialMathContext &cxt, const Map &empty_map) :
       fm_{fm}, cxt_{cxt}, empty_map_{empty_map},
@@ -372,19 +402,16 @@ namespace fiducial_vlam
       for (auto &pair : empty_map_.markers()) {
         if (pair.second.is_fixed()) {
           auto marker_key{GtsamUtil::marker_key(pair.second.id())};
-          auto marker_f_world{GtsamUtil::to_pose3(pair.second.t_map_marker().transform())};
+          auto marker_f_map{GtsamUtil::to_pose3(pair.second.t_map_marker().transform())};
 
           // Add the prior
           graph_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
             marker_key,
-            marker_f_world,
+            marker_f_map,
             gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_6x1));
 
           // Add the initial estimate.
-          initial_.insert(marker_key, marker_f_world);
-//
-//          // Update the marker seen count.
-//          marker_seen_counts_.emplace(marker_key, UINT64_MAX);
+          initial_.insert(marker_key, marker_f_map);
         }
       }
     }
@@ -392,8 +419,8 @@ namespace fiducial_vlam
     void process_observations(const Observations &observations,
                               const CameraInfo &camera_info)
     {
-      // Loop through the observations and figure out which marker observation
-      // should be used to figure out where the camera is.
+      // Loop through the observations and figure out which marker observation (the best)
+      // should be used to figure out the camera pose.
       const Observation *best_observation = nullptr;
       std::uint64_t max_counts = 0;
       for (auto &observation : observations.observations()) {
@@ -420,47 +447,37 @@ namespace fiducial_vlam
         return;
       }
 
+      gtsam::Pose3 camera_f_marker;
+
+      // Add the best observation to the graph and figure out an estimate for
+      // the camera pose.
+      add_between_factor(*best_observation,
+                         camera_info,
+                         camera_f_marker);
+
+      auto best_marker_f_map = initial_.at<gtsam::Pose3>(GtsamUtil::marker_key(best_observation->id()));
+      auto t_map_camera = best_marker_f_map * camera_f_marker;
+
       // Use that one observation of a known marker to figure out an initial
       // estimate of the pose of the camera.
       // loop through all the observations,
       for (auto &observation : observations.observations()) {
-        gtsam::Pose3 camera_f_marker;
-        gtsam::Pose3::Jacobian camera_f_marker_cov;
+
+        // Skip the best observation that has already been processed.
+        if (best_observation == &observation) {
+          continue;
+        }
 
         // From the observation, figure out the pose of the camera in the
         // marker frame.
-        solve_camera_f_marker(observation, camera_info,
-                              camera_f_marker, camera_f_marker_cov);
+        add_between_factor(observation, camera_info,
+                              camera_f_marker);
 
-        // Add the measurement factor.
+        // If this is the first time we have seen a marker, add an initial estimate.
         auto marker_key{GtsamUtil::marker_key(observation.id())};
-        graph_.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
-          marker_key,
-          GtsamUtil::camera_key(frames_processed_),
-          camera_f_marker,
-          gtsam::noiseModel::Gaussian::Covariance(camera_f_marker_cov * 4.));
-
-        // Update the marker seen counts
-        auto pair = marker_seen_counts_.find(marker_key);
-        bool first_time = (pair == marker_seen_counts_.end());
-        if (first_time) {
-          marker_seen_counts_.emplace(marker_key, 1);
-        } else {
-          pair->second += 1;
-        }
-
-        // If this is the first time we have seen a fixed marker, then add a
-        // prior to pin its pose down.
-        if (first_time) {
-          auto marker_ptr = empty_map_.find_marker_const(observation.id());
-          if (marker_ptr != nullptr && marker_ptr->is_fixed()) {
-
-            fixed_marker_seen_ = true;
-            graph_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
-              marker_key,
-              GtsamUtil::to_pose3(marker_ptr->t_map_marker().transform()),
-              gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_6x1));
-          }
+        if (!initial_.exists(marker_key)) {
+          auto marker_f_map = t_map_camera * camera_f_marker.inverse();
+          initial_.insert(marker_key, marker_f_map);
         }
       }
 
