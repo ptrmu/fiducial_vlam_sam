@@ -268,6 +268,12 @@ namespace fiducial_vlam
       // observations.
       auto observations = fm_.detect_markers(gray, color_marked);
 
+      // Publish the observations.
+      if (observations.size()) {
+        auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg_);
+        observations_pub_->publish(observations_msg);
+      }
+
       // If there is a map, find t_map_marker for each detected
       // marker. The t_map_markers has an entry for each element
       // in observations. If the marker wasn't found in the map, then
@@ -350,10 +356,6 @@ namespace fiducial_vlam
                 tf_message_pub_->publish(tf_message);
               }
             }
-
-            // Publish the observations
-            auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg_);
-            observations_pub_->publish(observations_msg);
           }
         }
       }

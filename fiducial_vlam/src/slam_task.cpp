@@ -320,8 +320,8 @@ namespace fiducial_vlam
     gtsam::NonlinearFactorGraph graph_{};
     gtsam::Values initial_{};
     std::map<gtsam::Key, std::uint64_t> marker_seen_counts_{};
-    bool fixed_marker_seen_{false};
     std::uint64_t frames_processed_{0};
+    std::uint64_t last_frames_processed_{0};
     gtsam::Key resectioning_camera_key_{gtsam::Symbol('c', 0)};
 
     void solve_camera_f_marker(
@@ -449,14 +449,17 @@ namespace fiducial_vlam
 
       gtsam::Pose3 camera_f_marker;
 
-      // Add the best observation to the graph and figure out an estimate for
-      // the camera pose.
+      // Add the best observation to the graph.
       add_between_factor(*best_observation,
                          camera_info,
                          camera_f_marker);
 
+      // Figure out the camera pose for this frame. Use for the initial camera pose estimate and also
+      // later to figure out initial pose estimates for new markers.
       auto best_marker_f_map = initial_.at<gtsam::Pose3>(GtsamUtil::marker_key(best_observation->id()));
       auto t_map_camera = best_marker_f_map * camera_f_marker;
+
+      initial_.insert(GtsamUtil::camera_key(frames_processed_), t_map_camera);
 
       // Use that one observation of a known marker to figure out an initial
       // estimate of the pose of the camera.
@@ -471,7 +474,7 @@ namespace fiducial_vlam
         // From the observation, figure out the pose of the camera in the
         // marker frame.
         add_between_factor(observation, camera_info,
-                              camera_f_marker);
+                           camera_f_marker);
 
         // If this is the first time we have seen a marker, add an initial estimate.
         auto marker_key{GtsamUtil::marker_key(observation.id())};
@@ -482,39 +485,52 @@ namespace fiducial_vlam
       }
 
       frames_processed_ += 1;
+
+      // Optimize the graph
+      auto params = gtsam::LevenbergMarquardtParams();
+//      params.setVerbosityLM("TERMINATION");
+//      params.setVerbosity("TERMINATION");
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+
+      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
+//      std::cout << "Frame " << frames_processed_ << ": " << std::endl;
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+//      std::cout << "final error = " << graph_.error(result) << std::endl;
+
+
+      // Update the initial estimate with the values from the optimization.
+      initial_ = result;
     }
 
     std::unique_ptr<Map> solve_map()
     {
       auto new_map = std::make_unique<Map>(empty_map_);
 
-      if (!fixed_marker_seen_) {
+      // Don't bother publishing a mew map if no new frames have been processed.
+      if (last_frames_processed_ == frames_processed_) {
         return new_map;
       }
+      last_frames_processed_ = frames_processed_;
 
-      // Find some appropriate initial values
-      auto initial = gtsam::InitializePose3::initialize(graph_);
-
-//      initial.print("initial\n");
-
-      // Optimize the graph
-      auto params = gtsam::LevenbergMarquardtParams();
-      params.setVerbosityLM("TERMINATION");
-      params.setVerbosity("TERMINATION");
-      params.setRelativeErrorTol(1e-8);
-      params.setAbsoluteErrorTol(1e-8);
-
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial, params).optimize();
-      std::cout << "Frame " << frames_processed_ << ": " << std::endl;
-      std::cout << "initial error = " << graph_.error(initial) << std::endl;
-      std::cout << "final error = " << graph_.error(result) << std::endl;
+//      // Optimize the graph
+//      auto params = gtsam::LevenbergMarquardtParams();
+//      params.setVerbosityLM("TERMINATION");
+//      params.setVerbosity("TERMINATION");
+//      params.setRelativeErrorTol(1e-8);
+//      params.setAbsoluteErrorTol(1e-8);
+//
+//      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
+      std::cout << "Frame " << frames_processed_ << ": ";
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+      std::cout << "final error = " << graph_.error(initial_) << std::endl;
 
       // Build up the new map.
       for (auto &pair : marker_seen_counts_) {
         auto marker_key{pair.first};
         auto marker_id{static_cast<int>(gtsam::Symbol{marker_key}.index())};
 
-        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, result, marker_key);
+        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, initial_, marker_key);
 
         // update an existing marker or add a new one.
         auto marker_ptr = new_map->find_marker(marker_id);
