@@ -6,8 +6,7 @@
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
 #include "gtsam/inference/Symbol.h"
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/DoglegOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
@@ -319,6 +318,7 @@ namespace fiducial_vlam
 
     gtsam::NonlinearFactorGraph graph_{};
     gtsam::Values initial_{};
+    gtsam::Values result_{};
     std::map<gtsam::Key, std::uint64_t> marker_seen_counts_{};
     std::uint64_t frames_processed_{0};
     std::uint64_t last_frames_processed_{0};
@@ -353,7 +353,10 @@ namespace fiducial_vlam
       initial.insert(resectioning_camera_key_, camera_f_marker_initial);
 
       // 4. Optimize the graph using Levenberg-Marquardt
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
+      auto params = gtsam::LevenbergMarquardtParams();
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
 //      std::cout << "camera_f_marker initial error = " << graph.error(initial) << std::endl;
 //      std::cout << "final error = " << graph.error(result) << std::endl;
 
@@ -487,20 +490,32 @@ namespace fiducial_vlam
       frames_processed_ += 1;
 
       // Optimize the graph
+#if 1
       auto params = gtsam::LevenbergMarquardtParams();
 //      params.setVerbosityLM("TERMINATION");
 //      params.setVerbosity("TERMINATION");
       params.setRelativeErrorTol(1e-8);
       params.setAbsoluteErrorTol(1e-8);
 
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
-//      std::cout << "Frame " << frames_processed_ << ": " << std::endl;
+      result_ = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
+      std::cout << "Frame " << frames_processed_ << ": ";
 //      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
-//      std::cout << "final error = " << graph_.error(result) << std::endl;
+      std::cout << "final error = " << graph_.error(result_) << std::endl;
+#else
+      auto params = gtsam::DoglegParams();
+//      params.setVerbosityLM("TERMINATION");
+//      params.setVerbosity("TERMINATION");
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
 
+      result_ = gtsam::DoglegOptimizer(graph_, initial_, params).optimize();
+      std::cout << "Frame " << frames_processed_ << ": ";
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+      std::cout << "final error = " << graph_.error(result_) << std::endl;
+#endif
 
       // Update the initial estimate with the values from the optimization.
-      initial_ = result;
+//      initial_ = result;
     }
 
     std::unique_ptr<Map> solve_map()
@@ -521,16 +536,16 @@ namespace fiducial_vlam
 //      params.setAbsoluteErrorTol(1e-8);
 //
 //      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
-      std::cout << "Frame " << frames_processed_ << ": ";
+//      std::cout << "Frame " << frames_processed_ << ": ";
 //      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
-      std::cout << "final error = " << graph_.error(initial_) << std::endl;
+//      std::cout << "final error = " << graph_.error(initial_) << std::endl;
 
       // Build up the new map.
       for (auto &pair : marker_seen_counts_) {
         auto marker_key{pair.first};
         auto marker_id{static_cast<int>(gtsam::Symbol{marker_key}.index())};
 
-        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, initial_, marker_key);
+        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, result_, marker_key);
 
         // update an existing marker or add a new one.
         auto marker_ptr = new_map->find_marker(marker_id);
