@@ -457,8 +457,8 @@ namespace fiducial_vlam
                          camera_info,
                          camera_f_marker);
 
-      // Figure out the camera pose for this frame. Use for the initial camera pose estimate and also
-      // later to figure out initial pose estimates for new markers.
+      // Figure out the camera pose estimate for this frame. Later, use the initial camera pose estimate
+      // to figure out the initial marker pose estimates for new markers.
       auto best_marker_f_map = initial_.at<gtsam::Pose3>(GtsamUtil::marker_key(best_observation->id()));
       auto t_map_camera = best_marker_f_map * camera_f_marker;
 
