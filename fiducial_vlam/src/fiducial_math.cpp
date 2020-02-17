@@ -1339,7 +1339,7 @@ namespace fiducial_vlam
     std::string update_map_cmd(std::string &cmd) override
     {
       if (cmd == "start") {
-        return ros2_shared::string_printf(
+        return ros2_shared::string_print::f(
           "UpdateFiducialMath start map creation\nsam_not_cv %d\nsfm_not_slam %d\nmulti_frame %d",
           cxt_.sam_not_cv_, cxt_.sfm_not_slam_, cxt_.multi_frame_optimization_);
       }

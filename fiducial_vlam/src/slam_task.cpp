@@ -16,6 +16,7 @@
 #include <gtsam/slam/ProjectionFactor.h>
 #include "map.hpp"
 #include "observation.hpp"
+#include "ros2_shared/string_printf.hpp"
 #include "task_thread.hpp"
 
 namespace fiducial_vlam
@@ -145,6 +146,72 @@ namespace fiducial_vlam
     }
   };
 
+// ==============================================================================
+// ProjectBetweenFactor class
+// ==============================================================================
+
+  class ProjectBetweenFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
+  {
+    const gtsam::Cal3DS2 cal3ds2_; // Make a copy. A shared object might be better.
+    const gtsam::Point3 point_f_marker_;
+    const gtsam::Point2 point_f_image_;
+
+  public:
+    ProjectBetweenFactor(gtsam::Point2 point_f_image,
+                         const gtsam::SharedNoiseModel &model,
+                         const gtsam::Key key_marker,
+                         gtsam::Point3 point_f_marker,
+                         const gtsam::Key key_camera,
+                         const gtsam::Cal3DS2 &cal3ds2) :
+      NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(model, key_marker, key_camera),
+      cal3ds2_{cal3ds2},
+      point_f_marker_(std::move(point_f_marker)),
+      point_f_image_(std::move(point_f_image))
+    {}
+
+    /// evaluate the error
+    gtsam::Vector evaluateError(const gtsam::Pose3 &marker_f_world,
+                                const gtsam::Pose3 &camera_f_world,
+                                boost::optional<gtsam::Matrix &> H1,
+                                boost::optional<gtsam::Matrix &> H2) const override
+    {
+      gtsam::Matrix36 d_point3_wrt_pose3;
+      gtsam::Matrix26 d_point2_wrt_pose3;
+      gtsam::Matrix23 d_point2_wrt_point3;
+
+      // Transform the point from the Marker frame to the World frame
+      gtsam::Point3 point_f_world = marker_f_world.transform_from(
+        point_f_marker_,
+        H1 ? gtsam::OptionalJacobian<3, 6>(d_point3_wrt_pose3) : boost::none);
+
+      // Project this point to the camera's image frame. Catch and return a default
+      // value on a CheiralityException.
+      auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{camera_f_world, cal3ds2_};
+      try {
+        gtsam::Point2 point_f_image = camera.project(
+          point_f_world,
+          H2 ? gtsam::OptionalJacobian<2, 6>(d_point2_wrt_pose3) : boost::none,
+          H1 ? gtsam::OptionalJacobian<2, 3>(d_point2_wrt_point3) : boost::none);
+
+        // Return the Jacobian for each input
+        if (H1) {
+          *H1 = d_point2_wrt_point3 * d_point3_wrt_pose3;
+        }
+        if (H2) {
+          *H2 = d_point2_wrt_pose3;
+        }
+
+        // Return the error.
+        return point_f_image - point_f_image_;
+
+      } catch (gtsam::CheiralityException &e) {
+        std::cout << "ProjectBetweenFactor CheiralityException Exception!" << std::endl;
+      }
+      if (H1) *H1 = gtsam::Matrix::Zero(2, 6);
+      if (H2) *H2 = gtsam::Matrix::Zero(2, 6);
+      return gtsam::Vector2::Constant(2.0 * cal3ds2_.fx());
+    }
+  };
 
 // ==============================================================================
 // SlamTaskWork class
@@ -453,9 +520,7 @@ namespace fiducial_vlam
       gtsam::Pose3 camera_f_marker;
 
       // Add the best observation to the graph.
-      add_between_factor(*best_observation,
-                         camera_info,
-                         camera_f_marker);
+      add_between_factor(*best_observation, camera_info, camera_f_marker);
 
       // Figure out the camera pose estimate for this frame. Later, use the initial camera pose estimate
       // to figure out the initial marker pose estimates for new markers.
@@ -476,8 +541,7 @@ namespace fiducial_vlam
 
         // From the observation, figure out the pose of the camera in the
         // marker frame.
-        add_between_factor(observation, camera_info,
-                           camera_f_marker);
+        add_between_factor(observation, camera_info, camera_f_marker);
 
         // If this is the first time we have seen a marker, add an initial estimate.
         auto marker_key{GtsamUtil::marker_key(observation.id())};
@@ -564,8 +628,242 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// ProjectBetweenTaskWork class
+// ==============================================================================
+
+  class ProjectBetweenTaskWork
+  {
+    FiducialMath &fm_;
+    const FiducialMathContext &cxt_;
+    const Map &empty_map_;
+    const gtsam::SharedNoiseModel corner_noise_;
+
+    gtsam::NonlinearFactorGraph graph_{};
+    gtsam::Values initial_{};
+    gtsam::Values result_{};
+    std::map<gtsam::Key, std::uint64_t> marker_seen_counts_{};
+    std::uint64_t frames_processed_{0};
+    std::uint64_t last_frames_processed_{0};
+    gtsam::Key resectioning_camera_key_{gtsam::Symbol('c', 0)};
+
+
+    gtsam::Pose3 solve_camera_f_marker(
+      const Observation &observation,
+      const CameraInfo &camera_info)
+    {
+      auto cv_t_camera_marker = fm_.solve_t_camera_marker(observation, camera_info, empty_map_.marker_length());
+      return GtsamUtil::to_pose3(cv_t_camera_marker.transform().inverse());
+    }
+
+    void add_between_factor(
+      const Observation &observation,
+      const CameraInfo &camera_info,
+      gtsam::Pose3 &camera_f_marker)
+    {
+      gtsam::Pose3::Jacobian camera_f_marker_cov;
+
+      // From the observation, figure out the pose of the camera in the
+      // marker frame.
+      camera_f_marker = solve_camera_f_marker(observation, camera_info);
+
+      // Add ProjectBetween factors to the graph
+      auto marker_key{GtsamUtil::marker_key(observation.id())};
+      auto corners_f_image = observation.to_point_array<gtsam::Point2>();
+      auto corners_f_marker = Convert::corners_f_marker<gtsam::Point3>(empty_map_.marker_length());
+      for (size_t j = 0; j < corners_f_image.size(); j += 1) {
+        graph_.emplace_shared<ProjectBetweenFactor>(corners_f_image[j],
+                                                    corner_noise_,
+                                                    marker_key,
+                                                    corners_f_marker[j],
+                                                    GtsamUtil::camera_key(frames_processed_),
+                                                    camera_info.cal3ds2());
+      }
+
+      // Update the marker seen counts
+      auto pair = marker_seen_counts_.find(marker_key);
+      bool first_time = (pair == marker_seen_counts_.end());
+      if (first_time) {
+        marker_seen_counts_.emplace(marker_key, 1);
+      } else {
+        pair->second += 1;
+      }
+    }
+
+  public:
+    ProjectBetweenTaskWork(FiducialMath &fm, const FiducialMathContext &cxt, const Map &empty_map) :
+      fm_{fm}, cxt_{cxt}, empty_map_{empty_map},
+      corner_noise_{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.corner_measurement_sigma_)}
+    {
+      // Add priors and initial estimates for fixed markers
+      for (auto &pair : empty_map_.markers()) {
+        if (pair.second.is_fixed()) {
+          auto marker_key{GtsamUtil::marker_key(pair.second.id())};
+          auto marker_f_map{GtsamUtil::to_pose3(pair.second.t_map_marker().transform())};
+
+          // Add the prior
+          graph_.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
+            marker_key,
+            marker_f_map,
+            gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_6x1));
+
+          // Add the initial estimate.
+          initial_.insert(marker_key, marker_f_map);
+          result_.insert(marker_key, marker_f_map);
+        }
+      }
+    }
+
+    void process_observations(const Observations &observations,
+                              const CameraInfo &camera_info)
+    {
+      // Loop through the observations and figure out which marker observation (the best)
+      // should be used to figure out the camera pose.
+      const Observation *best_observation = nullptr;
+      std::uint64_t max_counts = 0;
+      for (auto &observation : observations.observations()) {
+        // A fixed marker will always be the best
+        auto marker_ptr = empty_map_.find_marker_const(observation.id());
+        if (marker_ptr != nullptr && marker_ptr->is_fixed()) {
+          best_observation = &observation;
+          break;
+        }
+        // Otherwise search for the marker that has been viewed in the most frames.
+        auto marker_key{GtsamUtil::marker_key(observation.id())};
+        auto pair = marker_seen_counts_.find(marker_key);
+        if (pair != marker_seen_counts_.end()) {
+          if (pair->second > max_counts) {
+            max_counts = pair->second;
+            best_observation = &observation;
+          }
+        }
+      }
+
+      // If we didn't find a marker, then we have no way to process these
+      // observations so just return.
+      if (best_observation == nullptr) {
+        return;
+      }
+
+      gtsam::Pose3 camera_f_marker;
+
+      // Add the best observation to the graph.
+      add_between_factor(*best_observation, camera_info, camera_f_marker);
+
+      // Figure out the camera pose estimate for this frame. Later, use the initial camera pose estimate
+      // to figure out the initial marker pose estimates for new markers.
+      auto best_marker_f_map = result_.at<gtsam::Pose3>(GtsamUtil::marker_key(best_observation->id()));
+      auto t_map_camera = best_marker_f_map * camera_f_marker;
+
+      initial_.insert(GtsamUtil::camera_key(frames_processed_), t_map_camera);
+
+      // Use that one observation of a known marker to figure out an initial
+      // estimate of the pose of the camera.
+      // loop through all the observations,
+      for (auto &observation : observations.observations()) {
+
+        // Skip the best observation that has already been processed.
+        if (best_observation == &observation) {
+          continue;
+        }
+
+        // From the observation, figure out the pose of the camera in the
+        // marker frame.
+        add_between_factor(observation, camera_info, camera_f_marker);
+
+        // If this is the first time we have seen a marker, add an initial estimate.
+        auto marker_key{GtsamUtil::marker_key(observation.id())};
+        if (!initial_.exists(marker_key)) {
+          auto marker_f_map = t_map_camera * camera_f_marker.inverse();
+          initial_.insert(marker_key, marker_f_map);
+        }
+      }
+
+      frames_processed_ += 1;
+
+      // Optimize the graph
+#if 0
+      auto params = gtsam::LevenbergMarquardtParams();
+//      params.setVerbosityLM("TRYLAMBDA");
+      params.setVerbosity("TERMINATION");
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+
+//      graph_.print("\ngraph\n");
+//      initial_.print("\ninitial\n");
+
+      result_ = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
+      std::cout << "Frame " << frames_processed_ << ": ";
+      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+      std::cout << "final error = " << graph_.error(result_) << std::endl;
+#else
+      auto params = gtsam::DoglegParams();
+//      params.setVerbosityDL("VERBOSE");
+      params.setVerbosity("TERMINATION");
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+
+      result_ = gtsam::DoglegOptimizer(graph_, initial_, params).optimize();
+      std::cout << "Frame " << frames_processed_ << ": ";
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+      std::cout << "final error = " << graph_.error(result_) << std::endl;
+#endif
+
+      // Update the initial estimate with the values from the optimization.
+      initial_ = result_;
+    }
+
+    std::unique_ptr<Map> solve_map()
+    {
+      auto new_map = std::make_unique<Map>(empty_map_);
+
+      // Don't bother publishing a mew map if no new frames have been processed.
+      if (last_frames_processed_ == frames_processed_) {
+        return new_map;
+      }
+      last_frames_processed_ = frames_processed_;
+
+//      // Optimize the graph
+//      auto params = gtsam::LevenbergMarquardtParams();
+//      params.setVerbosityLM("TERMINATION");
+//      params.setVerbosity("TERMINATION");
+//      params.setRelativeErrorTol(1e-8);
+//      params.setAbsoluteErrorTol(1e-8);
+//
+//      auto result = gtsam::LevenbergMarquardtOptimizer(graph_, initial_, params).optimize();
+//      std::cout << "Frame " << frames_processed_ << ": ";
+//      std::cout << "initial error = " << graph_.error(initial_) << std::endl;
+//      std::cout << "final error = " << graph_.error(initial_) << std::endl;
+
+      // Build up the new map.
+      for (auto &pair : marker_seen_counts_) {
+        auto marker_key{pair.first};
+        auto marker_id{static_cast<int>(gtsam::Symbol{marker_key}.index())};
+
+        auto t_map_marker = GtsamUtil::extract_transform_with_covariance(graph_, result_, marker_key);
+
+        // update an existing marker or add a new one.
+        auto marker_ptr = new_map->find_marker(marker_id);
+        if (marker_ptr == nullptr) {
+          Marker new_marker{marker_id, t_map_marker};
+          new_marker.set_update_count(pair.second);
+          new_map->add_marker(new_marker);
+        } else if (!marker_ptr->is_fixed()) {
+          marker_ptr->set_t_map_marker(t_map_marker);
+          marker_ptr->set_update_count(pair.second);
+        }
+      }
+
+      return new_map;
+    }
+  };
+
+// ==============================================================================
 // SlamTask class
 // ==============================================================================
+
+#define USE_THREAD
+
+  typedef ProjectBetweenTaskWork TaskWork;
 
   class SlamTask : public UpdateMapInterface
   {
@@ -576,13 +874,18 @@ namespace fiducial_vlam
     std::unique_ptr<Map> empty_map_;
     std::future<std::unique_ptr<Map>> solve_map_future_{};
 
-    std::unique_ptr<BatchSlamTaskWork> stw_; // This will ultimately get owned by the thread
+    task_thread::TaskThread<TaskWork> task_thread_;
+    std::unique_ptr<TaskWork> stw_; // This will ultimately get owned by the thread
+
+    std::uint64_t updates_count_{0};
+    std::uint64_t solve_map_updates_count_{0};
 
   public:
     SlamTask(FiducialMath &fm, const FiducialMathContext &cxt, const Map &empty_map) :
       UpdateMapInterface{}, fm_{fm}, cxt_{cxt},
       empty_map_{std::make_unique<Map>(empty_map)},
-      stw_{std::make_unique<BatchSlamTaskWork>(fm, cxt_, *empty_map_)}
+      task_thread_(std::make_unique<TaskWork>(fm, cxt_, *empty_map_)),
+      stw_{std::make_unique<TaskWork>(fm, cxt_, *empty_map_)}
     {}
 
     ~SlamTask() = default;
@@ -591,15 +894,24 @@ namespace fiducial_vlam
                     const CameraInfo &camera_info,
                     Map &map) override
     {
-      auto func = [observations, camera_info](BatchSlamTaskWork &stw) -> void
+      updates_count_ += 1;
+
+      auto func = [observations, camera_info](TaskWork &stw) -> void
       {
         stw.process_observations(observations, camera_info);
       };
+#ifdef USE_THREAD
+      task_thread_.push(func);
+#else
       func(*stw_);
+#endif
     }
 
     void update_map_for_publishing(Map &map) override
     {
+      auto msg{
+        ros2_shared::string_print::f("update_map_for_publishing queued tasks:%d", task_thread_.tasks_in_queue())};
+
       // If the future is valid, then a map is being solved and we should check
       // to see if it is complete
       if (solve_map_future_.valid()) {
@@ -610,20 +922,33 @@ namespace fiducial_vlam
           auto new_map = solve_map_future_.get();
           map.reset(*new_map);
         }
+        std::cout << ros2_shared::string_print::f("%s, solve_map queued:%d, status=%s\n",
+                                                  msg.c_str(), solve_map_updates_count_,
+                                                  (status == std::future_status::ready) ? "DONE!!!!!!" : "waiting");
         return;
       }
+
+      solve_map_updates_count_ = updates_count_;
 
       // A map is not being solved, so queue a solution up.
       std::promise<std::unique_ptr<Map>> solve_map_promise{};
       solve_map_future_ = solve_map_promise.get_future();
 
-      auto func = [promise = std::move(solve_map_promise)](BatchSlamTaskWork &stw) mutable -> void
+      auto func = [promise = std::move(solve_map_promise)](TaskWork &stw) mutable -> void
       {
         auto new_map = stw.solve_map();
         promise.set_value(std::move(new_map));
       };
 
+#ifdef USE_THREAD
+      task_thread_.push(std::move(func));
+#else
       func(*stw_);
+#endif
+
+      std::cout << ros2_shared::string_print::f("%s, update queued\n",
+                                                msg.c_str());
+
     }
 
     std::string update_map_cmd(std::string &cmd) override
