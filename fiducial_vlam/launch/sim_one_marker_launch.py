@@ -22,9 +22,9 @@ make_not_use_map = 0
 corner_measurement_sigma = 0.7
 
 vloc_args = [{
-    'use_sim_time': False,  # Don't use /clock
+    'use_sim_time': True,  # Use /clock
     'publish_tfs': 1,  # Publish drone and camera /tf
-    'stamp_msgs_with_current_time': 1,  # Stamp with now()
+    'stamp_msgs_with_current_time': 0,  # Stamp with now()
     'map_init_pose_z': 0,
     'sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
@@ -38,7 +38,7 @@ vloc_args = [{
 }]
 
 vmap_args = [{
-    'use_sim_time': False,  # Don't use /clock
+    'use_sim_time': True,  # Use /clock
     'publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1778,  # Marker length
     'marker_map_save_full_filename': map_filename,
