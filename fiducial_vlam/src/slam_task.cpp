@@ -1,6 +1,9 @@
 
 #include "fiducial_math.hpp"
 
+#define ENABLE_TIMING
+
+#include <gtsam/base/timing.h>
 #include <gtsam/geometry/Cal3DS2.h>
 #include <gtsam/geometry/PinholeCamera.h>
 #include <gtsam/geometry/Point3.h>
@@ -886,6 +889,7 @@ namespace fiducial_vlam
       params.factorization = gtsam::ISAM2Params::QR;
       params.relinearizeThreshold = 0.01;
       params.relinearizeSkip = 1;
+      params.evaluateNonlinearError = true;
       return params;
     }
 
@@ -1013,12 +1017,15 @@ namespace fiducial_vlam
     void process_observations(const Observations &observations,
                               const CameraInfo &camera_info)
     {
+      gttic(process_observations);
       auto camera_key{GtsamUtil::camera_key(frames_processed_)};
       bool unknown_exist{false};
       gtsam::ISAM2Result first_update_result;
       gtsam::ISAM2Result last_update_result;
+      int update1, update2, update3, update4;
 
       { // First pass through the markers for those that have been seen already
+        gttic(first_update_result);
         gtsam::NonlinearFactorGraph graph{};
         gtsam::Values initial{};
 
@@ -1053,12 +1060,24 @@ namespace fiducial_vlam
 
         // Update iSAM with the factors for known markers. This will find the best estimate for the
         // camera pose which is used below for calculating an estimate of new marker poses.
+        gttic(update1);
         first_update_result = isam_.update(graph, initial);
-        isam_.update();
+        std::cout << "1 "
+                  << first_update_result.errorBefore.get() << " "
+                  << first_update_result.errorAfter.get() << std::endl;
+        gttoc(update1);
+        gttic(update2);
+        auto next_update_result = isam_.update();
+        std::cout << "  "
+                  << next_update_result.errorBefore.get() << " "
+                  << next_update_result.errorAfter.get() << std::endl;
+        gttoc(update2);
+        gttoc(first_update_result);
       }
 
 
       if (unknown_exist) {
+        gttic(last_update_result);
         // Second pass through the markers for those that have not been seen yet
         gtsam::NonlinearFactorGraph graph{};
         gtsam::Values initial{};
@@ -1080,18 +1099,25 @@ namespace fiducial_vlam
         add_project_between_factors(observations, camera_info, camera_key, do_add_func, graph);
 
         // Update iSAM with the new factors to unknown markers
+        gttic(update3);
         isam_.update(graph, initial);
+        gttoc(update3);
+        gttic(update4);
         last_update_result = isam_.update();
+        gttoc(update4);
+        gttoc(last_update_result);
       }
 
       frames_processed_ += 1;
       std::cout << "Frame " << frames_processed_ << std::endl;
 //                << "- error before:" << first_update_result.errorBefore.value()
 //                << " after:" << last_update_result.errorAfter.value() << std::endl;
+      gttoc(process_observations);
     }
 
     std::unique_ptr<Map> solve_map()
     {
+      gttic(solve_map);
       auto new_map = std::make_unique<Map>(empty_map_);
 
       // Don't bother publishing a mew map if no new frames have been processed.
@@ -1144,6 +1170,13 @@ namespace fiducial_vlam
           t_map_marker, t_map_marker_cov));
         map_marker_ptr->set_update_count(pair.second);
       }
+
+      gttoc(solve_map);
+
+#ifdef ENABLE_TIMING
+      gtsam::tictoc_print();
+      gtsam::tictoc_reset_();
+#endif
 
       return new_map;
     }
