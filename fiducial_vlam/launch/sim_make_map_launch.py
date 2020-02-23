@@ -13,7 +13,7 @@ worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
 map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
-world_filename = os.path.join(worlds_directory, 'dense_circle_of_markers.world')
+world_filename = os.path.join(worlds_directory, 'three_dense_circles_of_markers.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 
 sam_not_cv = 0
