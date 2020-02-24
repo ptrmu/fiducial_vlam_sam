@@ -126,7 +126,7 @@ namespace fiducial_vlam
 // ==============================================================================
 // ResectioningFactor class
 // ==============================================================================
-
+#if 0
   class ResectioningFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3>
   {
     const gtsam::Cal3DS2 &cal3ds2_;
@@ -154,6 +154,7 @@ namespace fiducial_vlam
       return camera.project(P_, H) - p_;
     }
   };
+#endif
 
 // ==============================================================================
 // ProjectBetweenFactor class
@@ -216,12 +217,13 @@ namespace fiducial_vlam
       } catch (gtsam::CheiralityException &e) {
         std::cout << "ProjectBetweenFactor CheiralityException Exception!" << std::endl;
       }
-      if (H1) *H1 = gtsam::Matrix::Zero(2, 6);
-      if (H2) *H2 = gtsam::Matrix::Zero(2, 6);
-      return gtsam::Vector2::Constant(2.0 * cal3ds2_.fx());
+      if (H1) *H1 = gtsam::Matrix26::Zero();
+      if (H2) *H2 = gtsam::Matrix26::Zero();
+      return gtsam::Vector2{2.0 * cal3ds2_.fx(), 2.0 * cal3ds2_.fy()};
     }
   };
 
+#if 0
 // ==============================================================================
 // SlamTaskWork class
 // ==============================================================================
@@ -865,12 +867,12 @@ namespace fiducial_vlam
       return new_map;
     }
   };
-
+#endif
 // ==============================================================================
-// ProjectBetweenIsamTaskWork class
+// TaskWork class
 // ==============================================================================
 
-  class ProjectBetweenIsamTaskWork
+  class TaskWork
   {
     FiducialMath &fm_;
     const FiducialMathContext &cxt_;
@@ -984,7 +986,7 @@ namespace fiducial_vlam
     }
 
   public:
-    ProjectBetweenIsamTaskWork(FiducialMath &fm, const FiducialMathContext &cxt, const Map &empty_map) :
+    TaskWork(FiducialMath &fm, const FiducialMathContext &cxt, const Map &empty_map) :
       fm_{fm}, cxt_{cxt}, empty_map_{empty_map},
       corner_noise_{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.corner_measurement_sigma_)}
     {
@@ -1041,6 +1043,9 @@ namespace fiducial_vlam
           return known_marker;
         };
 
+        // Actually add the factors to the isam structure. The do_add_function specifies if
+        // a factor is added for a particular marker. This invocation will add factors for
+        // markers that have previously been seen.
         add_project_between_factors(observations, camera_info, camera_key, do_add_func, graph);
 
         // If there is no good marker (if there are no known markers) then just return.
@@ -1096,6 +1101,7 @@ namespace fiducial_vlam
           return !known_marker;
         };
 
+        // This time add factors for markers that haven't been previously seen.
         add_project_between_factors(observations, camera_info, camera_key, do_add_func, graph);
 
         // Update iSAM with the new factors to unknown markers
@@ -1187,8 +1193,6 @@ namespace fiducial_vlam
 // ==============================================================================
 
 #define USE_THREAD
-
-  typedef ProjectBetweenIsamTaskWork TaskWork;
 
   class SlamTask : public UpdateMapInterface
   {
