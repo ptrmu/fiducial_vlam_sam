@@ -96,8 +96,6 @@ namespace fiducial_vlam
   class UpdateMapInterface
   {
   public:
-    UpdateMapInterface() = default;
-
     virtual ~UpdateMapInterface() = default;
 
     virtual void update_map(const Observations &observations,
@@ -107,6 +105,23 @@ namespace fiducial_vlam
     virtual void update_map_for_publishing(Map &map) = 0;
 
     virtual std::string update_map_cmd(std::string &cmd) = 0;
+  };
+
+// ==============================================================================
+// BuildMarkerMapInterface class
+// ==============================================================================
+
+  class BuildMarkerMapInterface
+  {
+  public:
+    virtual ~BuildMarkerMapInterface() = default;
+
+    virtual void add_observations(const Observations &observations,
+                                      const CameraInfo &camera_info) = 0;
+
+    virtual std::string update_map(Map &map) = 0;
+
+    virtual std::string build_marker_map_cmd(std::string &cmd) = 0;
   };
 
 // ==============================================================================
