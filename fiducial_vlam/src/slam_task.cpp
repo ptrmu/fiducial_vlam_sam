@@ -1,7 +1,7 @@
 
 #include "fiducial_math.hpp"
 
-#define ENABLE_TIMING
+//#define ENABLE_TIMING
 
 #include <gtsam/base/timing.h>
 #include <gtsam/geometry/Cal3DS2.h>
@@ -868,6 +868,7 @@ namespace fiducial_vlam
       }
     };
 #endif
+#if 0
 // ==============================================================================
 // TaskWork class
 // ==============================================================================
@@ -1206,7 +1207,7 @@ namespace fiducial_vlam
     task_thread::TaskThread<TaskWork> task_thread_;
     std::unique_ptr<TaskWork> stw_; // This will ultimately get owned by the thread
 
-    std::uint64_t updates_count_{0};
+    std::uint64_t frames_added_count_{0};
     std::uint64_t solve_map_updates_count_{0};
 
   public:
@@ -1223,7 +1224,7 @@ namespace fiducial_vlam
                     const CameraInfo &camera_info,
                     Map &map) override
     {
-      updates_count_ += 1;
+      frames_added_count_ += 1;
 
       auto func = [observations, camera_info](TaskWork &stw) -> void
       {
@@ -1257,7 +1258,7 @@ namespace fiducial_vlam
         return;
       }
 
-      solve_map_updates_count_ = updates_count_;
+      solve_map_updates_count_ = frames_added_count_;
 
       // A map is not being solved, so queue a solution up.
       std::promise<std::unique_ptr<Map>> solve_map_promise{};
@@ -1295,7 +1296,7 @@ namespace fiducial_vlam
   {
     return std::unique_ptr<UpdateMapInterface>{new SlamTask{fm, cxt, empty_map}};
   }
-
+#endif
 
 // ==============================================================================
 // SamBuildMarkerMapTask class
@@ -1320,7 +1321,7 @@ namespace fiducial_vlam
       params.factorization = gtsam::ISAM2Params::QR;
       params.relinearizeThreshold = 0.01;
       params.relinearizeSkip = 1;
-      params.evaluateNonlinearError = true;
+//      params.evaluateNonlinearError = true;
       return params;
     }
 
@@ -1496,15 +1497,15 @@ namespace fiducial_vlam
         // camera pose which is used below for calculating an estimate of new marker poses.
         gttic(update1);
         first_update_result = isam_.update(graph, initial);
-        std::cout << "1 "
-                  << first_update_result.errorBefore.get() << " "
-                  << first_update_result.errorAfter.get() << std::endl;
+//        std::cout << "1 "
+//                  << first_update_result.errorBefore.get() << " "
+//                  << first_update_result.errorAfter.get() << std::endl;
         gttoc(update1);
         gttic(update2);
         auto next_update_result = isam_.update();
-        std::cout << "  "
-                  << next_update_result.errorBefore.get() << " "
-                  << next_update_result.errorAfter.get() << std::endl;
+//        std::cout << "  "
+//                  << next_update_result.errorBefore.get() << " "
+//                  << next_update_result.errorAfter.get() << std::endl;
         gttoc(update2);
         gttoc(first_update_result);
       }
@@ -1544,7 +1545,7 @@ namespace fiducial_vlam
       }
 
       frames_processed_ += 1;
-      std::cout << "Frame " << frames_processed_ << std::endl;
+//      std::cout << "Frame " << frames_processed_ << std::endl;
 //                << "- error before:" << first_update_result.errorBefore.value()
 //                << " after:" << last_update_result.errorAfter.value() << std::endl;
       gttoc(process_observations);
@@ -1629,12 +1630,11 @@ namespace fiducial_vlam
     const FiducialMathContext cxt_;
     std::unique_ptr<Map> empty_map_;
 
-    task_thread::TaskThread<SamBuildMarkerMapTask> task_thread_;
     std::unique_ptr<SamBuildMarkerMapTask> stw_; // This will ultimately get owned by the thread
-
+    std::unique_ptr<task_thread::TaskThread<SamBuildMarkerMapTask>> task_thread_{};
     std::future<std::unique_ptr<Map>> solve_map_future_{};
 
-    std::uint64_t updates_count_{0};
+    std::uint64_t frames_added_count_{0};
     std::uint64_t solve_map_updates_count_{0};
 
   public:
@@ -1643,21 +1643,85 @@ namespace fiducial_vlam
                           const Map &empty_map) :
       fm_{fm}, cxt_{cxt},
       empty_map_{std::make_unique<Map>(empty_map)},
-      task_thread_(std::make_unique<SamBuildMarkerMapTask>(fm, cxt_, *empty_map_)),
       stw_{std::make_unique<SamBuildMarkerMapTask>(fm, cxt_, *empty_map_)}
-    {}
+    {
+      // If we are using a thread, create it and pass the work object to it.
+      if (cxt.compute_on_thread_) {
+        task_thread_ = std::make_unique<task_thread::TaskThread<SamBuildMarkerMapTask>>(std::move(stw_));
+      }
+    }
 
     virtual ~SamBuildMarkerMapImpl() = default;
 
-    virtual void add_observations(const Observations &observations,
-                                  const CameraInfo &camera_info)
-    {}
+    void process_observations(const Observations &observations,
+                              const CameraInfo &camera_info) override
+    {
+      frames_added_count_ += 1;
+
+      auto func = [observations, camera_info](SamBuildMarkerMapTask &stw) -> void
+      {
+        stw.process_observations(observations, camera_info);
+      };
+
+      if (task_thread_) {
+        task_thread_->push(std::move(func));
+      } else {
+        func(*stw_);
+      }
+    }
 
     virtual std::string update_map(Map &map)
-    {}
+    {
+      auto msg{ros2_shared::string_print::f("update_map frames: added %d, processed %d",
+                                            frames_added_count_,
+                                            frames_added_count_ - task_thread_->tasks_in_queue())};
+
+      // If the future is valid, then a map is being solved and we should check
+      // to see if it is complete
+      if (solve_map_future_.valid()) {
+
+        // Is it complete?
+        bool complete = solve_map_future_.wait_for(std::chrono::milliseconds(0) ) == std::future_status::ready;
+        if (!complete) {
+          return ros2_shared::string_print::f("%s, needed %d, waiting for needed frames to be processed",
+                                              msg.c_str(), solve_map_updates_count_);
+        }
+
+        auto new_map = solve_map_future_.get();
+        map.reset(*new_map);
+        return ros2_shared::string_print::f("%s, map complete and being published",
+                                            msg.c_str());
+      }
+
+      solve_map_updates_count_ = frames_added_count_;
+
+      // A map is not being solved, so queue a solution up.
+      std::promise<std::unique_ptr<Map>> solve_map_promise{};
+      solve_map_future_ = solve_map_promise.get_future();
+
+      auto func = [promise = std::move(solve_map_promise)](SamBuildMarkerMapTask &stw) mutable -> void
+      {
+        auto new_map = stw.solve_map();
+        promise.set_value(std::move(new_map));
+      };
+
+      if (task_thread_) {
+        task_thread_->push(std::move(func));
+      } else {
+        func(*stw_);
+      }
+
+      return ros2_shared::string_print::f("%s, needed %d, build map task queued",
+                                          msg.c_str(), solve_map_updates_count_);
+    }
 
     virtual std::string build_marker_map_cmd(std::string &cmd)
-    {}
+    {
+      if (cmd == "start") {
+        return std::string{"SamBuildMarkerMap Start map creation."};
+      }
+      return std::string{};
+    }
   };
 
   std::unique_ptr<BuildMarkerMapInterface> sam_build_marker_map_factory(CvFiducialMathInterface &fm,

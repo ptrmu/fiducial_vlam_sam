@@ -98,6 +98,8 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     VMAP_ALL_PARAMS
     VMAP_ALL_OTHERS
+
+    int timer_period_milliseconds_;
   };
 }
 

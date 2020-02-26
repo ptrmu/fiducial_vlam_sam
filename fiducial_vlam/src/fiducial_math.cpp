@@ -1440,43 +1440,43 @@ namespace fiducial_vlam
   {
     cv_->annotate_image_with_marker_axis(color_marked, t_camera_marker, camera_info);
   }
-
-  void FiducialMath::update_map(const Observations &observations,
-                                const CameraInfo &camera_info,
-                                Map &map)
-  {
-    if (update_) {
-      update_->update_map(observations, camera_info, map);
-    }
-  }
-
-  void FiducialMath::update_map_for_publishing(Map &map)
-  {
-    if (update_) {
-      update_->update_map_for_publishing(map);
-    }
-  }
-
-  std::string FiducialMath::update_map_cmd(std::string &cmd, const Map &empty_map)
-  {
-    if (update_) {
-      auto ret_str = update_->update_map_cmd(cmd);
-      if (cmd == "done") {
-        update_.reset(nullptr);
-      }
-      return ret_str;
-    }
-
-    if (cmd == "start") {
-      update_ = cv_->cxt_.use_slam_task_ ?
-                slam_task_factory(*this, cv_->cxt_, empty_map) :
-                std::unique_ptr<UpdateMapInterface>{new UpdateFiducialMath{*cv_, *sam_}};
-
-      return update_->update_map_cmd(cmd);
-    }
-
-    return std::string("No Update active");
-  }
+//
+//  void FiducialMath::update_map(const Observations &observations,
+//                                const CameraInfo &camera_info,
+//                                Map &map)
+//  {
+//    if (update_) {
+//      update_->update_map(observations, camera_info, map);
+//    }
+//  }
+//
+//  void FiducialMath::update_map_for_publishing(Map &map)
+//  {
+//    if (update_) {
+//      update_->update_map_for_publishing(map);
+//    }
+//  }
+//
+//  std::string FiducialMath::update_map_cmd(std::string &cmd, const Map &empty_map)
+//  {
+////    if (update_) {
+////      auto ret_str = update_->update_map_cmd(cmd);
+////      if (cmd == "done") {
+////        update_.reset(nullptr);
+////      }
+////      return ret_str;
+////    }
+////
+////    if (cmd == "start") {
+////      update_ = cv_->cxt_.use_slam_task_ ?
+////                slam_task_factory(*this, cv_->cxt_, empty_map) :
+////                std::unique_ptr<UpdateMapInterface>{new UpdateFiducialMath{*cv_, *sam_}};
+////
+////      return update_->update_map_cmd(cmd);
+////    }
+//
+//    return std::string("No Update active");
+//  }
 
 // ==============================================================================
 // CvFiducialMathImpl class

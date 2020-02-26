@@ -306,6 +306,7 @@ namespace fiducial_vlam
       if (std::abs(cxt_.marker_map_publish_frequency_hz_) < 1.e-10) {
         cxt_.marker_map_publish_frequency_hz_ = 30. / 60.;
       }
+      cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.marker_map_publish_frequency_hz_);
 
       cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
         cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
@@ -409,55 +410,14 @@ namespace fiducial_vlam
       // ROS subscriptions
       // If we are not making a map, don't bother subscribing to the observations.
       if (cxt_.make_not_use_map_) {
-        observations_sub_ = create_subscription<fiducial_vlam_msgs::msg::Observations>(
-          cxt_.fiducial_observations_sub_topic_,
-          512,
-          [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
-          {
-            // Only process observations if we are making maps
-            if (cxt_.make_not_use_map_) {
-              this->observations_callback(msg);
-            }
-          });
       }
-
-      static const int timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.marker_map_publish_frequency_hz_);
 
       // Timer for publishing map info
       map_pub_timer_ = create_wall_timer(
-        std::chrono::milliseconds(timer_period_milliseconds_),
+        std::chrono::milliseconds(cxt_.timer_period_milliseconds_),
         [this]() -> void
         {
-          // Publish only if there is a map. There might not
-          // be a map if no markers have been observed.
-          if (map_) {
-            rclcpp::Time enter_build_map_time{now()};
-            // Give a little time for other tasks to process. For large optimizations, this timer routine
-            // sucks up CPU cycles and other tasks are starved.
-            if ((enter_build_map_time - exit_build_map_time_) >=
-                std::chrono::milliseconds(timer_period_milliseconds_) / 2) {
-              build_map();
-            }
-            exit_build_map_time_ = now();
-
-            // Publish any map we have built to this point.
-            publish_map_and_visualization();
-          }
-
-          // Figure out if there is an update maps command to process.
-          if (!cxt_.update_map_cmd_.empty()) {
-            if (!cxt_.make_not_use_map_) {
-              RCLCPP_INFO(get_logger(), "UpdateMapCmd command ignored because not in make_map mode %s",
-                          cxt_.update_map_cmd_.c_str());
-            } else {
-              auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_, *empty_map_);
-              if (!ret.empty()) {
-                RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
-              }
-            }
-            // Reset the cmd_string in preparation for the next command.
-            CXT_MACRO_SET_PARAMETER((*this), cxt_, update_map_cmd, "");
-          }
+          timer_msg_callback();
         });
 
       (void) observations_sub_;
@@ -467,7 +427,123 @@ namespace fiducial_vlam
 
   private:
 
-    void observations_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
+    void timer_msg_callback()
+    {
+      // Publish only if there is a map. There might not
+      // be a map if no markers have been observed.
+      if (map_) {
+        rclcpp::Time enter_build_map_time{now()};
+        // Give a little time for other tasks to process. For large optimizations, this timer routine
+        // sucks up CPU cycles and other tasks are starved.
+        if ((enter_build_map_time - exit_build_map_time_) >=
+            std::chrono::milliseconds(cxt_.timer_period_milliseconds_) / 2) {
+          build_map();
+        }
+        exit_build_map_time_ = now();
+
+        // Publish any map we have built to this point.
+        publish_map_and_visualization();
+      }
+
+      // Figure out if there is an update maps command to process.
+      if (!cxt_.update_map_cmd_.empty()) {
+        std::string cmd{cxt_.update_map_cmd_};
+
+        // Reset the cmd_string in preparation for the next command.
+        CXT_MACRO_SET_PARAMETER((*this), cxt_, update_map_cmd, "");
+
+        auto ret = process_update_map_cmd(cmd);
+        if (!ret.empty()) {
+          RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
+        }
+      }
+    }
+
+    void build_map()
+    {
+      if (build_marker_map_) {
+        // Build a map from the observations
+        auto ret = build_marker_map_->update_map(*map_);
+        if (!ret.empty()) {
+          RCLCPP_INFO(get_logger(), "UpdateMap response: %s", ret.c_str());
+        }
+
+        // Save the map
+        if (cxt_.make_not_use_map_ && !cxt_.marker_map_save_full_filename_.empty()) {
+          auto err_msg = to_YAML_file(map_, cxt_.marker_map_save_full_filename_);
+          if (!err_msg.empty()) {
+            RCLCPP_INFO(get_logger(), err_msg.c_str());
+          }
+        }
+      }
+    }
+
+    void publish_map_and_visualization()
+    {
+      // publish the map
+      std_msgs::msg::Header header;
+      header.stamp = now();
+      header.frame_id = cxt_.map_frame_id_;
+      fiducial_map_pub_->publish(*map_->to_map_msg(header));
+
+      // Publish the marker Visualization
+      if (cxt_.publish_marker_visualizations_) {
+        fiducial_markers_pub_->publish(to_marker_array_msg());
+      }
+
+      // Publish the transform tree
+      if (cxt_.publish_tfs_) {
+        tf_message_pub_->publish(to_tf_message());
+      }
+    }
+
+    std::string process_update_map_cmd(std::string &cmd)
+    {
+//      if (!cxt_.make_not_use_map_) {
+//        RCLCPP_INFO(get_logger(), "UpdateMapCmd command ignored because not in make_map mode %s",
+//                    cxt_.update_map_cmd_.c_str());
+//      } else {
+//        auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_, *empty_map_);
+//        if (!ret.empty()) {
+//          RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
+//        }
+//      }
+
+      // If we have and active map builder, then just pass the command along
+      if (build_marker_map_) {
+        auto ret_str = build_marker_map_->build_marker_map_cmd(cmd);
+        if (cmd == "done") {
+          build_marker_map_.reset(nullptr);
+        }
+        return ret_str;
+      }
+
+      // If no builder is active, then look for the start command
+      if (cmd == "start") {
+
+        // Subscribe to observations messages if we have not already.
+        if (observations_sub_ == nullptr) {
+          observations_sub_ = create_subscription<fiducial_vlam_msgs::msg::Observations>(
+            cxt_.fiducial_observations_sub_topic_,
+            512,
+            [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
+            {
+              observations_msg_callback(msg);
+            });
+        }
+
+        // Create a builder object. Now any observation messages will get passed to it.
+        build_marker_map_ = sam_build_marker_map_factory(*cvfm_, fm_cxt_, *empty_map_);
+
+        // Pass the "start" command to the builder incase it wants to do anything (like report status)
+        return build_marker_map_->build_marker_map_cmd(cmd);
+      }
+
+      return std::string("No Update active");
+
+    }
+
+    void observations_msg_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
     {
       CameraInfo ci{msg->camera_info};
 
@@ -487,8 +563,10 @@ namespace fiducial_vlam
 
       callbacks_processed_ += 1;
 
-      // Update our map with the observations
-      fm_.update_map(observations, ci, *map_);
+      // Process these observations if we are building a map
+      if (build_marker_map_) {
+        build_marker_map_->process_observations(observations, ci);
+      }
     }
 
     tf2_msgs::msg::TFMessage to_tf_message()
@@ -540,39 +618,6 @@ namespace fiducial_vlam
         markers.markers.emplace_back(marker_msg);
       }
       return markers;
-    }
-
-    void build_map()
-    {
-      // Update the map from FiducialMath in-case we are doing iterative map creation.
-      fm_.update_map_for_publishing(*map_);
-
-      // Save the map
-      if (cxt_.make_not_use_map_ && !cxt_.marker_map_save_full_filename_.empty()) {
-        auto err_msg = to_YAML_file(map_, cxt_.marker_map_save_full_filename_);
-        if (!err_msg.empty()) {
-          RCLCPP_INFO(get_logger(), err_msg.c_str());
-        }
-      }
-    }
-
-    void publish_map_and_visualization()
-    {
-      // publish the map
-      std_msgs::msg::Header header;
-      header.stamp = now();
-      header.frame_id = cxt_.map_frame_id_;
-      fiducial_map_pub_->publish(*map_->to_map_msg(header));
-
-      // Publish the marker Visualization
-      if (cxt_.publish_marker_visualizations_) {
-        fiducial_markers_pub_->publish(to_marker_array_msg());
-      }
-
-      // Publish the transform tree
-      if (cxt_.publish_tfs_) {
-        tf_message_pub_->publish(to_tf_message());
-      }
     }
 
     std::unique_ptr<Map> initialize_map()
