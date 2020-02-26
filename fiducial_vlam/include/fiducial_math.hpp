@@ -108,23 +108,6 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// BuildMarkerMapInterface class
-// ==============================================================================
-
-  class BuildMarkerMapInterface
-  {
-  public:
-    virtual ~BuildMarkerMapInterface() = default;
-
-    virtual void add_observations(const Observations &observations,
-                                      const CameraInfo &camera_info) = 0;
-
-    virtual std::string update_map(Map &map) = 0;
-
-    virtual std::string build_marker_map_cmd(std::string &cmd) = 0;
-  };
-
-// ==============================================================================
 // FiducialMath class
 // ==============================================================================
 
@@ -168,12 +151,75 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// slam_task_factory
+// CvFiducialMathInterface class
+// ==============================================================================
+
+  class CvFiducialMathInterface
+  {
+  public:
+    virtual ~CvFiducialMathInterface() = default;
+
+    virtual TransformWithCovariance solve_t_camera_marker(const Observation &observation,
+                                                          const CameraInfo &camera_info,
+                                                          double marker_length) = 0;
+
+    virtual Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &image,
+                                        std::shared_ptr<cv_bridge::CvImage> &color_marked) = 0;
+
+    virtual void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
+                                                 const TransformWithCovariance &t_camera_marker,
+                                                 const CameraInfo &camera_info) = 0;
+  };
+
+// ==============================================================================
+// LocalizeCameraInterface class
+// ==============================================================================
+
+  class LocalizeCameraInterface
+  {
+  public:
+    virtual ~LocalizeCameraInterface() = default;
+
+    virtual TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                                       const CameraInfo &camera_info,
+                                                       Map &map) = 0;
+  };
+
+// ==============================================================================
+// BuildMarkerMapInterface class
+// ==============================================================================
+
+  class BuildMarkerMapInterface
+  {
+  public:
+    virtual ~BuildMarkerMapInterface() = default;
+
+    virtual void add_observations(const Observations &observations,
+                                  const CameraInfo &camera_info) = 0;
+
+    virtual std::string update_map(Map &map) = 0;
+
+    virtual std::string build_marker_map_cmd(std::string &cmd) = 0;
+  };
+
+
+// ==============================================================================
+// factories
 // ==============================================================================
 
   std::unique_ptr<UpdateMapInterface> slam_task_factory(FiducialMath &fm,
                                                         const FiducialMathContext &cxt,
                                                         const Map &empty_map);
+
+  std::unique_ptr<CvFiducialMathInterface> cv_fiducial_math_factory(const FiducialMathContext &cxt);
+
+  std::unique_ptr<BuildMarkerMapInterface> sam_build_marker_map_factory(CvFiducialMathInterface &fm,
+                                                                   const FiducialMathContext &cxt,
+                                                                   const Map &empty_map);
+
+  std::unique_ptr<BuildMarkerMapInterface> cv_build_marker_map_factory(CvFiducialMathInterface &fm,
+                                                                  const FiducialMathContext &cxt,
+                                                                  const Map &empty_map);
 
 }
 

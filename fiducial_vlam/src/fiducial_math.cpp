@@ -61,6 +61,56 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// CvUtil class
+// ==============================================================================
+
+  struct CvUtil
+  {
+    static tf2::Transform to_tf2_transform(const cv::Vec3d &rvec, const cv::Vec3d &tvec)
+    {
+      cv::Mat rmat;
+      cv::Rodrigues(rvec, rmat);
+      tf2::Matrix3x3 m;
+      for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+          m[row][col] = rmat.at<double>(row, col);  // Row- vs. column-major order
+        }
+      }
+      return tf2::Transform(m, tf2::Vector3{tvec[0], tvec[1], tvec[2]});
+    }
+
+    static void to_cv_rvec_tvec(const TransformWithCovariance &t, cv::Vec3d &rvec, cv::Vec3d &tvec)
+    {
+      auto c = t.transform().getOrigin();
+      tvec[0] = c.x();
+      tvec[1] = c.y();
+      tvec[2] = c.z();
+      auto R = t.transform().getBasis();
+      cv::Mat rmat(3, 3, CV_64FC1);
+      for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+          rmat.at<double>(row, col) = R[row][col];
+        }
+      }
+      cv::Rodrigues(rmat, rvec);
+    }
+
+    static Observations to_observations(const std::vector<int> &ids,
+                                        const std::vector<std::vector<cv::Point2f>> &corners)
+    {
+      Observations observations;
+      for (int i = 0; i < ids.size(); i += 1) {
+        observations.add(Observation(ids[i],
+                                     corners[i][0].x, corners[i][0].y,
+                                     corners[i][1].x, corners[i][1].y,
+                                     corners[i][2].x, corners[i][2].y,
+                                     corners[i][3].x, corners[i][3].y));
+      }
+      return observations;
+    }
+  };
+
+// ==============================================================================
 // CameraInfo::CvCameraInfo class
 // ==============================================================================
 
@@ -1108,7 +1158,7 @@ namespace fiducial_vlam
       }
     }
 
-    template <class T>
+    template<class T>
     void update_markers_in_map(int marker_id,
                                const T &graph_or_isam,
                                const gtsam::Values &result,
@@ -1426,5 +1476,138 @@ namespace fiducial_vlam
     }
 
     return std::string("No Update active");
+  }
+
+// ==============================================================================
+// CvFiducialMathImpl class
+// ==============================================================================
+
+  class CvFiducialMathImpl : public CvFiducialMathInterface
+  {
+    const FiducialMathContext &cxt_;
+
+    static void drawDetectedMarkers(cv::InputOutputArray image,
+                                    cv::InputArrayOfArrays corners,
+                                    cv::InputArray ids)
+    {
+      // calculate colors
+      auto borderColor = cv::Scalar(0, 255, 0);
+      cv::Scalar textColor = borderColor;
+      cv::Scalar cornerColor = borderColor;
+
+      std::swap(textColor.val[0], textColor.val[1]);     // text color just sawp G and R
+      std::swap(cornerColor.val[1], cornerColor.val[2]); // corner color just sawp G and B
+
+      int nMarkers = static_cast<int>(corners.total());
+      for (int i = 0; i < nMarkers; i++) {
+
+        cv::Mat currentMarker = corners.getMat(i);
+        CV_Assert((currentMarker.total() == 4) && (currentMarker.type() == CV_32FC2));
+
+        // draw marker sides
+        for (int j = 0; j < 4; j++) {
+          cv::Point2f p0, p1;
+          p0 = currentMarker.ptr<cv::Point2f>(0)[j];
+          p1 = currentMarker.ptr<cv::Point2f>(0)[(j + 1) % 4];
+          line(image, p0, p1, borderColor, 1);
+        }
+
+        // draw first corner mark
+        rectangle(image,
+                  currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
+                  currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3),
+                  cornerColor, 1, cv::LINE_AA);
+
+        // draw ID
+//      if (ids.total() != 0) {
+//        cv::Point2f cent(0, 0);
+//        for (int p = 0; p < 4; p++)
+//          cent += currentMarker.ptr<cv::Point2f>(0)[p];
+//
+//        cent = cent / 4.;
+//        std::stringstream s;
+//        s << "id=" << ids.getMat().ptr<int>(0)[i];
+//        putText(image, s.str(), cent, cv::FONT_HERSHEY_SIMPLEX, 0.5, textColor, 2);
+//      }
+      }
+    }
+
+  public:
+    explicit CvFiducialMathImpl(const FiducialMathContext &cxt) :
+      cxt_{cxt}
+    {}
+
+
+    virtual TransformWithCovariance solve_t_camera_marker(const Observation &observation,
+                                                          const CameraInfo &camera_info,
+                                                          double marker_length) override
+    {
+      // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame
+      auto corners_f_marker{Convert::corners_f_marker<cv::Point3d>(marker_length)};
+      auto corners_f_image{observation.to_point_vector<cv::Point2d>()};
+
+      // Figure out marker pose.
+      cv::Vec3d rvec, tvec;
+      cv::solvePnP(corners_f_marker, corners_f_image,
+                   camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
+                   rvec, tvec);
+
+      // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
+      // camera coordinate system". In this case the marker frame is the model coordinate system.
+      // So rvec, tvec are the transformation t_camera_marker.
+      return TransformWithCovariance(CvUtil::to_tf2_transform(rvec, tvec));
+    }
+
+    virtual Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &gray,
+                                        std::shared_ptr<cv_bridge::CvImage> &color_marked) override
+    {
+      // Todo: make the dictionary a parameter
+      auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+      auto detectorParameters = cv::aruco::DetectorParameters::create();
+#if (CV_VERSION_MAJOR == 4)
+//     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
+//     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
+//     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
+//     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
+
+      // Use the new AprilTag 2 corner algorithm, much better but much slower
+      detectorParameters->cornerRefinementMethod = cxt_.cv4_corner_refinement_method_;
+#else
+      // 0 = false
+      // 1 = true
+      detectorParameters->doCornerRefinement = cxt_.cv3_do_corner_refinement_;
+#endif
+
+      // Detect markers
+      std::vector<int> ids;
+      std::vector<std::vector<cv::Point2f>> corners;
+      cv::aruco::detectMarkers(gray->image, dictionary, corners, ids, detectorParameters);
+
+      // Annotate the markers
+      if (color_marked) {
+        drawDetectedMarkers(color_marked->image, corners, ids);
+      }
+
+      // return the corners as a list of observations
+      return CvUtil::to_observations(ids, corners);
+
+    }
+
+    virtual void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
+                                                 const TransformWithCovariance &t_camera_marker,
+                                                 const CameraInfo &camera_info) override
+    {
+      cv::Vec3d rvec, tvec;
+      CvUtil::to_cv_rvec_tvec(t_camera_marker, rvec, tvec);
+
+      cv::aruco::drawAxis(color_marked->image,
+                          camera_info.cv()->camera_matrix(), camera_info.cv()->dist_coeffs(),
+                          rvec, tvec, 0.1);
+    }
+  };
+
+  std::unique_ptr<CvFiducialMathInterface> cv_fiducial_math_factory(const FiducialMathContext &cxt)
+  {
+    return std::make_unique<CvFiducialMathImpl>(cxt);
   }
 }

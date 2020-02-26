@@ -284,10 +284,14 @@ namespace fiducial_vlam
     VmapContext cxt_{};
     FiducialMathContext fm_cxt_{};
     FiducialMath fm_;
+
+    std::unique_ptr<CvFiducialMathInterface> cvfm_;
+    std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
+
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
     std::unique_ptr<Map> empty_map_{}; // Map that doesn't get updated.
     int callbacks_processed_{0};
-    rclcpp::Time exit_timer_;
+    rclcpp::Time exit_build_map_time_;
 
     // ROS publishers
     rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr fiducial_map_pub_{};
@@ -326,7 +330,7 @@ namespace fiducial_vlam
       VMAP_ALL_PARAMS
     }
 
-    void validate_fm_parameters()
+    static void validate_fm_parameters()
     {}
 
     void load_fm_parameters()
@@ -372,7 +376,9 @@ namespace fiducial_vlam
 
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
-      Node("vmap_node", options), fm_(fm_cxt_), exit_timer_{now()}
+      Node{"vmap_node", options}, fm_{fm_cxt_},
+      cvfm_{cv_fiducial_math_factory(fm_cxt_)},
+      exit_build_map_time_{now()}
     {
       // Get parameters from the command line
       load_parameters();
@@ -382,7 +388,7 @@ namespace fiducial_vlam
 
       // Initialize the map. Load from file or otherwise.
       map_ = initialize_map();
-      empty_map_.reset(new Map{*map_});
+      empty_map_ = std::make_unique<Map>(*map_);
 
 //      auto s = to_YAML_string(*map_, "test");
 //      auto m = from_YAML_string(s, "test");
@@ -422,16 +428,20 @@ namespace fiducial_vlam
         std::chrono::milliseconds(timer_period_milliseconds_),
         [this]() -> void
         {
-          // Only if there is a map. There might not
+          // Publish only if there is a map. There might not
           // be a map if no markers have been observed.
           if (map_) {
-            rclcpp::Time enter_publish{now()};
+            rclcpp::Time enter_build_map_time{now()};
             // Give a little time for other tasks to process. For large optimizations, this timer routine
             // sucks up CPU cycles and other tasks are starved.
-            if ((enter_publish - exit_timer_) >= std::chrono::milliseconds(timer_period_milliseconds_) / 2) {
-              this->publish_map_and_visualization();
+            if ((enter_build_map_time - exit_build_map_time_) >=
+                std::chrono::milliseconds(timer_period_milliseconds_) / 2) {
+              build_map();
             }
-            exit_timer_ = now();
+            exit_build_map_time_ = now();
+
+            // Publish any map we have built to this point.
+            publish_map_and_visualization();
           }
 
           // Figure out if there is an update maps command to process.
@@ -532,11 +542,22 @@ namespace fiducial_vlam
       return markers;
     }
 
-    void publish_map_and_visualization()
+    void build_map()
     {
       // Update the map from FiducialMath in-case we are doing iterative map creation.
       fm_.update_map_for_publishing(*map_);
 
+      // Save the map
+      if (cxt_.make_not_use_map_ && !cxt_.marker_map_save_full_filename_.empty()) {
+        auto err_msg = to_YAML_file(map_, cxt_.marker_map_save_full_filename_);
+        if (!err_msg.empty()) {
+          RCLCPP_INFO(get_logger(), err_msg.c_str());
+        }
+      }
+    }
+
+    void publish_map_and_visualization()
+    {
       // publish the map
       std_msgs::msg::Header header;
       header.stamp = now();
@@ -551,14 +572,6 @@ namespace fiducial_vlam
       // Publish the transform tree
       if (cxt_.publish_tfs_) {
         tf_message_pub_->publish(to_tf_message());
-      }
-
-      // Save the map
-      if (cxt_.make_not_use_map_ && !cxt_.marker_map_save_full_filename_.empty()) {
-        auto err_msg = to_YAML_file(map_, cxt_.marker_map_save_full_filename_);
-        if (!err_msg.empty()) {
-          RCLCPP_INFO(get_logger(), err_msg.c_str());
-        }
       }
     }
 

@@ -75,7 +75,7 @@ namespace fiducial_vlam
     { return y3_; }
 
     template<class TPoint>
-    auto to_point_array() const
+    auto to_point_vector() const
     {
       return std::vector<TPoint>{
         TPoint{x0_, y0_},
