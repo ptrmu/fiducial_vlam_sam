@@ -143,14 +143,6 @@ namespace fiducial_vlam
     void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color,
                                          const TransformWithCovariance &t_camera_marker,
                                          const CameraInfo &camera_info);
-//
-//    void update_map(const Observations &observations,
-//                    const CameraInfo &camera_info,
-//                    Map &map);
-//
-//    void update_map_for_publishing(Map &map);
-//
-//    std::string update_map_cmd(std::string &cmd, const Map &empty_map_);
   };
 
 // ==============================================================================
