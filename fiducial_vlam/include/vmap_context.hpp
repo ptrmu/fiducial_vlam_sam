@@ -45,10 +45,7 @@ namespace fiducial_vlam
   std::string, "fiducial_marker_locations.yaml") \
   CXT_MACRO_MEMBER(       /* name of the file to load the marker map from  */  \
   marker_map_load_full_filename, \
-  std::string, "fiducial_marker_locations_saved.yaml") \
-  CXT_MACRO_MEMBER(       /* non-zero => create a new map  */\
-  make_not_use_map,  \
-  int, 1) \
+  std::string, "") \
   CXT_MACRO_MEMBER(       /* 0->marker id, pose from file, 1->marker id, pose as parameter, 2->camera pose as parameter  */ \
   map_init_style, \
   int, 1) \

@@ -283,13 +283,11 @@ namespace fiducial_vlam
   {
     VmapContext cxt_{};
     FiducialMathContext fm_cxt_{};
-    FiducialMath fm_;
 
     std::unique_ptr<CvFiducialMathInterface> cvfm_;
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
-    std::unique_ptr<Map> empty_map_{}; // Map that doesn't get updated.
     int callbacks_processed_{0};
     rclcpp::Time exit_build_map_time_;
 
@@ -365,7 +363,7 @@ namespace fiducial_vlam
       }
 
       // Find t_camera_marker
-      auto t_camera_marker = fm_.solve_t_camera_marker(*min_obs, ci, cxt_.marker_length_);
+      auto t_camera_marker = cvfm_->solve_t_camera_marker(*min_obs, ci, cxt_.marker_length_);
 
       // And t_map_camera
       auto t_map_camera = cxt_.map_init_transform_;
@@ -377,7 +375,7 @@ namespace fiducial_vlam
 
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
-      Node{"vmap_node", options}, fm_{fm_cxt_},
+      Node{"vmap_node", options},
       cvfm_{cv_fiducial_math_factory(fm_cxt_)},
       exit_build_map_time_{now()}
     {
@@ -388,8 +386,7 @@ namespace fiducial_vlam
       load_fm_parameters();
 
       // Initialize the map. Load from file or otherwise.
-      map_ = initialize_map();
-      empty_map_ = std::make_unique<Map>(*map_);
+      map_ = initialize_map(true);
 
 //      auto s = to_YAML_string(*map_, "test");
 //      auto m = from_YAML_string(s, "test");
@@ -405,11 +402,6 @@ namespace fiducial_vlam
 
       if (cxt_.publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>("tf", 16);
-      }
-
-      // ROS subscriptions
-      // If we are not making a map, don't bother subscribing to the observations.
-      if (cxt_.make_not_use_map_) {
       }
 
       // Timer for publishing map info
@@ -469,7 +461,7 @@ namespace fiducial_vlam
         }
 
         // Save the map
-        if (cxt_.make_not_use_map_ && !cxt_.marker_map_save_full_filename_.empty()) {
+        if (!cxt_.marker_map_save_full_filename_.empty()) {
           auto err_msg = to_YAML_file(map_, cxt_.marker_map_save_full_filename_);
           if (!err_msg.empty()) {
             RCLCPP_INFO(get_logger(), err_msg.c_str());
@@ -532,8 +524,11 @@ namespace fiducial_vlam
             });
         }
 
+        // Initialize the map to empty
+        initialize_map(false);
+
         // Create a builder object. Now any observation messages will get passed to it.
-        build_marker_map_ = sam_build_marker_map_factory(*cvfm_, fm_cxt_, *empty_map_);
+        build_marker_map_ = sam_build_marker_map_factory(*cvfm_, fm_cxt_, *map_);
 
         // Pass the "start" command to the builder incase it wants to do anything (like report status)
         return build_marker_map_->build_marker_map_cmd(cmd);
@@ -620,12 +615,12 @@ namespace fiducial_vlam
       return markers;
     }
 
-    std::unique_ptr<Map> initialize_map()
+    std::unique_ptr<Map> initialize_map(bool load_full_map)
     {
       std::unique_ptr<Map> map_unique{};
 
       // If not building a map, then load the map from a file
-      if (!cxt_.make_not_use_map_) {
+      if (load_full_map && !cxt_.marker_map_load_full_filename_.empty()) {
         RCLCPP_INFO(get_logger(), "Loading map file '%s'", cxt_.marker_map_load_full_filename_.c_str());
 
         // load the map.
