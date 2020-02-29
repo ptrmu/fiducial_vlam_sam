@@ -31,15 +31,25 @@ if (NOT OpenCV_FOUND)
 endif ()
 message(STATUS "Found OpenCV version ${OpenCV_VERSION}")
 
+# Prefer to use GTSAM, but should work without
+find_package(GTSAM QUIET)
+if (GTSAM_FOUND)
+  set(MY_GTSAM_INCLUDES "${GTSAM_INCLUDE_DIR} ${GTSAM_INCLUDE_DIR}/gtsam/3rdparty/Eigen")
+  set(MY_GTSAM_LIB "GTSAM")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_GTSAM")
+else ()
+  set(MY_GTSAM_INCLUDES "")
+  set(MY_GTSAM_LIB "")
+  message(STATUS "GTSAM not found, functionality limited")
+endif ()
+
 # Find packages
 find_package(ament_cmake REQUIRED)
 find_package(class_loader REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fiducial_vlam_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-find_package(GTSAM REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(OpenCV REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(ros2_shared REQUIRED)
@@ -56,8 +66,7 @@ include_directories(
   ${cv_bridge_INCLUDE_DIRS}
   ${fiducial_vlam_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
-  ${GTSAM_INCLUDE_DIR}
-  ${GTSAM_INCLUDE_DIR}/gtsam/3rdparty/Eigen
+  ${MY_GTSAM_INCLUDES}
   ${nav_msgs_INCLUDE_DIRS}
   ${ros2_shared_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
@@ -97,7 +106,7 @@ set(VLOC_NODE_DEPS
   class_loader
   cv_bridge
   fiducial_vlam_msgs
-  GTSAM
+  ${MY_GTSAM_LIB}
   nav_msgs
   OpenCV
   rclcpp
@@ -126,16 +135,17 @@ add_executable(vloc_main
 ament_target_dependencies(vloc_main
   ${VLOC_NODE_DEPS})
 
-# ?? Why can't I put this in ament_target_dependencies
-target_link_libraries(vloc_node
-  gtsam
-  )
+if (GTSAM_FOUND)
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vloc_node
+    gtsam
+    )
 
-# ?? Why can't I put this in ament_target_dependencies
-target_link_libraries(vloc_main
-  gtsam
-  )
-
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vloc_main
+    gtsam
+    )
+endif ()
 
 #=============
 # vmap node
@@ -183,10 +193,16 @@ add_executable(vmap_main
 ament_target_dependencies(vmap_main
   ${VMAP_NODE_DEPS})
 
-# ?? Why can't I put this in ament_target_dependencies
-target_link_libraries(vmap_main
-  gtsam
-  )
+if (GTSAM_FOUND)
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vmap_main
+    gtsam
+    )
+
+  target_link_libraries(vmap_node
+    gtsam
+    )
+endif ()
 
 #=============
 # Install
