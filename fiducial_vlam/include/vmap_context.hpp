@@ -79,7 +79,7 @@ namespace fiducial_vlam
   \
   CXT_MACRO_MEMBER(       /* commands to the build_marker_map system  */  \
   build_marker_map_cmd, \
-  std::string, "start") \
+  std::string, "") \
   CXT_MACRO_MEMBER(       /* image frames to skip when creating map. 1=>use all frames, 2=>use every other frame, ...  */  \
   build_map_skip_images, \
   int, 0) \

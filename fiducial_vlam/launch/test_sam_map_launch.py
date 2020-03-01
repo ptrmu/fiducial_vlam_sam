@@ -11,10 +11,12 @@ package_share_directory = get_package_share_directory(package_name);
 package_launch_directory = os.path.join(package_share_directory, 'launch')
 package_cfg_directory = os.path.join(package_share_directory, 'cfg')
 
-map_filename = os.path.join(package_cfg_directory, 'fiducial_marker_locations_test_sam.yaml')
+created_map_filename = os.path.join(package_cfg_directory, 'fiducial_marker_locations_test_sam.yaml')
+existing_map_filename = os.path.join(package_cfg_directory, 'fiducial_marker_locations_test_sam_existing.yaml')
 rviz_config_filename = os.path.join(package_cfg_directory, package_name + '.rviz')
 
-print("map_filename: ", map_filename)
+print("created_map_filename: ", created_map_filename)
+print("existing_map_filename: ", existing_map_filename)
 print("rviz_config_filename: ", rviz_config_filename)
 
 corner_measurement_sigma = 1.0
@@ -44,9 +46,11 @@ vmap_args = [{
     'use_sim_time': False,  # Use /clock if available
     'publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1627,  # Marker length
-    'marker_map_save_full_filename': map_filename,
-    'marker_map_load_full_filename': map_filename,
+    'marker_map_save_full_filename': created_map_filename,
+    'marker_map_load_full_filename': existing_map_filename,
     'corner_measurement_sigma': corner_measurement_sigma,
+    'build_map_skip_images' : 15,
+    'map_init_id': 1,
 }]
 
 
