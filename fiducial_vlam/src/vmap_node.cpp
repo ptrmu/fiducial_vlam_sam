@@ -288,7 +288,7 @@ namespace fiducial_vlam
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
-    int callbacks_processed_{0};
+    std::uint64_t build_map_skip_images_count_{0};
     rclcpp::Time exit_build_map_time_;
 
     // ROS publishers
@@ -309,6 +309,8 @@ namespace fiducial_vlam
       cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
         cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
         cxt_.map_init_pose_roll_, cxt_.map_init_pose_pitch_, cxt_.map_init_pose_yaw_});
+
+      cxt_.build_map_skip_images_ = std::max(1, cxt_.build_map_skip_images_);
     }
 
     void load_parameters()
@@ -350,7 +352,8 @@ namespace fiducial_vlam
     }
 
     // Special "initialize map from camera location" mode
-    void initialize_map_from_observations(const Observations &observations, CameraInfo &ci)
+    void initialize_map_from_observations(const Observations &observations,
+                                          const CameraInfoInterface &ci)
     {
       // Find the marker with the lowest id
       int min_id = std::numeric_limits<int>::max();
@@ -376,7 +379,7 @@ namespace fiducial_vlam
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
       Node{"vmap_node", options},
-      cvfm_{cv_fiducial_math_factory(fm_cxt_)},
+      cvfm_{make_cv_fiducial_math(fm_cxt_)},
       exit_build_map_time_{now()}
     {
       // Get parameters from the command line
@@ -386,10 +389,7 @@ namespace fiducial_vlam
       load_fm_parameters();
 
       // Initialize the map. Load from file or otherwise.
-      map_ = initialize_map(true);
-
-//      auto s = to_YAML_string(*map_, "test");
-//      auto m = from_YAML_string(s, "test");
+      map_ = initialize_map(cxt_.marker_map_load_full_filename_, Map::MapStyles::pose);
 
       // ROS publishers.
       fiducial_map_pub_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
@@ -438,11 +438,11 @@ namespace fiducial_vlam
       }
 
       // Figure out if there is an update maps command to process.
-      if (!cxt_.update_map_cmd_.empty()) {
-        std::string cmd{cxt_.update_map_cmd_};
+      if (!cxt_.build_marker_map_cmd_.empty()) {
+        std::string cmd{cxt_.build_marker_map_cmd_};
 
         // Reset the cmd_string in preparation for the next command.
-        CXT_MACRO_SET_PARAMETER((*this), cxt_, update_map_cmd, "");
+        CXT_MACRO_SET_PARAMETER((*this), cxt_, build_marker_map_cmd, "");
 
         auto ret = process_update_map_cmd(cmd);
         if (!ret.empty()) {
@@ -455,7 +455,7 @@ namespace fiducial_vlam
     {
       if (build_marker_map_) {
         // Build a map from the observations
-        auto ret = build_marker_map_->update_map(*map_);
+        auto ret = build_marker_map_->build_marker_map(*map_);
         if (!ret.empty()) {
           RCLCPP_INFO(get_logger(), "UpdateMap response: %s", ret.c_str());
         }
@@ -491,17 +491,8 @@ namespace fiducial_vlam
 
     std::string process_update_map_cmd(std::string &cmd)
     {
-//      if (!cxt_.make_not_use_map_) {
-//        RCLCPP_INFO(get_logger(), "UpdateMapCmd command ignored because not in make_map mode %s",
-//                    cxt_.update_map_cmd_.c_str());
-//      } else {
-//        auto ret = fm_.update_map_cmd(cxt_.update_map_cmd_, *empty_map_);
-//        if (!ret.empty()) {
-//          RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
-//        }
-//      }
-
-      // If we have and active map builder, then just pass the command along
+      // If we have and active map builder, then just pass the command along and
+      // then kill the process if the command was 'done'
       if (build_marker_map_) {
         auto ret_str = build_marker_map_->build_marker_map_cmd(cmd);
         if (cmd == "done") {
@@ -524,11 +515,12 @@ namespace fiducial_vlam
             });
         }
 
-        // Initialize the map to empty
-        initialize_map(false);
+        // Initialize the map to empty. Use the covariance style in this case because we
+        // only have sam map creators at this point.
+        map_ = initialize_map("", Map::MapStyles::covariance);
 
         // Create a builder object. Now any observation messages will get passed to it.
-        build_marker_map_ = sam_build_marker_map_factory(*cvfm_, fm_cxt_, *map_);
+        build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *cvfm_, *map_);
 
         // Pass the "start" command to the builder incase it wants to do anything (like report status)
         return build_marker_map_->build_marker_map_cmd(cmd);
@@ -540,27 +532,32 @@ namespace fiducial_vlam
 
     void observations_msg_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
     {
-      CameraInfo ci{msg->camera_info};
-
-      // Get observations from the message.
-      Observations observations(*msg);
-
-      // If the map has not yet been initialized, then initialize it with these observations.
-      // This is only used for the special camera based map initialization
-      if (!map_ && observations.size() > 0) {
-        initialize_map_from_observations(observations, ci);
-      }
-
-      // There is nothing to do at this point unless we have more than one observation.
-      if (observations.size() < 2) {
+      // skip some messages so we don't get too overloaded doing the isam optimization.
+      build_map_skip_images_count_ += 1;
+      if ((build_map_skip_images_count_ % cxt_.build_map_skip_images_) != 0) {
         return;
       }
 
-      callbacks_processed_ += 1;
+      // Create an CameraInfo. This object will get passed to the map builder.
+      std::unique_ptr<const CameraInfoInterface> ci{make_camera_info(msg->camera_info)};
+
+      // Get observations from the message. This object will also get passed to the map builder
+      std::unique_ptr<Observations> observations{std::make_unique<Observations>(*msg)};
+
+      // If the map has not yet been initialized, then initialize it with these observations.
+      // This is only used for the special camera based map initialization
+      if (!map_ && observations->size() > 0) {
+        initialize_map_from_observations(*observations, *ci);
+      }
+
+      // There is nothing to do at this point unless we have more than one observation.
+      if (observations->size() < 2) {
+        return;
+      }
 
       // Process these observations if we are building a map
       if (build_marker_map_) {
-        build_marker_map_->process_observations(observations, ci);
+        build_marker_map_->process_observations(std::move(observations), std::move(ci));
       }
     }
 
@@ -615,16 +612,17 @@ namespace fiducial_vlam
       return markers;
     }
 
-    std::unique_ptr<Map> initialize_map(bool load_full_map)
+    std::unique_ptr<Map> initialize_map(const std::string &marker_map_load_full_filename,
+                                        Map::MapStyles new_map_style)
     {
       std::unique_ptr<Map> map_unique{};
 
       // If not building a map, then load the map from a file
-      if (load_full_map && !cxt_.marker_map_load_full_filename_.empty()) {
-        RCLCPP_INFO(get_logger(), "Loading map file '%s'", cxt_.marker_map_load_full_filename_.c_str());
+      if (!marker_map_load_full_filename.empty()) {
+        RCLCPP_INFO(get_logger(), "Loading map file '%s'", marker_map_load_full_filename.c_str());
 
         // load the map.
-        auto err_msg = from_YAML_file(cxt_.marker_map_load_full_filename_, map_unique);
+        auto err_msg = from_YAML_file(marker_map_load_full_filename, map_unique);
 
         if (err_msg.empty()) {
           return map_unique;
@@ -640,17 +638,11 @@ namespace fiducial_vlam
         return map_unique;
       }
 
-      // Base the style of the new map on the sam_not_cv parameter. If we are not
-      // doing sam, then the map contains only poses.
-      Map::MapStyles new_map_style = fm_cxt_.sam_not_cv_ ?
-                                     Map::MapStyles::covariance :
-                                     Map::MapStyles::pose;
-
       // if Style == 0, look for a file and pull the pose from it.
       // If there is a problem, fall into style 1.
       if (cxt_.map_init_style_ == 0) {
         std::unique_ptr<Map> map_temp{};
-        auto err_msg = from_YAML_file(cxt_.marker_map_load_full_filename_, map_temp);
+        auto err_msg = from_YAML_file(marker_map_load_full_filename, map_temp);
         if (!err_msg.empty()) {
           RCLCPP_ERROR(get_logger(), "Error while trying to initialize map style 0");
           RCLCPP_ERROR(get_logger(), err_msg.c_str());
@@ -661,7 +653,7 @@ namespace fiducial_vlam
           if (marker_temp == nullptr) {
             RCLCPP_ERROR(get_logger(), "Error while trying to initialize map style 0");
             RCLCPP_ERROR(get_logger(), "Map file '%s' does not contain a marker with id %d",
-                         cxt_.marker_map_load_full_filename_.c_str(), cxt_.map_init_id_);
+                         marker_map_load_full_filename.c_str(), cxt_.map_init_id_);
             RCLCPP_ERROR(get_logger(), "Falling into initialize map style 1");
 
           } else {

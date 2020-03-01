@@ -20,8 +20,8 @@ namespace fiducial_vlam
     std::shared_ptr<cv_bridge::CvImage> &color_marked,
     const TransformWithCovariance &t_map_camera,
     const std::vector<TransformWithCovariance> &t_map_markers,
-    const CameraInfo & camera_info,
-    FiducialMath &fm)
+    CvFiducialMathInterface &fm,
+    const CameraInfoInterface &camera_info)
   {
     // Annotate the image by drawing axes on each marker that was used for the location
     // calculation. This calculation uses the average t_map_camera and the t_map_markers
@@ -45,13 +45,13 @@ namespace fiducial_vlam
 
   static std::vector<TransformWithCovariance> markers_t_map_cameras(
     const Observations &observations,
-    const CameraInfo &camera_info,
-    Map &map,
-    FiducialMath &fm)
+    LocalizeCameraInterface &fm,
+    const CameraInfoInterface &camera_info,
+    const Map &map)
   {
     std::vector<TransformWithCovariance> t_map_cameras;
 
-    for (auto &observation : observations.observations()) {
+    for (const auto &observation : observations.observations()) {
       Observations single_observation{};
       single_observation.add(observation);
       auto t_map_camera = fm.solve_t_map_camera(single_observation, camera_info, map);
@@ -72,9 +72,9 @@ namespace fiducial_vlam
   {
     VlocContext cxt_{};
     FiducialMathContext fm_cxt_{};
-    FiducialMath fm_;
+    std::unique_ptr<CvFiducialMathInterface> fm_;
+    std::unique_ptr<LocalizeCameraInterface> lc_{};
     std::unique_ptr<Map> map_{};
-    std::unique_ptr<CameraInfo> camera_info_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};
 
@@ -135,10 +135,10 @@ namespace fiducial_vlam
       FM_ALL_PARAMS
     }
 
-
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
-      Node("vloc_node", options), fm_(fm_cxt_)
+      Node("vloc_node", options),
+      fm_{make_cv_fiducial_math(fm_cxt_)}
     {
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
 
@@ -147,6 +147,9 @@ namespace fiducial_vlam
 
       // Set up parameter for FiducialMath
       load_fm_parameters();
+
+      // load the camera localizer
+      lc_ = make_cv_localize_camera(fm_cxt_);
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
@@ -184,13 +187,16 @@ namespace fiducial_vlam
       camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
         cxt_.camera_info_sub_topic_,
         camera_info_qos,
-        [this](const sensor_msgs::msg::CameraInfo::UniquePtr msg) -> void
+        [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) -> void
         {
-          if (!camera_info_) {
-            camera_info_ = std::make_unique<CameraInfo>(*msg);
-            // Save the info message because we pass it along with the observations.
-            camera_info_msg_ = std::make_unique<sensor_msgs::msg::CameraInfo>(*msg);
-          }
+          // Save this message because it will be used for the next image message.
+          // Note: we are taking ownership of this object
+          camera_info_msg_ = std::move(msg);
+//          if (!camera_info_) {
+//            camera_info_ = std::make_unique<CameraInfo>(*msg);
+//            // Save the info message because we pass it along with the observations.
+//            camera_info_msg_ = std::make_unique<sensor_msgs::msg::CameraInfo>(*msg);
+//          }
         });
 
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
@@ -207,7 +213,7 @@ namespace fiducial_vlam
           // the stamp to use for all published messages derived from this image message.
           auto stamp{msg->header.stamp};
 
-          if (!camera_info_) {
+          if (!camera_info_msg_) {
             RCLCPP_DEBUG(get_logger(), "Ignore image message because no camera_info has been received yet.");
 
           } else if ((stamp.nanosec == 0l && stamp.sec == 0l) || stamp == last_image_stamp_) {
@@ -218,7 +224,7 @@ namespace fiducial_vlam
             // The stamp_msgs_with_current_time_ parameter can help this by replacing the
             // image message time with the current time.
             stamp = cxt_.stamp_msgs_with_current_time_ ? builtin_interfaces::msg::Time(now()) : stamp;
-            process_image(std::move(msg), stamp);
+            process_image(std::move(msg), std::move(camera_info_msg_), stamp);
           }
 
           last_image_stamp_ = stamp;
@@ -239,7 +245,9 @@ namespace fiducial_vlam
     }
 
   private:
-    void process_image(sensor_msgs::msg::Image::UniquePtr image_msg, std_msgs::msg::Header::_stamp_type stamp)
+    void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
+                       std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg,
+                       std_msgs::msg::Header::_stamp_type stamp)
     {
       // Convert ROS to OpenCV
       cv_bridge::CvImagePtr gray{cv_bridge::toCvCopy(*image_msg, "mono8")};
@@ -266,11 +274,11 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = fm_.detect_markers(gray, color_marked);
+      auto observations = fm_->detect_markers(gray, color_marked);
 
       // Publish the observations.
       if (observations.size()) {
-        auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg_);
+        auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg);
         observations_pub_->publish(observations_msg);
       }
 
@@ -286,7 +294,7 @@ namespace fiducial_vlam
         TransformWithCovariance t_map_camera;
 
         // Only try to determine the location if markers were detected.
-        if (observations.size()) {
+        if (!observations.observations().empty()) {
 
 //        RCLCPP_INFO(get_logger(), "%i observations", observations.size());
 //        for (auto &obs : observations.observations()) {
@@ -299,14 +307,15 @@ namespace fiducial_vlam
 //        }
 
           // Find the camera pose from the observations.
-          t_map_camera = fm_.solve_t_map_camera(observations, *camera_info_, *map_);
+          auto camera_info{make_camera_info(*camera_info_msg)};
+          t_map_camera = lc_->solve_t_map_camera(observations, *camera_info, *map_);
 
           if (t_map_camera.is_valid()) {
 
             // If annotated images have been requested, then add the annotations now.
             if (color_marked) {
               auto t_map_markers = map_->find_t_map_markers(observations);
-              annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *camera_info_, fm_);
+              annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *fm_, *camera_info);
             }
 
             // Find the transform from the base of the robot to the map. Also include the covariance.
@@ -350,7 +359,7 @@ namespace fiducial_vlam
 
             // if requested, publish the camera tf as determined from each marker.
             if (cxt_.publish_tfs_per_marker_) {
-              auto t_map_cameras = markers_t_map_cameras(observations, *camera_info_, *map_, fm_);
+              auto t_map_cameras = markers_t_map_cameras(observations, *lc_, *camera_info, *map_);
               auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
               if (!tf_message.transforms.empty()) {
                 tf_message_pub_->publish(tf_message);

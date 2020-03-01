@@ -54,7 +54,6 @@ def generate_launch_description():
                 'publish_tfs': 1,                               # Publish marker /tf
                 'marker_length': 0.1778,                        # Marker length
                 'marker_map_load_full_filename': map_path,      # Load a pre-built map from disk
-                'make_not_use_map': 0                           # Don't save a map to disk
             }]),
 
         # Joystick driver, generates /namespace/joy messages

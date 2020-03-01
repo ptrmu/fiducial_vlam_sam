@@ -84,6 +84,16 @@ namespace fiducial_vlam
         TPoint{x3_, y3_},
       };
     }
+
+    template<class TPoint>
+    void to_point_vector(std::vector<TPoint> &destination) const
+    {
+      destination.insert(destination.end(), {
+        TPoint{x0_, y0_},
+        TPoint{x1_, y1_},
+        TPoint{x2_, y2_},
+        TPoint{x3_, y3_}});
+    }
   };
 
 // ==============================================================================

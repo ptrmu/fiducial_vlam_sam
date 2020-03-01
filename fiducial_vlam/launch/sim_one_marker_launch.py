@@ -16,9 +16,6 @@ map_filename = os.path.join(worlds_directory, 'one_marker_map.yaml')
 world_filename = os.path.join(worlds_directory, 'one_marker.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 
-sam_not_cv = 1
-sfm_not_slam = 1
-make_not_use_map = 0
 corner_measurement_sigma = 0.7
 
 vloc_args = [{
@@ -29,8 +26,6 @@ vloc_args = [{
     'sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
     'publish_image_marked': 1,
-    'sam_not_cv': sam_not_cv,
-    'sfm_not_slam': sfm_not_slam,
     'camera_frame_id': 'forward_camera',
     'publish_base_pose': 1,
     'publish_camera_odom': 1,
@@ -43,9 +38,6 @@ vmap_args = [{
     'marker_length': 0.1778,  # Marker length
     'marker_map_save_full_filename': map_filename,
     'marker_map_load_full_filename': map_filename,
-    'make_not_use_map': make_not_use_map,
-    'sam_not_cv': sam_not_cv,
-    'sfm_not_slam': sfm_not_slam,
     'corner_measurement_sigma': corner_measurement_sigma,
 }]
 

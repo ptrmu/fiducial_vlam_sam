@@ -36,7 +36,6 @@ def generate_primary_action_list(drone_name, computer_name):
         generate_rviz_execute_process(computer_name),
         Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              node_name='vmap_main', parameters=[{
-                'make_not_use_map': 0,
                 'marker_map_load_full_filename': _map_filename
             }]),
     ]

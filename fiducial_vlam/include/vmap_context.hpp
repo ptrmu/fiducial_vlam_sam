@@ -11,7 +11,7 @@ namespace rclcpp
 
 namespace fiducial_vlam
 {
-#define VMAP_ALL_PARAMS \
+#define VMAP_ALL_PUBSUB_PARAMS \
   CXT_MACRO_MEMBER(       /* topic for publishing map of markers  */ \
   fiducial_map_pub_topic,  \
   std::string, "/fiducial_map") \
@@ -39,7 +39,10 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(       /* Hz => rate at which the marker map is published */ \
   marker_map_publish_frequency_hz, \
   double, 0.) \
-  \
+  /* End of list */
+
+
+#define VMAP_ALL_MAP_PARAMS \
   CXT_MACRO_MEMBER(       /* name of the file to store the marker map in  */  \
   marker_map_save_full_filename, \
   std::string, "fiducial_marker_locations.yaml") \
@@ -74,28 +77,24 @@ namespace fiducial_vlam
   marker_length,  \
   double, 0.1775) \
   \
-  CXT_MACRO_MEMBER(       /* commands to the update_map system  */  \
-  update_map_cmd, \
+  CXT_MACRO_MEMBER(       /* commands to the build_marker_map system  */  \
+  build_marker_map_cmd, \
   std::string, "start") \
+  CXT_MACRO_MEMBER(       /* image frames to skip when creating map. 1=>use all frames, 2=>use every other frame, ...  */  \
+  build_map_skip_images, \
+  int, 0) \
   /* End of list */
 
-//  CXT_MACRO_MEMBER(       /* length of a side of a marker in meters */ \
-//  marker_length,  \
-//  double, 0.1778) \
 
-#define VMAP_ALL_OTHERS \
-  CXT_MACRO_MEMBER(       /* A transform derived from individual parameters */ \
-  map_init_transform,  \
-  TransformWithCovariance,) \
-  /* End of list */
+#define VMAP_ALL_PARAMS VMAP_ALL_PUBSUB_PARAMS VMAP_ALL_MAP_PARAMS
 
   struct VmapContext
   {
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     VMAP_ALL_PARAMS
-    VMAP_ALL_OTHERS
 
+    TransformWithCovariance map_init_transform_;
     int timer_period_milliseconds_;
   };
 }

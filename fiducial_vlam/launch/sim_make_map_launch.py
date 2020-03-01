@@ -12,15 +12,12 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
-world_filename = os.path.join(worlds_directory, 'three_dense_circles_of_markers.world')
+world_name = "dense_circle_of_markers"
+created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
+existing_map_filename = os.path.join(worlds_directory,  world_name + '.yaml')
+world_filename = os.path.join(worlds_directory, world_name + '.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 
-sam_not_cv = 0
-sfm_not_slam = 0
-make_not_use_map = 1
-multi_frame_optimization=1
-use_isam=0
 corner_measurement_sigma = 0.7
 
 vloc_args = [{
@@ -31,27 +28,22 @@ vloc_args = [{
     'sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
     'publish_image_marked': 1,
-    'sam_not_cv': sam_not_cv,
-    'sfm_not_slam': sfm_not_slam,
     'camera_frame_id': 'forward_camera',
     'publish_base_pose': 1,
     'publish_camera_odom': 1,
     'publish_base_odom': 1,
+    'cv4_corner_refinement_method': 2,
 }]
 
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
     'publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1730,  # Marker length
-    'marker_map_save_full_filename': map_filename,
-    'marker_map_load_full_filename': "",
-    'make_not_use_map': make_not_use_map,
-    'sam_not_cv': sam_not_cv,
-    'sfm_not_slam': sfm_not_slam,
-    'multi_frame_optimization': multi_frame_optimization,
-    'use_isam': use_isam,
+    'marker_map_save_full_filename': created_map_filename,
+    'marker_map_load_full_filename': existing_map_filename,
     'corner_measurement_sigma': corner_measurement_sigma,
-    'update_map_cmd': 'start',
+    'build_map_skip_images' : 3,
+    'build_map_cmd': 'start',
 }]
 
 
@@ -72,8 +64,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args, node_namespace='forward_camera'),
-        # Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)

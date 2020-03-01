@@ -20,6 +20,7 @@
 #include <gtsam/slam/ProjectionFactor.h>
 #include "map.hpp"
 #include "observation.hpp"
+#include "opencv2/core.hpp"
 #include "ros2_shared/string_printf.hpp"
 #include "task_thread.hpp"
 
@@ -129,7 +130,7 @@ namespace fiducial_vlam
 
   class ProjectBetweenFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
   {
-    const gtsam::Cal3DS2 cal3ds2_; // Make a copy. A shared object might be better.
+    const std::shared_ptr<gtsam::Cal3DS2> cal3ds2_; // hold on to a shared pointer.
     const gtsam::Point3 point_f_marker_;
     const gtsam::Point2 point_f_image_;
 
@@ -139,7 +140,7 @@ namespace fiducial_vlam
                          const gtsam::Key key_marker,
                          gtsam::Point3 point_f_marker,
                          const gtsam::Key key_camera,
-                         const gtsam::Cal3DS2 &cal3ds2) :
+                         const std::shared_ptr<gtsam::Cal3DS2> &cal3ds2) :
       NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(model, key_marker, key_camera),
       cal3ds2_{cal3ds2},
       point_f_marker_(std::move(point_f_marker)),
@@ -163,7 +164,7 @@ namespace fiducial_vlam
 
       // Project this point to the camera's image frame. Catch and return a default
       // value on a CheiralityException.
-      auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{camera_f_world, cal3ds2_};
+      auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{camera_f_world, *cal3ds2_};
       try {
         gtsam::Point2 point_f_image = camera.project(
           point_f_world,
@@ -186,7 +187,7 @@ namespace fiducial_vlam
       }
       if (H1) *H1 = gtsam::Matrix26::Zero();
       if (H2) *H2 = gtsam::Matrix26::Zero();
-      return gtsam::Vector2{2.0 * cal3ds2_.fx(), 2.0 * cal3ds2_.fy()};
+      return gtsam::Vector2{2.0 * cal3ds2_->fx(), 2.0 * cal3ds2_->fy()};
     }
   };
 
@@ -261,7 +262,7 @@ namespace fiducial_vlam
 
     gtsam::Pose3 solve_camera_f_marker(
       const Observation &observation,
-      const CameraInfo &camera_info)
+      const CameraInfoInterface &camera_info)
     {
       auto cv_t_camera_marker = fm_.solve_t_camera_marker(observation, camera_info, empty_map_.marker_length());
       return GtsamUtil::to_pose3(cv_t_camera_marker.transform().inverse());
@@ -269,7 +270,7 @@ namespace fiducial_vlam
 
 
     void add_project_between_factors(const Observations &observations,
-                                     const CameraInfo &camera_info,
+                                     const std::shared_ptr<gtsam::Cal3DS2> &cal3ds2,
                                      gtsam::Key camera_key,
                                      std::function<bool(bool, const Observation &)> do_add_func,
                                      gtsam::NonlinearFactorGraph &graph)
@@ -294,7 +295,7 @@ namespace fiducial_vlam
                                                        marker_key,
                                                        corners_f_marker[j],
                                                        camera_key,
-                                                       camera_info.cal3ds2());
+                                                       cal3ds2);
           }
 
           // update the marker seen counts
@@ -339,7 +340,7 @@ namespace fiducial_vlam
     }
 
     void process_observations(const Observations &observations,
-                              const CameraInfo &camera_info)
+                              const CameraInfoInterface &camera_info)
     {
       gttic(process_observations);
       auto camera_key{GtsamUtil::camera_key(frames_processed_)};
@@ -347,6 +348,18 @@ namespace fiducial_vlam
       gtsam::ISAM2Result first_update_result;
       gtsam::ISAM2Result last_update_result;
       int update1, update2, update3, update4;
+
+      auto &cm{camera_info.camera_matrix()};
+      auto &dc{camera_info.dist_coeffs()};
+      auto cal3ds2{std::make_shared<gtsam::Cal3DS2>(cm.at<double>(0, 0),  // fx
+                                                    cm.at<double>(1, 1),  // fy
+                                                    1.0, // s
+                                                    cm.at<double>(0, 2),  // u0
+                                                    cm.at<double>(1, 2),  // v0
+                                                    dc.at<double>(0), // k1
+                                                    dc.at<double>(1), // k2
+                                                    dc.at<double>(2), // p1
+                                                    dc.at<double>(3))};// p2
 
       { // First pass through the markers for those that have been seen already
         gttic(first_update_result);
@@ -368,7 +381,7 @@ namespace fiducial_vlam
         // Actually add the factors to the isam structure. The do_add_function specifies if
         // a factor is added for a particular marker. This invocation will add factors for
         // markers that have previously been seen.
-        add_project_between_factors(observations, camera_info, camera_key, do_add_func, graph);
+        add_project_between_factors(observations, cal3ds2, camera_key, do_add_func, graph);
 
         // If there is no good marker (if there are no known markers) then just return.
         if (good_marker() == nullptr) {
@@ -412,7 +425,7 @@ namespace fiducial_vlam
         // Get the latest estimate of the camera location
         auto camera_f_world_latest = isam_.calculateEstimate<gtsam::Pose3>(camera_key);
 
-        auto do_add_func = [this, camera_info, &initial, camera_f_world_latest](
+        auto do_add_func = [this, &camera_info, &initial, camera_f_world_latest](
           bool known_marker, const Observation &observation) -> bool
         {
           if (!known_marker) {
@@ -424,7 +437,7 @@ namespace fiducial_vlam
         };
 
         // This time add factors for markers that haven't been previously seen.
-        add_project_between_factors(observations, camera_info, camera_key, do_add_func, graph);
+        add_project_between_factors(observations, cal3ds2, camera_key, do_add_func, graph);
 
         // Update iSAM with the new factors to unknown markers
         gttic(update3);
@@ -448,7 +461,7 @@ namespace fiducial_vlam
       gttic(solve_map);
       auto new_map = std::make_unique<Map>(empty_map_);
 
-      // Don't bother publishing a mew map if no new frames have been processed.
+      // Don't bother publishing a new map if no new frames have been processed.
       if (last_frames_processed_ == frames_processed_) {
         return new_map;
       }
@@ -516,10 +529,10 @@ namespace fiducial_vlam
 
   class SamBuildMarkerMapImpl : public BuildMarkerMapInterface
   {
-    CvFiducialMathInterface &fm_;
     // These parameters are captured when the class is constructed. This allows
     // the map creation to proceed in one mode.
     const FiducialMathContext cxt_;
+    CvFiducialMathInterface &fm_;
     std::unique_ptr<Map> empty_map_;
 
     std::unique_ptr<SamBuildMarkerMapTask> stw_; // This will ultimately get owned by the thread
@@ -530,10 +543,10 @@ namespace fiducial_vlam
     std::uint64_t solve_map_updates_count_{0};
 
   public:
-    SamBuildMarkerMapImpl(CvFiducialMathInterface &fm,
-                          const FiducialMathContext &cxt,
+    SamBuildMarkerMapImpl(const FiducialMathContext &cxt,
+                          CvFiducialMathInterface &fm,
                           const Map &empty_map) :
-      fm_{fm}, cxt_{cxt},
+      cxt_{cxt}, fm_{fm},
       empty_map_{std::make_unique<Map>(empty_map)},
       stw_{std::make_unique<SamBuildMarkerMapTask>(fm, cxt_, *empty_map_)}
     {
@@ -545,14 +558,14 @@ namespace fiducial_vlam
 
     virtual ~SamBuildMarkerMapImpl() = default;
 
-    void process_observations(const Observations &observations,
-                              const CameraInfo &camera_info) override
+    void process_observations(std::unique_ptr<const Observations> observations,
+                              std::unique_ptr<const CameraInfoInterface> camera_info) override
     {
       frames_added_count_ += 1;
 
-      auto func = [observations, camera_info](SamBuildMarkerMapTask &stw) -> void
+      auto func = [obs = std::move(observations), ci = std::move(camera_info)](SamBuildMarkerMapTask &stw) -> void
       {
-        stw.process_observations(observations, camera_info);
+        stw.process_observations(*obs, *ci);
       };
 
       if (task_thread_) {
@@ -562,9 +575,9 @@ namespace fiducial_vlam
       }
     }
 
-    virtual std::string update_map(Map &map)
+    virtual std::string build_marker_map(Map &map)
     {
-      auto msg{ros2_shared::string_print::f("update_map frames: added %d, processed %d",
+      auto msg{ros2_shared::string_print::f("build_marker_map frames: added %d, processed %d",
                                             frames_added_count_,
                                             frames_added_count_ - task_thread_->tasks_in_queue())};
 
@@ -575,7 +588,7 @@ namespace fiducial_vlam
         // Is it complete?
         bool complete = solve_map_future_.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
         if (!complete) {
-          return ros2_shared::string_print::f("%s, needed %d, waiting for needed frames to be processed",
+          return ros2_shared::string_print::f("%s, need %d, waiting for needed frames to be processed",
                                               msg.c_str(), solve_map_updates_count_);
         }
 
@@ -603,7 +616,7 @@ namespace fiducial_vlam
         func(*stw_);
       }
 
-      return ros2_shared::string_print::f("%s, needed %d, build map task queued",
+      return ros2_shared::string_print::f("%s, need %d, build map task queued",
                                           msg.c_str(), solve_map_updates_count_);
     }
 
@@ -616,11 +629,10 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<BuildMarkerMapInterface> sam_build_marker_map_factory(CvFiducialMathInterface &fm,
-                                                                        const FiducialMathContext &cxt,
-                                                                        const Map &empty_map)
+  std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
+                                                                     CvFiducialMathInterface &fm,
+                                                                     const Map &empty_map)
   {
-    return std::unique_ptr<BuildMarkerMapInterface>{new SamBuildMarkerMapImpl{fm, cxt, empty_map}};
+    return std::make_unique<SamBuildMarkerMapImpl>(cxt, fm, empty_map);
   }
-
 }
