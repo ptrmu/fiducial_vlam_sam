@@ -203,6 +203,9 @@ namespace fiducial_vlam
 
   std::unique_ptr<LocalizeCameraInterface> make_cv_localize_camera(const FiducialMathContext &cxt);
 
+  std::unique_ptr<LocalizeCameraInterface> make_sam_localize_camera(const FiducialMathContext &cxt,
+                                                                    LocalizeCameraInterface &cv_lc);
+
 // ==============================================================================
 // BuildMarkerMapInterface class
 // ==============================================================================
