@@ -9,15 +9,12 @@
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
 #include "gtsam/inference/Symbol.h"
-#include <gtsam/nonlinear/DoglegOptimizer.h>
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/slam/BetweenFactor.h>
-#include <gtsam/slam/InitializePose3.h>
 #include <gtsam/slam/PriorFactor.h>
-#include <gtsam/slam/ProjectionFactor.h>
 #include "map.hpp"
 #include "observation.hpp"
 #include "opencv2/core.hpp"
@@ -115,9 +112,21 @@ namespace fiducial_vlam
                                                                      const gtsam::Values &result,
                                                                      gtsam::Key key)
     {
-      gtsam::Marginals marginals(graph, result);
-      return to_transform_with_covariance(result.at<gtsam::Pose3>(key),
-                                          marginals.marginalCovariance(key));
+      try {
+        auto marginals{gtsam::Marginals{graph, result}};
+        return to_transform_with_covariance(result.at<gtsam::Pose3>(key),
+                                            marginals.marginalCovariance(key));
+
+      } catch (gtsam::IndeterminantLinearSystemException &ex) {
+        try {
+          auto marginals{gtsam::Marginals{graph, result, gtsam::Marginals::QR}};
+          return to_transform_with_covariance(result.at<gtsam::Pose3>(key),
+                                              marginals.marginalCovariance(key));
+        } catch (gtsam::IndeterminantLinearSystemException &ex) {
+        }
+      }
+
+      return TransformWithCovariance{};
     }
 
     static TransformWithCovariance to_cov_f_world(const TransformWithCovariance &twc)
@@ -147,19 +156,19 @@ namespace fiducial_vlam
       return gtsam::Symbol{'c', j};
     }
 
-    static std::shared_ptr<gtsam::Cal3DS2> make_cal3ds2(const CameraInfoInterface &camera_info)
+    static std::shared_ptr<const gtsam::Cal3DS2> make_cal3ds2(const CameraInfoInterface &camera_info)
     {
       auto &cm{camera_info.camera_matrix()};
       auto &dc{camera_info.dist_coeffs()};
-      return std::make_shared<gtsam::Cal3DS2>(cm.at<double>(0, 0),  // fx
-                                              cm.at<double>(1, 1),  // fy
-                                              1.0, // s
-                                              cm.at<double>(0, 2),  // u0
-                                              cm.at<double>(1, 2),  // v0
-                                              dc.at<double>(0), // k1
-                                              dc.at<double>(1), // k2
-                                              dc.at<double>(2), // p1
-                                              dc.at<double>(3));// p2
+      return std::make_shared<const gtsam::Cal3DS2>(cm.at<double>(0, 0),  // fx
+                                                    cm.at<double>(1, 1),  // fy
+                                                    1.0, // s
+                                                    cm.at<double>(0, 2),  // u0
+                                                    cm.at<double>(1, 2),  // v0
+                                                    dc.at<double>(0), // k1
+                                                    dc.at<double>(1), // k2
+                                                    dc.at<double>(2), // p1
+                                                    dc.at<double>(3));// p2
     }
   };
 
@@ -169,7 +178,7 @@ namespace fiducial_vlam
 
   class ProjectBetweenFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
   {
-    const std::shared_ptr<gtsam::Cal3DS2> cal3ds2_; // hold on to a shared pointer.
+    std::shared_ptr<const gtsam::Cal3DS2> cal3ds2_; // hold on to a shared pointer.
     const gtsam::Point3 point_f_marker_;
     const gtsam::Point2 point_f_image_;
 
@@ -179,7 +188,7 @@ namespace fiducial_vlam
                          const gtsam::Key key_marker,
                          gtsam::Point3 point_f_marker,
                          const gtsam::Key key_camera,
-                         const std::shared_ptr<gtsam::Cal3DS2> &cal3ds2) :
+                         const std::shared_ptr<const gtsam::Cal3DS2> &cal3ds2) :
       NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(model, key_marker, key_camera),
       cal3ds2_{cal3ds2},
       point_f_marker_(std::move(point_f_marker)),
@@ -309,9 +318,9 @@ namespace fiducial_vlam
 
 
     void add_project_between_factors(const Observations &observations,
-                                     const std::shared_ptr<gtsam::Cal3DS2> &cal3ds2,
+                                     const std::shared_ptr<const gtsam::Cal3DS2> &cal3ds2,
                                      gtsam::Key camera_key,
-                                     std::function<bool(bool, const Observation &)> do_add_func,
+                                     const std::function<bool(bool, const Observation &)> &do_add_func,
                                      gtsam::NonlinearFactorGraph &graph)
     {
       for (auto &observation : observations.observations()) {
@@ -384,21 +393,9 @@ namespace fiducial_vlam
       gttic(process_observations);
       auto camera_key{GtsamUtil::camera_key(frames_processed_)};
       bool unknown_exist{false};
-      gtsam::ISAM2Result first_update_result;
-      gtsam::ISAM2Result last_update_result;
       int update1, update2, update3, update4;
 
-      auto &cm{camera_info.camera_matrix()};
-      auto &dc{camera_info.dist_coeffs()};
-      auto cal3ds2{std::make_shared<gtsam::Cal3DS2>(cm.at<double>(0, 0),  // fx
-                                                    cm.at<double>(1, 1),  // fy
-                                                    1.0, // s
-                                                    cm.at<double>(0, 2),  // u0
-                                                    cm.at<double>(1, 2),  // v0
-                                                    dc.at<double>(0), // k1
-                                                    dc.at<double>(1), // k2
-                                                    dc.at<double>(2), // p1
-                                                    dc.at<double>(3))};// p2
+      auto cal3ds2{GtsamUtil::make_cal3ds2(camera_info)};
 
       { // First pass through the markers for those that have been seen already
         gttic(first_update_result);
@@ -440,13 +437,13 @@ namespace fiducial_vlam
         // Update iSAM with the factors for known markers. This will find the best estimate for the
         // camera pose which is used below for calculating an estimate of new marker poses.
         gttic(update1);
-        first_update_result = isam_.update(graph, initial);
+        isam_.update(graph, initial);
 //        std::cout << "1 "
 //                  << first_update_result.errorBefore.get() << " "
 //                  << first_update_result.errorAfter.get() << std::endl;
         gttoc(update1);
         gttic(update2);
-        auto next_update_result = isam_.update();
+        isam_.update();
 //        std::cout << "  "
 //                  << next_update_result.errorBefore.get() << " "
 //                  << next_update_result.errorAfter.get() << std::endl;
@@ -483,7 +480,7 @@ namespace fiducial_vlam
         isam_.update(graph, initial);
         gttoc(update3);
         gttic(update4);
-        last_update_result = isam_.update();
+        isam_.update();
         gttoc(update4);
         gttoc(last_update_result);
       }
@@ -595,8 +592,6 @@ namespace fiducial_vlam
       }
     }
 
-    virtual ~SamBuildMarkerMapImpl() = default;
-
     void process_observations(std::unique_ptr<const Observations> observations,
                               std::unique_ptr<const CameraInfoInterface> camera_info) override
     {
@@ -614,7 +609,7 @@ namespace fiducial_vlam
       }
     }
 
-    virtual std::string build_marker_map(Map &map)
+    std::string build_marker_map(Map &map) override
     {
       auto msg{ros2_shared::string_print::f("build_marker_map frames: added %d, processed %d",
                                             frames_added_count_,
@@ -633,8 +628,8 @@ namespace fiducial_vlam
 
         auto new_map = solve_map_future_.get();
         map.reset(*new_map);
-        return ros2_shared::string_print::f("%s, map complete and being published",
-                                            msg.c_str());
+        return ros2_shared::string_print::f("%s, map complete with %d markers.",
+                                            msg.c_str(), map.markers().size());
       }
 
       solve_map_updates_count_ = frames_added_count_;
@@ -659,7 +654,7 @@ namespace fiducial_vlam
                                           msg.c_str(), solve_map_updates_count_);
     }
 
-    virtual std::string build_marker_map_cmd(std::string &cmd)
+    std::string build_marker_map_cmd(std::string &cmd) override
     {
       if (cmd == "start") {
         return std::string{"SamBuildMarkerMap Start map creation."};
@@ -771,7 +766,10 @@ namespace fiducial_vlam
                                   graph, initial);
 
       // 4. Optimize the graph using Levenberg-Marquardt
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial).optimize();
+      auto params = gtsam::LevenbergMarquardtParams();
+      params.setRelativeErrorTol(1e-8);
+      params.setAbsoluteErrorTol(1e-8);
+      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
       //      std::cout << "initial error = " << graph.error(initial) << std::endl;
       //      std::cout << "final error = " << graph.error(result) << std::endl;
 
@@ -779,7 +777,7 @@ namespace fiducial_vlam
       auto t_map_camera = GtsamUtil::extract_transform_with_covariance(graph, result, camera_key_);
 
       // 6. Rotate the covariance into the world frame
-      return GtsamUtil::to_cov_f_world(t_map_camera);
+      return t_map_camera.is_valid() ? GtsamUtil::to_cov_f_world(t_map_camera) : TransformWithCovariance{};
     }
   };
 

@@ -288,7 +288,7 @@ namespace fiducial_vlam
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
-    std::uint64_t build_map_skip_images_count_{0};
+    std::uint64_t build_marker_map_skip_images_count_{0};
     rclcpp::Time exit_build_map_time_;
 
     // ROS publishers
@@ -310,7 +310,7 @@ namespace fiducial_vlam
         cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
         cxt_.map_init_pose_roll_, cxt_.map_init_pose_pitch_, cxt_.map_init_pose_yaw_});
 
-      cxt_.build_map_skip_images_ = std::max(1, cxt_.build_map_skip_images_);
+      cxt_.build_marker_map_skip_images_ = std::max(1, cxt_.build_marker_map_skip_images_);
     }
 
     void load_parameters()
@@ -444,9 +444,9 @@ namespace fiducial_vlam
         // Reset the cmd_string in preparation for the next command.
         CXT_MACRO_SET_PARAMETER((*this), cxt_, build_marker_map_cmd, "");
 
-        auto ret = process_update_map_cmd(cmd);
-        if (!ret.empty()) {
-          RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret.c_str());
+        auto ret_str = process_update_map_cmd(cmd);
+        if (!ret_str.empty()) {
+          RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret_str.c_str());
         }
       }
     }
@@ -455,9 +455,9 @@ namespace fiducial_vlam
     {
       if (build_marker_map_) {
         // Build a map from the observations
-        auto ret = build_marker_map_->build_marker_map(*map_);
-        if (!ret.empty()) {
-          RCLCPP_INFO(get_logger(), "UpdateMap response: %s", ret.c_str());
+        auto ret_str = build_marker_map_->build_marker_map(*map_);
+        if (!ret_str.empty()) {
+          RCLCPP_INFO(get_logger(), "UpdateMap response: %s", ret_str.c_str());
         }
 
         // Save the map
@@ -516,8 +516,9 @@ namespace fiducial_vlam
         }
 
         // Initialize the map to empty. Use the covariance style in this case because we
-        // only have sam map creators at this point.
-        map_ = initialize_map("", Map::MapStyles::covariance);
+        // only have sam map creators at this point. At this point, it doessn't seem that
+        // using the covariance of the discovered markers helps in locating the camera.
+        map_ = initialize_map("", Map::MapStyles::pose);
 
         // Create a builder object. Now any observation messages will get passed to it.
         build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *cvfm_, *map_);
@@ -533,8 +534,8 @@ namespace fiducial_vlam
     void observations_msg_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
     {
       // skip some messages so we don't get too overloaded doing the isam optimization.
-      build_map_skip_images_count_ += 1;
-      if ((build_map_skip_images_count_ % cxt_.build_map_skip_images_) != 0) {
+      build_marker_map_skip_images_count_ += 1;
+      if ((build_marker_map_skip_images_count_ % cxt_.build_marker_map_skip_images_) != 0) {
         return;
       }
 

@@ -90,7 +90,7 @@ namespace fiducial_vlam
   int, 2) \
   CXT_MACRO_MEMBER(       /* noise in detection of marker corners in the image (sigma in pixels) */ \
   corner_measurement_sigma, \
-  double, 1.0) \
+  double, 2.0) \
   CXT_MACRO_MEMBER(       /* use gtsam not opencv for localizing the camera */ \
   localize_camera_sam_not_cv, \
   int, 1) \

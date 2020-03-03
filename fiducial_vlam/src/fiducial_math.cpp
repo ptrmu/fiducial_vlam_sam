@@ -157,8 +157,6 @@ namespace fiducial_vlam
       dist_coeffs_.at<double>(4) = msg.d[4];
     }
 
-    virtual ~CameraInfoImpl() = default;
-
     const cv::Mat &camera_matrix() const override
     {
       return camera_matrix_;
@@ -1568,10 +1566,9 @@ namespace fiducial_vlam
       cxt_{cxt}
     {}
 
-
-    virtual TransformWithCovariance solve_t_camera_marker(const Observation &observation,
-                                                          const CameraInfoInterface &camera_info,
-                                                          double marker_length) override
+    TransformWithCovariance solve_t_camera_marker(const Observation &observation,
+                                                  const CameraInfoInterface &camera_info,
+                                                  double marker_length) override
     {
       // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame
       auto corners_f_marker{Convert::corners_f_marker<cv::Point3d>(marker_length)};
@@ -1589,8 +1586,8 @@ namespace fiducial_vlam
       return TransformWithCovariance(CvUtil::to_tf2_transform(rvec, tvec));
     }
 
-    virtual Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &gray,
-                                        std::shared_ptr<cv_bridge::CvImage> &color_marked) override
+    Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &gray,
+                                std::shared_ptr<cv_bridge::CvImage> &color_marked) override
     {
       // Todo: make the dictionary a parameter
       auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -1624,9 +1621,9 @@ namespace fiducial_vlam
 
     }
 
-    virtual void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
-                                                 const TransformWithCovariance &t_camera_marker,
-                                                 const CameraInfoInterface &camera_info) override
+    void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
+                                         const TransformWithCovariance &t_camera_marker,
+                                         const CameraInfoInterface &camera_info) override
     {
       cv::Vec3d rvec, tvec;
       CvUtil::to_cv_rvec_tvec(t_camera_marker, rvec, tvec);

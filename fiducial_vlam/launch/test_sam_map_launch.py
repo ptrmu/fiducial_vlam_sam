@@ -49,7 +49,7 @@ vmap_args = [{
     'marker_map_save_full_filename': created_map_filename,
     'marker_map_load_full_filename': existing_map_filename,
     'corner_measurement_sigma': corner_measurement_sigma,
-    'build_map_skip_images' : 15,
+    'build_marker_map_skip_images' : 15,
     'map_init_id': 1,
 }]
 

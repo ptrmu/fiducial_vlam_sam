@@ -43,26 +43,6 @@ namespace fiducial_vlam
     }
   }
 
-  static std::vector<TransformWithCovariance> markers_t_map_cameras(
-    const Observations &observations,
-    LocalizeCameraInterface &fm,
-    const CameraInfoInterface &camera_info,
-    const Map &map)
-  {
-    std::vector<TransformWithCovariance> t_map_cameras;
-
-    for (const auto &observation : observations.observations()) {
-      Observations single_observation{};
-      single_observation.add(observation);
-      auto t_map_camera = fm.solve_t_map_camera(single_observation, camera_info, map);
-      if (t_map_camera.is_valid()) {
-        t_map_cameras.emplace_back(t_map_camera);
-      }
-    }
-
-    return t_map_cameras;
-  }
-
 
 // ==============================================================================
 // VlocNode class
@@ -73,7 +53,9 @@ namespace fiducial_vlam
     VlocContext cxt_{};
     FiducialMathContext fm_cxt_{};
     std::unique_ptr<CvFiducialMathInterface> fm_;
-    std::unique_ptr<LocalizeCameraInterface> lc_{};
+    std::unique_ptr<LocalizeCameraInterface> cv_lc_{};
+    std::unique_ptr<LocalizeCameraInterface> sam_lc_{};
+
     std::unique_ptr<Map> map_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};
@@ -135,10 +117,18 @@ namespace fiducial_vlam
       FM_ALL_PARAMS
     }
 
+    LocalizeCameraInterface &lc()
+    {
+      // Select which type of localize camera functionality to use.
+      return (fm_cxt_.localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
+    }
+
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
-      fm_{make_cv_fiducial_math(fm_cxt_)}
+      fm_{make_cv_fiducial_math(fm_cxt_)},
+      cv_lc_{make_cv_localize_camera(fm_cxt_)},
+      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)}
     {
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
 
@@ -147,9 +137,6 @@ namespace fiducial_vlam
 
       // Set up parameter for FiducialMath
       load_fm_parameters();
-
-      // load the camera localizer
-      lc_ = make_cv_localize_camera(fm_cxt_);
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
@@ -192,11 +179,6 @@ namespace fiducial_vlam
           // Save this message because it will be used for the next image message.
           // Note: we are taking ownership of this object
           camera_info_msg_ = std::move(msg);
-//          if (!camera_info_) {
-//            camera_info_ = std::make_unique<CameraInfo>(*msg);
-//            // Save the info message because we pass it along with the observations.
-//            camera_info_msg_ = std::make_unique<sensor_msgs::msg::CameraInfo>(*msg);
-//          }
         });
 
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
@@ -282,88 +264,72 @@ namespace fiducial_vlam
         observations_pub_->publish(observations_msg);
       }
 
-      // If there is a map, find t_map_marker for each detected
-      // marker. The t_map_markers has an entry for each element
-      // in observations. If the marker wasn't found in the map, then
-      // the t_map_marker entry has is_valid() as false.
       // Debugging hint: If the markers in color_marked are not outlined
       // in green, then they haven't been detected. If the markers in
-      // color_marked are outlined but they have no axes drawn, then vmap_node
+      // color_marked are outlined but they have no axes drawn, then
+      // no map message has been received. This could be because vmap_node
       // is not running or has not been able to find the starting node.
-      if (map_) {
-        TransformWithCovariance t_map_camera;
+      // We need a map and observations before we can publish camera
+      // localization information.
+      if (map_ && !observations.observations().empty()) {
+        auto camera_info{make_camera_info(*camera_info_msg)};
 
-        // Only try to determine the location if markers were detected.
-        if (!observations.observations().empty()) {
+        // Find the camera pose from the observations.
+        auto t_map_camera{lc().solve_t_map_camera(observations, *camera_info, *map_)};
 
-//        RCLCPP_INFO(get_logger(), "%i observations", observations.size());
-//        for (auto &obs : observations.observations()) {
-//          RCLCPP_INFO(get_logger(),
-//                      " Marker %i, p0[%8.3f, %8.3f], p1[%8.3f, %8.3f], p2[%8.3f, %8.3f], p3[%8.3f, %8.3f]",
-//                      obs.id(),
-//                      obs.x0(), obs.y0(), obs.x1(), obs.y1(),
-//                      obs.x2(), obs.y2(), obs.x3(), obs.y3()
-//          );
-//        }
+        if (t_map_camera.is_valid()) {
 
-          // Find the camera pose from the observations.
-          auto camera_info{make_camera_info(*camera_info_msg)};
-          t_map_camera = lc_->solve_t_map_camera(observations, *camera_info, *map_);
+          // If annotated images have been requested, then add the annotations now.
+          if (color_marked) {
+            auto t_map_markers = map_->find_t_map_markers(observations);
+            annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *fm_, *camera_info);
+          }
 
-          if (t_map_camera.is_valid()) {
+          // Find the transform from the base of the robot to the map. Also include the covariance.
+          // Note: the covariance values are with respect to the map frame so both t_map_camera and
+          // t_map_base have the same covariance.
+          TransformWithCovariance t_map_base{
+            t_map_camera.transform() * cxt_.t_camera_base_.transform(),
+            t_map_camera.cov()};
 
-            // If annotated images have been requested, then add the annotations now.
-            if (color_marked) {
-              auto t_map_markers = map_->find_t_map_markers(observations);
-              annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *fm_, *camera_info);
-            }
+          // Publish the camera an/or base pose in the map frame
+          if (cxt_.publish_camera_pose_) {
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.map_frame_id_);
+            // add some fixed variance for now.
+            add_fixed_covariance(pose_msg.pose);
+            camera_pose_pub_->publish(pose_msg);
+          }
+          if (cxt_.publish_base_pose_) {
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.map_frame_id_);
+            // add some fixed variance for now.
+            add_fixed_covariance(pose_msg.pose);
+            base_pose_pub_->publish(pose_msg);
+          }
 
-            // Find the transform from the base of the robot to the map. Also include the covariance.
-            // Note: the covariance values are with respect to the map frame so both t_map_camera and
-            // t_map_base have the same covariance.
-            TransformWithCovariance t_map_base{
-              t_map_camera.transform() * cxt_.t_camera_base_.transform(),
-              t_map_camera.cov()};
+          // Publish odometry of the camera and/or the base.
+          if (cxt_.publish_camera_odom_) {
+            auto odom_msg = to_odom_message(stamp, cxt_.camera_frame_id_, t_map_camera);
+            add_fixed_covariance(odom_msg.pose);
+            camera_odometry_pub_->publish(odom_msg);
+          }
+          if (cxt_.publish_base_odom_) {
+            auto odom_msg = to_odom_message(stamp, cxt_.base_frame_id_, t_map_base);
+            add_fixed_covariance(odom_msg.pose);
+            base_odometry_pub_->publish(odom_msg);
+          }
 
-            // Publish the camera an/or base pose in the map frame
-            if (cxt_.publish_camera_pose_) {
-              auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.map_frame_id_);
-              // add some fixed variance for now.
-              add_fixed_covariance(pose_msg.pose);
-              camera_pose_pub_->publish(pose_msg);
-            }
-            if (cxt_.publish_base_pose_) {
-              auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.map_frame_id_);
-              // add some fixed variance for now.
-              add_fixed_covariance(pose_msg.pose);
-              base_pose_pub_->publish(pose_msg);
-            }
+          // Also publish the camera's tf
+          if (cxt_.publish_tfs_) {
+            auto tf_message = to_tf_message(stamp, t_map_camera, t_map_base);
+            tf_message_pub_->publish(tf_message);
+          }
 
-            // Publish odometry of the camera and/or the base.
-            if (cxt_.publish_camera_odom_) {
-              auto odom_msg = to_odom_message(stamp, cxt_.camera_frame_id_, t_map_camera);
-              add_fixed_covariance(odom_msg.pose);
-              camera_odometry_pub_->publish(odom_msg);
-            }
-            if (cxt_.publish_base_odom_) {
-              auto odom_msg = to_odom_message(stamp, cxt_.base_frame_id_, t_map_base);
-              add_fixed_covariance(odom_msg.pose);
-              base_odometry_pub_->publish(odom_msg);
-            }
-
-            // Also publish the camera's tf
-            if (cxt_.publish_tfs_) {
-              auto tf_message = to_tf_message(stamp, t_map_camera, t_map_base);
+          // if requested, publish the camera tf as determined from each marker.
+          if (cxt_.publish_tfs_per_marker_) {
+            auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
+            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
+            if (!tf_message.transforms.empty()) {
               tf_message_pub_->publish(tf_message);
-            }
-
-            // if requested, publish the camera tf as determined from each marker.
-            if (cxt_.publish_tfs_per_marker_) {
-              auto t_map_cameras = markers_t_map_cameras(observations, *lc_, *camera_info, *map_);
-              auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
-              if (!tf_message.transforms.empty()) {
-                tf_message_pub_->publish(tf_message);
-              }
             }
           }
         }
@@ -445,6 +411,25 @@ namespace fiducial_vlam
       }
 
       return tf_message;
+    }
+
+    std::vector<TransformWithCovariance> markers_t_map_cameras(
+      const Observations &observations,
+      const CameraInfoInterface &camera_info,
+      const Map &map)
+    {
+      std::vector<TransformWithCovariance> t_map_cameras;
+
+      for (const auto &observation : observations.observations()) {
+        Observations single_observation{};
+        single_observation.add(observation);
+        auto t_map_camera = lc().solve_t_map_camera(single_observation, camera_info, map);
+        if (t_map_camera.is_valid()) {
+          t_map_cameras.emplace_back(t_map_camera);
+        }
+      }
+
+      return t_map_cameras;
     }
 
     void add_fixed_covariance(geometry_msgs::msg::PoseWithCovariance &pwc)
