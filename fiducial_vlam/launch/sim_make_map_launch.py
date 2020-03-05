@@ -12,7 +12,7 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-world_name = "three_dense_circles_of_markers"
+world_name = "dense_circle_of_markers"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
 existing_map_filename = os.path.join(worlds_directory,  world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
