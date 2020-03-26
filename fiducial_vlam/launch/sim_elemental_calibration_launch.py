@@ -12,7 +12,7 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-world_name = "three_dense_circles_of_markers"
+world_name = "charuco_12x9_aruco_5x5_target"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
 existing_map_filename = os.path.join(worlds_directory,  world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
@@ -64,8 +64,6 @@ def generate_launch_description():
         Node(package='joy', node_executable='joy_node', output='screen'),
 
         # Add forward-facing camera to the simulation
-        # Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
-        #      arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
         Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
              arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 

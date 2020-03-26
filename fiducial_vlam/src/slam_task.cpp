@@ -235,7 +235,7 @@ namespace fiducial_vlam
       }
       if (H1) *H1 = gtsam::Matrix26::Zero();
       if (H2) *H2 = gtsam::Matrix26::Zero();
-      return gtsam::Vector2{2.0 * cal3ds2_->fx(), 2.0 * cal3ds2_->fy()};
+      return gtsam::Vector2{2.0 * cal3ds2_->px(), 2.0 * cal3ds2_->py()};
     }
   };
 
