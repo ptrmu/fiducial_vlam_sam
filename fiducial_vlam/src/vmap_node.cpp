@@ -313,29 +313,21 @@ namespace fiducial_vlam
       cxt_.build_marker_map_skip_images_ = std::max(1, cxt_.build_marker_map_skip_images_);
     }
 
-    void load_parameters()
+    static void validate_fm_parameters()
+    {}
+
+    void setup_parameters()
     {
+      // Do Vmap parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
       CXT_MACRO_INIT_PARAMETERS(VMAP_ALL_PARAMS, validate_parameters)
-
 
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VMAP_ALL_PARAMS, validate_parameters)
 
-      RCLCPP_INFO(get_logger(), "VmapNode Parameters");
-
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), cxt_, n, t, d)
-      VMAP_ALL_PARAMS
-    }
-
-    static void validate_fm_parameters()
-    {}
-
-    void load_fm_parameters()
-    {
+      // Do Fiducial Math parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
       CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
@@ -344,11 +336,19 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
 
-      RCLCPP_INFO(get_logger(), "FiducialMath Parameters");
+      // Display all the parameters
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VmapNode Parameters", VMAP_ALL_PARAMS)
 
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), fm_cxt_, n, t, d)
-      FM_ALL_PARAMS
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(fm_cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "FiducialMath Parameters", FM_ALL_PARAMS)
+
+      // Check that all command line parameters are defined
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VMAP_ALL_PARAMS FM_ALL_PARAMS)
     }
 
     // Special "initialize map from camera location" mode
@@ -383,10 +383,7 @@ namespace fiducial_vlam
       exit_build_map_time_{now()}
     {
       // Get parameters from the command line
-      load_parameters();
-
-      // Set up parameter for FiducialMath
-      load_fm_parameters();
+      setup_parameters();
 
       // Initialize the map. Load from file or otherwise.
       map_ = initialize_map(cxt_.marker_map_load_full_filename_, Map::MapStyles::pose);

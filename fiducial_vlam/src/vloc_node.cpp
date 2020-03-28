@@ -79,29 +79,21 @@ namespace fiducial_vlam
         cxt_.t_camera_base_roll_, cxt_.t_camera_base_pitch_, cxt_.t_camera_base_yaw_});
     }
 
-    void load_parameters()
+    void validate_fm_parameters()
+    {}
+
+    void setup_parameters()
     {
+      // Do the vloc_node parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
       CXT_MACRO_INIT_PARAMETERS(VLOC_ALL_PARAMS, validate_parameters)
-
-
+      
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
 
-      RCLCPP_INFO(get_logger(), "VmapNode Parameters");
-
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), cxt_, n, t, d)
-      VLOC_ALL_PARAMS
-    }
-
-    void validate_fm_parameters()
-    {}
-
-    void load_fm_parameters()
-    {
+      // Do the fiducial_math parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
       CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
@@ -110,11 +102,19 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
 
-      RCLCPP_INFO(get_logger(), "FiducialMath Parameters");
+      // Display all the parameters
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VlocNode Parameters", VLOC_ALL_PARAMS)
 
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_PARAMETER(RCLCPP_INFO, get_logger(), fm_cxt_, n, t, d)
-      FM_ALL_PARAMS
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(fm_cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "FiducialMath Parameters", FM_ALL_PARAMS)
+
+      // Check that all command line parameters are defined
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS)
     }
 
     LocalizeCameraInterface &lc()
@@ -133,10 +133,7 @@ namespace fiducial_vlam
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
 
       // Get parameters from the command line
-      load_parameters();
-
-      // Set up parameter for FiducialMath
-      load_fm_parameters();
+      setup_parameters();
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(

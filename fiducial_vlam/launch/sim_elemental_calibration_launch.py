@@ -35,6 +35,7 @@ vloc_args = [{
     'publish_base_odom': 1,
     'cv4_corner_refinement_method': 2,
     'localize_camera_sam_not_cv': 1,
+    'elemental_parameter': 5,
 }]
 
 vmap_args = [{
