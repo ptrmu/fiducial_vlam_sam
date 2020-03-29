@@ -100,6 +100,7 @@ set(VLOC_NODE_SOURCES
   src/transform_with_covariance.cpp
   src/vloc_node.cpp
   src/slam_task.cpp
+  src/calibrate.cpp
   )
 
 set(VLOC_NODE_DEPS

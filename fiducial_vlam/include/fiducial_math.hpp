@@ -12,11 +12,6 @@ namespace cv_bridge
   class CvImage;
 }
 
-//namespace gtsam
-//{
-//  class Cal3DS2;
-//}
-
 namespace cv
 {
   class Mat;
@@ -24,13 +19,11 @@ namespace cv
 
 namespace fiducial_vlam
 {
-  class Observation;
-
-  class Observations;
-
-  class TransformWithCovariance;
-
-  class Map;
+  class CalibrateContext; //
+  class Observation; //
+  class Observations; //
+  class TransformWithCovariance; //
+  class Map; //
 
 // ==============================================================================
 // CameraInfoInterface class
@@ -39,43 +32,12 @@ namespace fiducial_vlam
   class CameraInfoInterface
   {
   public:
-    virtual ~CameraInfoInterface() = default;
-
-    virtual const cv::Mat &camera_matrix() const = 0;
-
-    virtual const cv::Mat &dist_coeffs() const = 0;
+    virtual ~CameraInfoInterface() = default; //
+    virtual const cv::Mat &camera_matrix() const = 0; //
+    virtual const cv::Mat &dist_coeffs() const = 0; //
   };
 
   std::unique_ptr<const CameraInfoInterface> make_camera_info(const sensor_msgs::msg::CameraInfo &msg);
-
-#if 0
-  // ==============================================================================
-  // CameraInfo class
-  // ==============================================================================
-
-    class CameraInfo
-    {
-      class CvCameraInfo;
-
-      std::shared_ptr<CvCameraInfo> cv_;
-
-    public:
-      CameraInfo();
-
-      explicit CameraInfo(const sensor_msgs::msg::CameraInfo &camera_info);
-
-      const gtsam::Cal3DS2 &cal3ds2() const;
-
-      auto &cv() const
-      { return cv_; }
-
-      cv::Mat &camera_matrix();
-
-  //
-  //    bool is_valid() const
-  //    { return cv_ != nullptr; }
-    };
-#endif
 
 // ==============================================================================
 // FiducialMathContext class
@@ -108,61 +70,6 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     FM_ALL_PARAMS
   };
-
-#if 0
-  // ==============================================================================
-  // UpdateMapInterface class
-  // ==============================================================================
-
-    class UpdateMapInterface
-    {
-    public:
-      virtual ~UpdateMapInterface() = default;
-
-      virtual void update_map(const Observations &observations,
-                              const CameraInfo &camera_info,
-                              Map &map) = 0;
-
-      virtual void update_map_for_publishing(Map &map) = 0;
-
-      virtual std::string update_map_cmd(std::string &cmd) = 0;
-    };
-
-  // ==============================================================================
-  // FiducialMath class
-  // ==============================================================================
-
-    class CvFiducialMath;
-
-    class SamFiducialMath;
-
-    class FiducialMath
-    {
-      std::unique_ptr<CvFiducialMath> cv_;
-      std::unique_ptr<SamFiducialMath> sam_;
-      std::unique_ptr<UpdateMapInterface> update_;
-
-    public:
-      explicit FiducialMath(FiducialMathContext &cxt);
-
-      ~FiducialMath();
-
-      TransformWithCovariance solve_t_camera_marker(const Observation &observation,
-                                                    const CameraInfo &camera_info,
-                                                    double marker_length);
-
-      TransformWithCovariance solve_t_map_camera(const Observations &observations,
-                                                 const CameraInfo &camera_info,
-                                                 Map &map);
-
-      Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &color,
-                                  std::shared_ptr<cv_bridge::CvImage> &color_marked);
-
-      void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color,
-                                           const TransformWithCovariance &t_camera_marker,
-                                           const CameraInfo &camera_info);
-    };
-#endif
 
 // ==============================================================================
 // CvFiducialMathInterface class

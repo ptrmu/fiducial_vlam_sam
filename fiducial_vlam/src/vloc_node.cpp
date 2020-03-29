@@ -3,6 +3,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "calibrate.hpp"
 #include "fiducial_math.hpp"
 #include "map.hpp"
 #include "observation.hpp"
@@ -52,9 +53,11 @@ namespace fiducial_vlam
   {
     VlocContext cxt_{};
     FiducialMathContext fm_cxt_{};
+    CalibrateContext cal_cxt_{};
     std::unique_ptr<CvFiducialMathInterface> fm_;
     std::unique_ptr<LocalizeCameraInterface> cv_lc_{};
     std::unique_ptr<LocalizeCameraInterface> sam_lc_{};
+    std::unique_ptr<CalibrateCameraInterface> cc_{};
 
     std::unique_ptr<Map> map_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
@@ -71,6 +74,7 @@ namespace fiducial_vlam
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_raw_sub_;
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Map>::SharedPtr map_sub_;
+    rclcpp::TimerBase::SharedPtr calibrate_timer_{};
 
     void validate_parameters()
     {
@@ -82,13 +86,16 @@ namespace fiducial_vlam
     void validate_fm_parameters()
     {}
 
+    void validate_cal_parameters()
+    {}
+
     void setup_parameters()
     {
       // Do the vloc_node parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
       CXT_MACRO_INIT_PARAMETERS(VLOC_ALL_PARAMS, validate_parameters)
-      
+
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
@@ -102,6 +109,15 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
 
+      // Do the calibrate  parameters
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cal_cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(CAL_ALL_PARAMS, validate_cal_parameters)
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cal_cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), CAL_ALL_PARAMS, validate_cal_parameters)
+
       // Display all the parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cxt_, n, t, d)
@@ -111,16 +127,21 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(fm_cxt_, n, t, d)
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "FiducialMath Parameters", FM_ALL_PARAMS)
 
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cal_cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "Calibrate Parameters", CAL_ALL_PARAMS)
+
       // Check that all command line parameters are defined
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS CAL_ALL_PARAMS)
     }
 
     LocalizeCameraInterface &lc()
     {
       // Select which type of localize camera functionality to use.
-      return (fm_cxt_.localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
+      return (cxt_.loc_calibrate_not_loocalize_ ) ? *cc_ :
+             (cxt_.loc_localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
     }
 
   public:
@@ -128,7 +149,8 @@ namespace fiducial_vlam
       Node("vloc_node", options),
       fm_{make_cv_fiducial_math(fm_cxt_)},
       cv_lc_{make_cv_localize_camera(fm_cxt_)},
-      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)}
+      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)},
+      cc_{make_calibrate_camera(cal_cxt_)}
     {
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
 
@@ -215,6 +237,14 @@ namespace fiducial_vlam
         [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
         {
           map_ = std::make_unique<Map>(*msg);
+        });
+
+      // Timer for publishing map info
+      calibrate_timer_ = create_wall_timer(
+        std::chrono::milliseconds(100),
+        [this]() -> void
+        {
+          calibrate_timer_callback();
         });
 
       (void) camera_info_sub_;
@@ -442,6 +472,29 @@ namespace fiducial_vlam
       pwc.covariance[28] = 12e-3; //
       pwc.covariance[35] = 4e-3; //
     }
+
+
+    void calibrate_timer_callback()
+    {
+      // Figure out if there is a command to process.
+      if (!cal_cxt_.cal_calibrate_camera_cmd_.empty()) {
+        std::string cmd{cal_cxt_.cal_calibrate_camera_cmd_};
+
+        // Reset the cmd_string in preparation for the next command.
+        CXT_MACRO_SET_PARAMETER((*this), cal_cxt_, cal_calibrate_camera_cmd, "");
+
+        // If we are not in calibrate mode, then don't send the command.
+        if (!cxt_.loc_calibrate_not_loocalize_) {
+          RCLCPP_ERROR(get_logger(), "Cannot execute calibrate_camera_cmd when not in calibrate mode");
+        } else {
+          auto ret_str = cc_->calibrate_camera_cmd(cmd);
+          if (!ret_str.empty()) {
+            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
+          }
+        }
+      }
+    }
+
   };
 
   std::shared_ptr<rclcpp::Node> vloc_node_factory(const rclcpp::NodeOptions &options)
