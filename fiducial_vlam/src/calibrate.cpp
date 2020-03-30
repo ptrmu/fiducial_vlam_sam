@@ -255,14 +255,6 @@ namespace fiducial_vlam
       if (!board_targets.check_init(gray->image.size)) {
         return Observations{};
       }
-//      if (board_targets_ == nullptr) {
-//        board_targets_ = new_board_targets(cv::Size{gray.cols, gray.rows});
-//      }
-//
-//      // Don't process images that happen to be a different size.
-//      if (board_targets_->width() != gray.cols || board_targets_->height() != gray.rows) {
-//        return Observations{};
-//      }
 
 //      auto image_holder = new_image_holder(gray);
 //
@@ -299,10 +291,62 @@ namespace fiducial_vlam
 
   private:
 
-    void evaluate_image(cv::Mat &gray, cv::Mat &marked)
-    {
-    }
 
+    std::shared_ptr<ImageHolder> new_image_holder(cv::Mat &gray)
+    {
+//      std::vector<std::vector<cv::Point2f> > rejected;
+//
+//      // detect markers
+//      std::vector<int> aruco_ids;
+//      std::vector<std::vector<cv::Point2f> > aruco_corners;
+//      cv::aruco::detectMarkers(gray, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
+//
+//      // refind strategy to detect more markers
+//      if (cxt_.refind_strategy_) {
+//        cv::aruco::refineDetectedMarkers(gray, board_, aruco_corners, aruco_ids, rejected);
+//      }
+//
+//      // interpolate charuco corners
+//      cv::Mat charuco_ids;
+//      cv::Mat charuco_corners;
+//      if (!aruco_ids.empty()) {
+//        cv::aruco::interpolateCornersCharuco(aruco_corners, aruco_ids,
+//                                             gray, charucoboard_,
+//                                             charuco_corners, charuco_ids);
+//      }
+//
+//      // Calculate Homography
+//      cv::Mat homo;
+//      std::vector<cv::Point2f> board_corners;
+//      if (!aruco_ids.empty()) {
+//        CharucoBoardModel cbm{cxt_.squares_x_, cxt_.squares_y_,
+//                              cxt_.square_length_, cxt_.marker_length_};
+//
+//        std::vector<cv::Vec2f> op{};
+//        std::vector<cv::Vec2f> ip{};
+//
+//        for (int i = 0; i < aruco_ids.size(); i += 1) {
+//          auto id = aruco_ids[i];
+//          auto object_points = cbm.marker_corners2D_f_board(id);
+//          auto image_points = aruco_corners[i];
+//          for (int j = 0; j < 4; j += 1) {
+//            op.emplace_back(cv::Vec2f{float(object_points[j].x), float(object_points[j].y)});
+//            ip.emplace_back(cv::Vec2f{float(image_points[j].x), float(image_points[j].y)});
+//          }
+//        }
+//
+//        homo = cv::findHomography(op, ip);
+//
+//        // Figure out the projection of the board corners in the image
+//        auto board_corners_f_board = cbm.board_corners2D_f_board();
+//        cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
+//      }
+//
+//      return std::make_shared<ImageHolder>(
+//        gray,
+//        std::move(aruco_ids), std::move(aruco_corners),
+//        std::move(homo), BoardProjection{std::move(board_corners)});
+    }
 
   };
 
