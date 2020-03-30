@@ -252,8 +252,8 @@ namespace fiducial_vlam
       return TransformWithCovariance(CvUtil::to_tf2_transform(rvec, tvec));
     }
 
-    Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &gray,
-                                std::shared_ptr<cv_bridge::CvImage> &color_marked) override
+    Observations detect_markers(cv_bridge::CvImage &gray,
+                                cv_bridge::CvImage &color_marked) override
     {
       // Todo: make the dictionary a parameter
       auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -275,11 +275,11 @@ namespace fiducial_vlam
       // Detect markers
       std::vector<int> ids;
       std::vector<std::vector<cv::Point2f>> corners;
-      cv::aruco::detectMarkers(gray->image, dictionary, corners, ids, detectorParameters);
+      cv::aruco::detectMarkers(gray.image, dictionary, corners, ids, detectorParameters);
 
       // Annotate the markers
-      if (color_marked) {
-        drawDetectedMarkers(color_marked->image, corners, ids);
+      if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
+        drawDetectedMarkers(color_marked.image, corners, ids);
       }
 
       // return the corners as a list of observations
@@ -287,14 +287,14 @@ namespace fiducial_vlam
 
     }
 
-    void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
+    void annotate_image_with_marker_axis(cv_bridge::CvImage &color_marked,
                                          const TransformWithCovariance &t_camera_marker,
                                          const CameraInfoInterface &camera_info) override
     {
       cv::Vec3d rvec, tvec;
       CvUtil::to_cv_rvec_tvec(t_camera_marker, rvec, tvec);
 
-      cv::aruco::drawAxis(color_marked->image,
+      cv::aruco::drawAxis(color_marked.image,
                           camera_info.camera_matrix(), camera_info.dist_coeffs(),
                           rvec, tvec, 0.1);
     }

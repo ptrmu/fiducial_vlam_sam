@@ -84,10 +84,10 @@ namespace fiducial_vlam
                                                           const CameraInfoInterface &camera_info,
                                                           double marker_length) = 0;
 
-    virtual Observations detect_markers(std::shared_ptr<cv_bridge::CvImage> &image,
-                                        std::shared_ptr<cv_bridge::CvImage> &color_marked) = 0;
+    virtual Observations detect_markers(cv_bridge::CvImage &gray,
+                                        cv_bridge::CvImage &color_marked) = 0;
 
-    virtual void annotate_image_with_marker_axis(std::shared_ptr<cv_bridge::CvImage> &color_marked,
+    virtual void annotate_image_with_marker_axis(cv_bridge::CvImage &color_marked,
                                                  const TransformWithCovariance &t_camera_marker,
                                                  const CameraInfoInterface &camera_info) = 0;
   };
@@ -133,6 +133,23 @@ namespace fiducial_vlam
   std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
                                                                      CvFiducialMathInterface &fm,
                                                                      const Map &empty_map);
+
+// ==============================================================================
+// ProcessImageInterface class
+// ==============================================================================
+
+  class ProcessImageInterface
+  {
+  public:
+    virtual ~ProcessImageInterface() = default;
+
+    virtual Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                                       cv_bridge::CvImage &color_marked) = 0;
+
+    virtual TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                                       const CameraInfoInterface &camera_info,
+                                                       const Map &map) = 0;
+  };
 
 }
 

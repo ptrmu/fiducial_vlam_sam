@@ -18,7 +18,7 @@ namespace fiducial_vlam
 {
 
   static void annotate_image_with_marker_axes(
-    std::shared_ptr<cv_bridge::CvImage> &color_marked,
+    cv_bridge::CvImage &color_marked,
     const TransformWithCovariance &t_map_camera,
     const std::vector<TransformWithCovariance> &t_map_markers,
     CvFiducialMathInterface &fm,
@@ -46,18 +46,62 @@ namespace fiducial_vlam
 
 
 // ==============================================================================
+// LocalizeCameraProcessImageImpl class
+// ==============================================================================
+
+  class LocalizeCameraProcessImageImpl : public ProcessImageInterface
+  {
+    const VlocContext &cxt_;
+    const FiducialMathContext &fm_cxt_;
+    CvFiducialMathInterface &fm_;
+    std::unique_ptr<LocalizeCameraInterface> cv_lc_{};
+    std::unique_ptr<LocalizeCameraInterface> sam_lc_{};
+
+    LocalizeCameraInterface &lc()
+    {
+      // Select which type of localize camera functionality to use.
+      return (cxt_.loc_localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
+    }
+
+
+  public:
+    explicit LocalizeCameraProcessImageImpl(const VlocContext &cxt,
+                                            const FiducialMathContext &fm_cxt,
+                                            CvFiducialMathInterface &fm) :
+      cxt_{cxt}, fm_cxt_{fm_cxt}, fm_{fm},
+      cv_lc_{make_cv_localize_camera(fm_cxt_)},
+      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)}
+    {}
+
+    Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                               cv_bridge::CvImage &color_marked) override
+    {
+      // Detect the markers in this image and create a list of
+      // observations.
+      return fm_.detect_markers(*gray, color_marked);
+    }
+
+    TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                               const CameraInfoInterface &camera_info,
+                                               const Map &map) override
+    {
+      return lc().solve_t_map_camera(observations, camera_info, map);
+    }
+  };
+
+// ==============================================================================
 // VlocNode class
 // ==============================================================================
 
   class VlocNode : public rclcpp::Node
   {
+    rclcpp::Logger ros_logger_inst_;
     VlocContext cxt_{};
     FiducialMathContext fm_cxt_{};
     CalibrateContext cal_cxt_{};
     std::unique_ptr<CvFiducialMathInterface> fm_;
-    std::unique_ptr<LocalizeCameraInterface> cv_lc_{};
-    std::unique_ptr<LocalizeCameraInterface> sam_lc_{};
-    std::unique_ptr<CalibrateCameraInterface> cc_{};
+    std::unique_ptr<ProcessImageInterface> lc_pi_{};
+    std::unique_ptr<ProcessImageInterface> cc_pi_{};
 
     std::unique_ptr<Map> map_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
@@ -137,23 +181,19 @@ namespace fiducial_vlam
       CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS CAL_ALL_PARAMS)
     }
 
-    LocalizeCameraInterface &lc()
+    ProcessImageInterface &pi()
     {
-      // Select which type of localize camera functionality to use.
-      return (cxt_.loc_calibrate_not_loocalize_ ) ? *cc_ :
-             (cxt_.loc_localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
+      return cxt_.loc_calibrate_not_loocalize_ ? *cc_pi_ : *lc_pi_;
     }
 
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
+      ros_logger_inst_{get_logger()},
       fm_{make_cv_fiducial_math(fm_cxt_)},
-      cv_lc_{make_cv_localize_camera(fm_cxt_)},
-      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)},
-      cc_{make_calibrate_camera(cal_cxt_)}
+      lc_pi_{std::make_unique<LocalizeCameraProcessImageImpl>(cxt_, fm_cxt_, *fm_)},
+      cc_pi_{make_calibrate_camera(ros_logger_inst_, cal_cxt_)}
     {
-      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
-
       // Get parameters from the command line
       setup_parameters();
 
@@ -247,10 +287,13 @@ namespace fiducial_vlam
           calibrate_timer_callback();
         });
 
+      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
+      RCLCPP_INFO(get_logger(), "vloc_node ready");
+
       (void) camera_info_sub_;
       (void) image_raw_sub_;
       (void) map_sub_;
-      RCLCPP_INFO(get_logger(), "vloc_node ready");
+      (void) calibrate_timer_;
     }
 
   private:
@@ -265,25 +308,37 @@ namespace fiducial_vlam
       // the original message image. If no annotated image is to be published,
       // then just make an empty image pointer. The routines need to check
       // that the pointer is valid before drawing into it.
-      cv_bridge::CvImagePtr color_marked;
+      cv_bridge::CvImage color_marked;
       if (cxt_.publish_image_marked_ &&
           count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
         // data so I create another CvImage that is not const and steal the
-        // image data.
+        // image data. This seems to work now but may not in the future! (3/29/2020)
+        // tracked_object is just a dummy variable, it is not tracking anything.
         std::shared_ptr<void const> tracked_object;
+        // const_color_marked points to the image data that is owned by image_msg.
         auto const_color_marked = cv_bridge::toCvShare(*image_msg, tracked_object);
-        cv::Mat mat_with_msg_data = const_color_marked->image; // opencv does not copy the image data on assignment
-        color_marked = cv_bridge::CvImagePtr{
-          new cv_bridge::CvImage{const_color_marked->header,
-                                 const_color_marked->encoding,
-                                 mat_with_msg_data}};
+        // mat_with_msg_data also references data that is owned by image_msg.
+        cv::Mat mat_with_msg_data = const_color_marked->image; // opencv does not copy the image data on assignment.
+        // color_marked now also references data that is owned by image_msg
+        color_marked = cv_bridge::CvImage{const_color_marked->header,
+                                          const_color_marked->encoding,
+                                          mat_with_msg_data};
+        // When mat_with_msg_data is destroyed, it does not release the image data because it does not own the data.
+        // When const_color_marked is destroyed, it does not release the image data because it does not own the data.
+        // tracked_object does not really track anything.
+        // When color_marked is destoryed at the end of this method, it will not release the image data because
+        //  it does not own the data.
+        // The image data will finally get released when the image_msg variable is destroyed because it owns the
+        //  image data. image_msg gets destroyed last thing in this method because it is passed by value. But that
+        //  is after color_marked is destroyed so there is no chance that the data will be references after being
+        //  released.
       }
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = fm_->detect_markers(gray, color_marked);
+      auto observations = pi().process_image(gray, color_marked);
 
       // Publish the observations.
       if (observations.size()) {
@@ -302,12 +357,12 @@ namespace fiducial_vlam
         auto camera_info{make_camera_info(*camera_info_msg)};
 
         // Find the camera pose from the observations.
-        auto t_map_camera{lc().solve_t_map_camera(observations, *camera_info, *map_)};
+        auto t_map_camera{pi().solve_t_map_camera(observations, *camera_info, *map_)};
 
         if (t_map_camera.is_valid()) {
 
           // If annotated images have been requested, then add the annotations now.
-          if (color_marked) {
+          if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
             auto t_map_markers = map_->find_t_map_markers(observations);
             annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *fm_, *camera_info);
           }
@@ -363,7 +418,7 @@ namespace fiducial_vlam
       }
 
       // Publish an annotated image if requested. Even if there is no map.
-      if (color_marked) {
+      if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
         // The marking has been happening on the original message.
         // Republish it now.
         image_marked_pub_->publish(std::move(image_msg));
@@ -450,7 +505,7 @@ namespace fiducial_vlam
       for (const auto &observation : observations.observations()) {
         Observations single_observation{};
         single_observation.add(observation);
-        auto t_map_camera = lc().solve_t_map_camera(single_observation, camera_info, map);
+        auto t_map_camera = pi().solve_t_map_camera(single_observation, camera_info, map);
         if (t_map_camera.is_valid()) {
           t_map_cameras.emplace_back(t_map_camera);
         }
@@ -487,10 +542,10 @@ namespace fiducial_vlam
         if (!cxt_.loc_calibrate_not_loocalize_) {
           RCLCPP_ERROR(get_logger(), "Cannot execute calibrate_camera_cmd when not in calibrate mode");
         } else {
-          auto ret_str = cc_->calibrate_camera_cmd(cmd);
-          if (!ret_str.empty()) {
-            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
-          }
+//          auto ret_str = cc_pi_->calibrate_camera_cmd(cmd);
+//          if (!ret_str.empty()) {
+//            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
+//          }
         }
       }
     }
