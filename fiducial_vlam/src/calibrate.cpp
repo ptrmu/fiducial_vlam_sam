@@ -256,7 +256,7 @@ namespace fiducial_vlam
         return Observations{};
       }
 
-//      auto image_holder = new_image_holder(gray);
+      auto image_holder = new_image_holder(gray);
 //
 //      if (!image_holder->aruco_ids_.empty()) {
 //        board_targets_->compare_to_targets(image_holder);
@@ -272,6 +272,7 @@ namespace fiducial_vlam
 //      }
 //
 //      mark_best_images(marked);
+
       // Detect the markers in this image and create a list of
       // observations.
       return Observations{};
