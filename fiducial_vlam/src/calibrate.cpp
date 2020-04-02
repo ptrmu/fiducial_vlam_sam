@@ -1,6 +1,7 @@
 
 #include "calibrate.hpp"
 
+#include "calibration_board_config.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include "fiducial_math.hpp"
 #include "observation.hpp"
@@ -13,6 +14,117 @@
 
 namespace fiducial_vlam
 {
+
+// ==============================================================================
+// Drawing functions copied from opencv
+// ==============================================================================
+
+  static void drawDetectedMarkers(cv::InputOutputArray _image, cv::InputArrayOfArrays _corners,
+                                  cv::InputArray _ids = cv::noArray(),
+                                  cv::Scalar borderColor = cv::Scalar(0, 255, 0))
+  {
+    CV_Assert(_image.getMat().total() != 0 &&
+              (_image.getMat().channels() == 1 || _image.getMat().channels() == 3));
+    CV_Assert((_corners.total() == _ids.total()) || _ids.total() == 0);
+
+    // calculate colors
+    cv::Scalar textColor, cornerColor;
+    textColor = cornerColor = borderColor;
+    cv::swap(textColor.val[0], textColor.val[1]);     // text color just sawp G and R
+    cv::swap(cornerColor.val[1], cornerColor.val[2]); // corner color just sawp G and B
+
+    int nMarkers = (int) _corners.total();
+    for (int i = 0; i < nMarkers; i++) {
+      cv::Mat currentMarker = _corners.getMat(i);
+      CV_Assert(currentMarker.total() == 4 && currentMarker.type() == CV_32FC2);
+
+      // draw marker sides
+      for (int j = 0; j < 4; j++) {
+        cv::Point2f p0, p1;
+        p0 = currentMarker.ptr<cv::Point2f>(0)[j];
+        p1 = currentMarker.ptr<cv::Point2f>(0)[(j + 1) % 4];
+        line(_image, p0, p1, borderColor, 1);
+      }
+      // draw first corner mark
+      rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
+                currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
+
+      // draw ID
+//      if (_ids.total() != 0) {
+//        cv::Point2f cent(0, 0);
+//        for (int p = 0; p < 4; p++)
+//          cent += currentMarker.ptr<cv::Point2f>(0)[p];
+//        cent = cent / 4.;
+//        std::stringstream s;
+//        s << "id=" << _ids.getMat().ptr<int>(0)[i];
+//        putText(_image, s.str(), cent, cv::FONT_HERSHEY_SIMPLEX, 0.5, textColor, 2);
+//      }
+    }
+  }
+
+  static void drawDetectedCornersCharuco(cv::InputOutputArray _image, cv::InputArray _charucoCorners,
+                                         cv::InputArray _charucoIds = cv::noArray(),
+                                         cv::Scalar cornerColor = cv::Scalar(255, 0, 0))
+  {
+    CV_Assert(_image.getMat().total() != 0 &&
+              (_image.getMat().channels() == 1 || _image.getMat().channels() == 3));
+    CV_Assert((_charucoCorners.getMat().total() == _charucoIds.getMat().total()) ||
+              _charucoIds.getMat().total() == 0);
+
+    unsigned int nCorners = (unsigned int) _charucoCorners.getMat().total();
+    for (unsigned int i = 0; i < nCorners; i++) {
+      cv::Point2f corner = _charucoCorners.getMat().at<cv::Point2f>(i);
+
+      // draw first corner mark
+      rectangle(_image, corner - cv::Point2f(3, 3), corner + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
+
+      // draw ID
+//      if (_charucoIds.total() != 0) {
+//        int id = _charucoIds.getMat().at<int>(i);
+//        std::stringstream s;
+//        s << "id=" << id;
+//        putText(_image, s.str(), corner + cv::Point2f(5, -5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+//                cornerColor, 2);
+//      }
+    }
+  }
+
+  static void drawBoardCorners(cv::InputOutputArray image, std::vector<cv::Point2f> &board_corners,
+                               cv::Scalar borderColor = cv::Scalar(0, 0, 255))
+  {
+    for (int j = 0; j < 4; j++) {
+      cv::Point2f p0, p1;
+      p0 = board_corners[j];
+      p1 = board_corners[(j + 1) % 4];
+      line(image, p0, p1, borderColor, 1);
+    }
+  }
+
+  static void drawPolygonAtCenter(std::shared_ptr<cv_bridge::CvImage> &color, std::vector<cv::Point2f> &board_corners,
+                                  cv::Scalar borderColor = cv::Scalar(0, 0, 255))
+  {
+    cv::Point2f avg;
+    for (int i = 0; i < board_corners.size(); i += 1) {
+      avg = avg + board_corners[i];
+    }
+    avg = avg / double(board_corners.size());
+    avg.x -= color->image.cols / 2;
+    avg.y -= color->image.rows / 2;
+    std::vector<cv::Point> bc = {
+      cv::Point{int(round(board_corners[0].x - avg.x)), int(round(board_corners[0].y - avg.y))},
+      cv::Point{int(round(board_corners[1].x - avg.x)), int(round(board_corners[1].y - avg.y))},
+      cv::Point{int(round(board_corners[2].x - avg.x)), int(round(board_corners[2].y - avg.y))},
+      cv::Point{int(round(board_corners[3].x - avg.x)), int(round(board_corners[3].y - avg.y))},
+    };
+    cv::fillConvexPoly(color->image, bc, borderColor);
+//    for (int j = 0; j < 4; j++) {
+//      cv::Point2f p0, p1;
+//      p0 = board_corners[j];
+//      p1 = board_corners[(j + 1) % 4];
+//      line(image, p0, p1, borderColor, 1);
+//    }
+  }
+
 
 // ==============================================================================
 // BoardProjection struct
@@ -41,7 +153,7 @@ namespace fiducial_vlam
 
   struct ImageHolder
   {
-    cv::Mat gray_;
+    std::shared_ptr<cv_bridge::CvImage> gray_;
 
     std::vector<int> aruco_ids_;
     std::vector<std::vector<cv::Point2f> > aruco_corners_;
@@ -49,12 +161,14 @@ namespace fiducial_vlam
     cv::Mat homo_;
     BoardProjection board_projection_;
 
-    ImageHolder(cv::Mat &gray,
-                std::vector<int> &&aruco_ids, std::vector<std::vector<cv::Point2f> > &&aruco_corners,
-                cv::Mat &&homo, BoardProjection &&board_projection) :
+    ImageHolder(std::shared_ptr<cv_bridge::CvImage> &gray,
+                std::vector<int> aruco_ids,
+                std::vector<std::vector<cv::Point2f> > aruco_corners,
+                cv::Mat homo,
+                BoardProjection board_projection) :
       gray_{gray},
-      aruco_ids_{aruco_ids}, aruco_corners_{aruco_corners},
-      homo_{homo}, board_projection_{board_projection}
+      aruco_ids_{std::move(aruco_ids)}, aruco_corners_{std::move(aruco_corners)},
+      homo_{std::move(homo)}, board_projection_{std::move(board_projection)}
     {}
   };
 
@@ -238,6 +352,10 @@ namespace fiducial_vlam
     rclcpp::Logger &logger_;
     const CalibrateContext &cal_cxt_;
 
+    cv::Ptr<cv::aruco::DetectorParameters> detectorParams_ = cv::aruco::DetectorParameters::create();
+
+    cv::Ptr<cv::aruco::Dictionary> dictionary_;
+
     BoardTargets board_targets{};
 
   public:
@@ -245,7 +363,10 @@ namespace fiducial_vlam
                                  const CalibrateContext &cal_cxt) :
       logger_{logger},
       cal_cxt_{cal_cxt}
-    {}
+    {
+      dictionary_ = cv::aruco::getPredefinedDictionary(
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt_.cal_aruco_dictionary_id_));
+    }
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                cv_bridge::CvImage &color_marked) override
@@ -262,10 +383,10 @@ namespace fiducial_vlam
 //        board_targets_->compare_to_targets(image_holder);
 //      }
 //
-//      // Annotate the image with info we have collected so far.
-//      if (!image_holder->aruco_ids_.empty()) {
-//        drawDetectedMarkers(marked, image_holder->aruco_corners_);
-//      }
+      // Annotate the image with info we have collected so far.
+      if (!image_holder->aruco_ids_.empty()) {
+        drawDetectedMarkers(color_marked.image, image_holder->aruco_corners_);
+      }
 //
 //      if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
 //        drawBoardCorners(marked, image_holder->board_projection_.ordered_board_corners_);
@@ -293,15 +414,15 @@ namespace fiducial_vlam
   private:
 
 
-    std::shared_ptr<ImageHolder> new_image_holder(cv::Mat &gray)
+    std::shared_ptr<ImageHolder> new_image_holder(std::shared_ptr<cv_bridge::CvImage> &gray)
     {
-//      std::vector<std::vector<cv::Point2f> > rejected;
-//
-//      // detect markers
-//      std::vector<int> aruco_ids;
-//      std::vector<std::vector<cv::Point2f> > aruco_corners;
-//      cv::aruco::detectMarkers(gray, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
-//
+      std::vector<std::vector<cv::Point2f> > rejected;
+
+      // detect markers
+      std::vector<int> aruco_ids;
+      std::vector<std::vector<cv::Point2f> > aruco_corners;
+      cv::aruco::detectMarkers(gray->image, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
+
 //      // refind strategy to detect more markers
 //      if (cxt_.refind_strategy_) {
 //        cv::aruco::refineDetectedMarkers(gray, board_, aruco_corners, aruco_ids, rejected);
@@ -316,37 +437,38 @@ namespace fiducial_vlam
 //                                             charuco_corners, charuco_ids);
 //      }
 //
-//      // Calculate Homography
-//      cv::Mat homo;
-//      std::vector<cv::Point2f> board_corners;
-//      if (!aruco_ids.empty()) {
-//        CharucoBoardModel cbm{cxt_.squares_x_, cxt_.squares_y_,
-//                              cxt_.square_length_, cxt_.marker_length_};
-//
-//        std::vector<cv::Vec2f> op{};
-//        std::vector<cv::Vec2f> ip{};
-//
-//        for (int i = 0; i < aruco_ids.size(); i += 1) {
-//          auto id = aruco_ids[i];
-//          auto object_points = cbm.marker_corners2D_f_board(id);
-//          auto image_points = aruco_corners[i];
-//          for (int j = 0; j < 4; j += 1) {
-//            op.emplace_back(cv::Vec2f{float(object_points[j].x), float(object_points[j].y)});
-//            ip.emplace_back(cv::Vec2f{float(image_points[j].x), float(image_points[j].y)});
-//          }
-//        }
-//
-//        homo = cv::findHomography(op, ip);
+      // Calculate Homography
+      cv::Mat homo;
+      std::vector<cv::Point2f> board_corners;
+      if (!aruco_ids.empty()) {
+        CharucoboardConfig cbm(cal_cxt_.cal_squares_x_, cal_cxt_.cal_squares_y_, cal_cxt_.cal_square_length_,
+                               cal_cxt_.cal_upper_left_white_not_black_, cal_cxt_.cal_marker_length_);
+
+        std::vector<cv::Vec2f> op{};
+        std::vector<cv::Vec2f> ip{};
+
+        for (int i = 0; i < aruco_ids.size(); i += 1) {
+          auto id = aruco_ids[i];
+          auto object_points = cbm.to_aruco_corners_f_board(cbm.to_aruco_corners_f_facade(id));
+          auto image_points = aruco_corners[i];
+          for (int j = 0; j < 4; j += 1) {
+            op.emplace_back(cv::Vec2f{float(object_points(0, j)), float(object_points(1, j))});
+            ip.emplace_back(cv::Vec2f{float(image_points[j].x), float(image_points[j].y)});
+          }
+        }
+
+        homo = cv::findHomography(op, ip);
 //
 //        // Figure out the projection of the board corners in the image
 //        auto board_corners_f_board = cbm.board_corners2D_f_board();
 //        cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
 //      }
 //
-//      return std::make_shared<ImageHolder>(
-//        gray,
-//        std::move(aruco_ids), std::move(aruco_corners),
-//        std::move(homo), BoardProjection{std::move(board_corners)});
+      }
+      return std::make_shared<ImageHolder>(
+        gray,
+        std::move(aruco_ids), std::move(aruco_corners),
+        std::move(homo), BoardProjection{std::move(board_corners)});
     }
 
   };

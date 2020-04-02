@@ -24,8 +24,7 @@ corner_measurement_sigma = 2.0
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
     'publish_tfs': 1,  # Publish drone and camera /tf
-    'stamp_msgs_with_current_time': 1,  # Stamp with now()
-    'map_init_pose_z': 0,
+    'stamp_msgs_with_current_time': 0,  # Stamp with now()
     'sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
     'publish_image_marked': 1,
@@ -35,7 +34,6 @@ vloc_args = [{
     'publish_base_odom': 1,
     'cv4_corner_refinement_method': 2,
     'localize_camera_sam_not_cv': 1,
-    'elemental_parameter': 5,
 }]
 
 vmap_args = [{
@@ -68,8 +66,8 @@ def generate_launch_description():
         Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
              arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
-             parameters=vloc_args, node_namespace='forward_camera'),
+        # Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+        #      parameters=vloc_args, node_namespace='forward_camera'),
         Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]

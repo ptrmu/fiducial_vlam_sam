@@ -99,14 +99,14 @@ namespace fiducial_vlam
   \
   CXT_MACRO_MEMBER(       /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */ \
   sub_camera_info_best_effort_not_reliable, \
-  int, 0) \
+  int, 1) \
   \
   CXT_MACRO_MEMBER(       /* use gtsam not opencv for localizing the camera */ \
   loc_localize_camera_sam_not_cv, \
   int, 0) \
   CXT_MACRO_MEMBER(       /* calibrate camera instead of localize camera */ \
   loc_calibrate_not_loocalize, \
-  int, 0) \
+  int, 1) \
   /* End of list */
 
   struct VlocContext
