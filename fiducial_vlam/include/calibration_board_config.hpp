@@ -126,6 +126,30 @@ namespace fiducial_vlam
       auto y(-(point_f_facade.y() - board_height_half_)); // facade y is down, board y is up
       return PointFBoard{x, y, 0.0};
     }
+
+    double board_width_per_height()
+    {
+      return static_cast<double>(squares_x_) / squares_y_;
+    }
+
+    CornerPointsFFacade board_corners_f_facade()
+    {
+      return (CornerPointsFFacade{} << PointFFacade{0.0, 0.0},
+        PointFFacade{squares_x_ * square_length_, 0.0},
+        PointFFacade{squares_x_ * square_length_, squares_y_ * square_length_},
+        PointFFacade{0.0, squares_y_ * square_length_}).finished();
+    }
+
+    template<typename TPoint2>
+    std::vector<TPoint2> board_corners_f_facade_point2_array()
+    {
+      return std::vector<TPoint2>{
+        TPoint2(0.0, 0.0),
+        TPoint2(squares_x_ * square_length_, 0.0),
+        TPoint2(squares_x_ * square_length_, squares_y_ * square_length_),
+        TPoint2(0.0, squares_y_ * square_length_)};
+    }
+
   };
 
 // ==============================================================================

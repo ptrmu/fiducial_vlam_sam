@@ -6,9 +6,9 @@
 #include "fiducial_math.hpp"
 #include "observation.hpp"
 #include "opencv2/aruco.hpp"
-#include "opencv2/aruco/charuco.hpp"
+//#include "opencv2/aruco/charuco.hpp"
 #include "opencv2/calib3d.hpp"
-#include "opencv2/imgcodecs.hpp"
+//#include "opencv2/imgcodecs.hpp"
 #include "rclcpp/logging.hpp"
 #include "transform_with_covariance.hpp"
 
@@ -43,11 +43,11 @@ namespace fiducial_vlam
         cv::Point2f p0, p1;
         p0 = currentMarker.ptr<cv::Point2f>(0)[j];
         p1 = currentMarker.ptr<cv::Point2f>(0)[(j + 1) % 4];
-        line(_image, p0, p1, borderColor, 1);
+        cv::line(_image, p0, p1, borderColor, 1);
       }
       // draw first corner mark
-      rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
-                currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
+      cv::rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
+                    currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
 
       // draw ID
 //      if (_ids.total() != 0) {
@@ -76,7 +76,7 @@ namespace fiducial_vlam
       cv::Point2f corner = _charucoCorners.getMat().at<cv::Point2f>(i);
 
       // draw first corner mark
-      rectangle(_image, corner - cv::Point2f(3, 3), corner + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
+      cv::rectangle(_image, corner - cv::Point2f(3, 3), corner + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
 
       // draw ID
 //      if (_charucoIds.total() != 0) {
@@ -93,10 +93,9 @@ namespace fiducial_vlam
                                cv::Scalar borderColor = cv::Scalar(0, 0, 255))
   {
     for (int j = 0; j < 4; j++) {
-      cv::Point2f p0, p1;
-      p0 = board_corners[j];
-      p1 = board_corners[(j + 1) % 4];
-      line(image, p0, p1, borderColor, 1);
+      auto p0 = board_corners[j];
+      auto p1 = board_corners[(j + 1) % 4];
+      cv::line(image, p0, p1, borderColor, 1);
     }
   }
 
@@ -185,20 +184,20 @@ namespace fiducial_vlam
 
   class BoardTargets
   {
-    cv::Size image_size_{0, 0};
-    std::vector<CalibrationImage> best_images_{};
+    cv::Size image_size_;
+    std::vector<CalibrationImage> best_images_;
 
-    static BoardProjection new_target(float width_per_height, const cv::Size &image_size,
+    static BoardProjection new_target(double board_width_per_height, const cv::Size &image_size,
                                       int x_alignment, float x_normalized, float width_normalized,
                                       int y_alignment, float y_normalized)
     {
-      float x_max = image_size.width - 1;
-      float y_max = image_size.height - 1;
+      double x_max = image_size.width - 1;
+      double y_max = image_size.height - 1;
 
-      float width = width_normalized * x_max;
-      float height = width / width_per_height;
+      double width = width_normalized * x_max;
+      double height = width / board_width_per_height;
 
-      float left = x_normalized * x_max;
+      double left = x_normalized * x_max;
       switch (x_alignment) {
         case 0:
           left -= width / 2;
@@ -208,7 +207,7 @@ namespace fiducial_vlam
           break;
       }
 
-      float top = y_normalized * y_max;
+      double top = y_normalized * y_max;
       switch (y_alignment) {
         case 0:
           top -= height / 2;
@@ -219,7 +218,7 @@ namespace fiducial_vlam
       }
 
       return BoardProjection(std::vector<cv::Point2f>{
-        cv::Point2f{left, top},
+        cv::Point2f(left, top),
         cv::Point2f(left + width, top),
         cv::Point2f(left + width, top + height),
         cv::Point2f(left, top + height),
@@ -239,24 +238,9 @@ namespace fiducial_vlam
     }
 
   public:
-//    explicit BoardTargets(rclcpp::Logger &logger, float width_per_height, const cv::Size &image_size) :
-//      logger_{logger}, image_size{image_size}, best_images_{new_best_images(width_per_height, image_size)}
-//    {
-//    }
-
-    bool check_init(const cv::MatSize &mat_size)
-    {
-      // Pick up this image size if we are not initialized
-      if (image_size_.width == 0) {
-        image_size_ = cv::Size(mat_size[1], mat_size[0]);
-        best_images_.clear();
-        // create new_best images
-        return true;
-      }
-
-      // Don't process images that happen to be a different size.
-      return image_size_.width == mat_size[1] && image_size_.height == mat_size[0];
-    }
+    explicit BoardTargets(rclcpp::Logger &logger, double board_width_per_height, const cv::Size &image_size) :
+      image_size_{image_size}, best_images_{new_best_images(board_width_per_height, image_size)}
+    {}
 
     void reset()
     {
@@ -344,56 +328,72 @@ namespace fiducial_vlam
 #endif
 
 // ==============================================================================
-// CalibrateCameraImpl class
+// CalibrateCameraProcessImageImpl class
 // ==============================================================================
 
-  class CalibrateCameraImpl : public CalibrateCameraInterface
+  class CalibrateCameraProcessImageImpl : public ProcessImageInterface
   {
     rclcpp::Logger &logger_;
-    const CalibrateContext &cal_cxt_;
-
-    cv::Ptr<cv::aruco::DetectorParameters> detectorParams_ = cv::aruco::DetectorParameters::create();
-
+    cv::Ptr<cv::aruco::DetectorParameters> detectorParams_;
     cv::Ptr<cv::aruco::Dictionary> dictionary_;
-
-    BoardTargets board_targets{};
+    CharucoboardConfig cbm_;
+    BoardTargets board_targets_;
 
   public:
-    explicit CalibrateCameraImpl(rclcpp::Logger &logger,
-                                 const CalibrateContext &cal_cxt) :
+    CalibrateCameraProcessImageImpl(rclcpp::Logger &logger,
+                                    const CalibrateContext &cal_cxt,
+                                    const cv::Size &image_size) :
       logger_{logger},
-      cal_cxt_{cal_cxt}
+      detectorParams_{cv::aruco::DetectorParameters::create()},
+      dictionary_{cv::aruco::getPredefinedDictionary(
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt.cal_aruco_dictionary_id_))},
+      cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
+           cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_),
+      board_targets_(logger, cbm_.board_width_per_height(), image_size)
     {
-      dictionary_ = cv::aruco::getPredefinedDictionary(
-        cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt_.cal_aruco_dictionary_id_));
+#if (CV_VERSION_MAJOR == 4)
+//     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
+//     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
+//     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
+//     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
+
+      // Use the new AprilTag 2 corner algorithm, much better but much slower
+      detectorParams_->cornerRefinementMethod = cal_cxt.cal_cv4_corner_refinement_method_;
+#else
+      // 0 = false
+      // 1 = true
+      detectorParameters->doCornerRefinement = cal_cxt.cal_cv3_do_corner_refinement_;
+#endif
+
     }
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                cv_bridge::CvImage &color_marked) override
     {
-      // The first time this is called, we have to initialize the targets with the size
-      // of the image passed in.
-      if (!board_targets.check_init(gray->image.size)) {
+      // Don't process images that happen to be a different size.
+      if (gray->image.size[1] != board_targets_.width() || gray->image.size[0] != board_targets_.height()) {
         return Observations{};
       }
 
       auto image_holder = new_image_holder(gray);
-//
+
 //      if (!image_holder->aruco_ids_.empty()) {
 //        board_targets_->compare_to_targets(image_holder);
 //      }
-//
-      // Annotate the image with info we have collected so far.
-      if (!image_holder->aruco_ids_.empty()) {
-        drawDetectedMarkers(color_marked.image, image_holder->aruco_corners_);
-      }
-//
-//      if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
-//        drawBoardCorners(marked, image_holder->board_projection_.ordered_board_corners_);
-//      }
+
+      if (color_marked.image.dims != 0) {
+
+        // Annotate the image with info we have collected so far.
+        if (!image_holder->aruco_ids_.empty()) {
+          drawDetectedMarkers(color_marked.image, image_holder->aruco_corners_);
+        }
+
+        if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
+          drawBoardCorners(color_marked.image, image_holder->board_projection_.ordered_board_corners_);
+        }
 //
 //      mark_best_images(marked);
-
+      }
       // Detect the markers in this image and create a list of
       // observations.
       return Observations{};
@@ -406,14 +406,7 @@ namespace fiducial_vlam
       return TransformWithCovariance{};
     }
 
-    std::string calibrate_camera_cmd(const std::string cmd) override
-    {
-      return std::string{};
-    }
-
   private:
-
-
     std::shared_ptr<ImageHolder> new_image_holder(std::shared_ptr<cv_bridge::CvImage> &gray)
     {
       std::vector<std::vector<cv::Point2f> > rejected;
@@ -441,36 +434,104 @@ namespace fiducial_vlam
       cv::Mat homo;
       std::vector<cv::Point2f> board_corners;
       if (!aruco_ids.empty()) {
-        CharucoboardConfig cbm(cal_cxt_.cal_squares_x_, cal_cxt_.cal_squares_y_, cal_cxt_.cal_square_length_,
-                               cal_cxt_.cal_upper_left_white_not_black_, cal_cxt_.cal_marker_length_);
 
-        std::vector<cv::Vec2f> op{};
-        std::vector<cv::Vec2f> ip{};
+        std::vector<cv::Point2f> op{};
+        std::vector<cv::Point2f> ip{};
 
         for (int i = 0; i < aruco_ids.size(); i += 1) {
           auto id = aruco_ids[i];
-          auto object_points = cbm.to_aruco_corners_f_board(cbm.to_aruco_corners_f_facade(id));
+          auto object_points = cbm_.to_aruco_corners_f_facade(id);
           auto image_points = aruco_corners[i];
           for (int j = 0; j < 4; j += 1) {
-            op.emplace_back(cv::Vec2f{float(object_points(0, j)), float(object_points(1, j))});
-            ip.emplace_back(cv::Vec2f{float(image_points[j].x), float(image_points[j].y)});
+            op.emplace_back(cv::Point2f{float(object_points(0, j)), float(object_points(1, j))});
+            ip.emplace_back(cv::Point2f{float(image_points[j].x), float(image_points[j].y)});
           }
         }
 
         homo = cv::findHomography(op, ip);
-//
-//        // Figure out the projection of the board corners in the image
-//        auto board_corners_f_board = cbm.board_corners2D_f_board();
-//        cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
-//      }
-//
+
+        // Figure out the projection of the board corners in the image
+        auto board_corners_f_board = cbm_.board_corners_f_facade_point2_array<cv::Point2f>();
+        cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
       }
+
       return std::make_shared<ImageHolder>(
         gray,
         std::move(aruco_ids), std::move(aruco_corners),
         std::move(homo), BoardProjection{std::move(board_corners)});
     }
+  };
 
+// ==============================================================================
+// CalibrateCameraImpl class
+// ==============================================================================
+
+  class CalibrateCameraImpl : public CalibrateCameraInterface
+  {
+    rclcpp::Logger &logger_;
+    const CalibrateContext &cal_cxt_;
+    std::unique_ptr<CalibrateCameraProcessImageImpl> pi_{};
+
+    std::string prep_image_capture(int i)
+    {
+
+    }
+
+  public:
+    explicit CalibrateCameraImpl(rclcpp::Logger &logger,
+                                 const CalibrateContext &cal_cxt) :
+      logger_{logger},
+      cal_cxt_{cal_cxt}
+    {}
+
+    Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                               cv_bridge::CvImage &color_marked) override
+    {
+      // The first time this is called, we have to initialize the targets with the size
+      // of the image passed in.
+      if (!pi_) {
+        pi_ = std::make_unique<CalibrateCameraProcessImageImpl>(logger_, cal_cxt_,
+                                                                cv::Size{gray->image.cols, gray->image.rows});
+      }
+
+      return pi_->process_image(gray, color_marked);
+    }
+
+    TransformWithCovariance solve_t_map_camera(const Observations &observations,
+                                               const CameraInfoInterface &camera_info,
+                                               const Map &map) override
+    {
+      return pi_ ? pi_->solve_t_map_camera(observations, camera_info, map) : TransformWithCovariance{};
+    }
+
+    std::string calibrate_camera_cmd(const std::string &cmd) override
+    {
+      std::string ret_str;
+
+      if (!pi_) {
+        return ret_str;
+      }
+
+      if (cmd.compare("cap0") == 0) {
+        ret_str = prep_image_capture(0);
+      } else if (cmd.compare("cap1") == 0) {
+        ret_str = prep_image_capture(1);
+      } else if (cmd.compare("cap2") == 0) {
+        ret_str = prep_image_capture(2);
+      } else if (cmd.compare("cap3") == 0) {
+        ret_str = prep_image_capture(3);
+      } else if (cmd.compare("cap4") == 0) {
+        ret_str = prep_image_capture(4);
+
+      } else if (cmd.compare("save_images") == 0) {
+      } else if (cmd.compare("load_images") == 0) {
+
+      } else if (cmd.compare("save_calibration") == 0) {
+      } else if (cmd.compare("load_calibration") == 0) {
+      }
+
+      return ret_str;
+    }
   };
 
   std::unique_ptr<CalibrateCameraInterface> make_calibrate_camera(rclcpp::Logger &logger,

@@ -101,7 +101,7 @@ namespace fiducial_vlam
     CalibrateContext cal_cxt_{};
     std::unique_ptr<CvFiducialMathInterface> fm_;
     std::unique_ptr<ProcessImageInterface> lc_pi_{};
-    std::unique_ptr<ProcessImageInterface> cc_pi_{};
+    std::unique_ptr<CalibrateCameraInterface> cc_pi_{};
 
     std::unique_ptr<Map> map_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
@@ -309,8 +309,9 @@ namespace fiducial_vlam
       // then just make an empty image pointer. The routines need to check
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImage color_marked;
-      if (cxt_.publish_image_marked_ &&
-          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
+//      if (cxt_.publish_image_marked_ &&
+//          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
+        if (cxt_.publish_image_marked_) {
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
         // data so I create another CvImage that is not const and steal the
@@ -418,7 +419,7 @@ namespace fiducial_vlam
       }
 
       // Publish an annotated image if requested. Even if there is no map.
-      if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
+      if (color_marked.image.dims != 0) {
         // The marking has been happening on the original message.
         // Republish it now.
         image_marked_pub_->publish(std::move(image_msg));
@@ -532,20 +533,20 @@ namespace fiducial_vlam
     void calibrate_timer_callback()
     {
       // Figure out if there is a command to process.
-      if (!cal_cxt_.cal_calibrate_camera_cmd_.empty()) {
-        std::string cmd{cal_cxt_.cal_calibrate_camera_cmd_};
+      if (!cal_cxt_.cal_cmd_.empty()) {
+        std::string cmd{cal_cxt_.cal_cmd_};
 
         // Reset the cmd_string in preparation for the next command.
-        CXT_MACRO_SET_PARAMETER((*this), cal_cxt_, cal_calibrate_camera_cmd, "");
+        CXT_MACRO_SET_PARAMETER((*this), cal_cxt_, cal_cmd, "");
 
         // If we are not in calibrate mode, then don't send the command.
         if (!cxt_.loc_calibrate_not_loocalize_) {
           RCLCPP_ERROR(get_logger(), "Cannot execute calibrate_camera_cmd when not in calibrate mode");
         } else {
-//          auto ret_str = cc_pi_->calibrate_camera_cmd(cmd);
-//          if (!ret_str.empty()) {
-//            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
-//          }
+          auto ret_str = cc_pi_->calibrate_camera_cmd(cmd);
+          if (!ret_str.empty()) {
+            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
+          }
         }
       }
     }
