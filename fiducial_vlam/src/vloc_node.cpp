@@ -281,7 +281,7 @@ namespace fiducial_vlam
 
       // Timer for publishing map info
       calibrate_timer_ = create_wall_timer(
-        std::chrono::milliseconds(100),
+        std::chrono::milliseconds(250),
         [this]() -> void
         {
           calibrate_timer_callback();
@@ -311,7 +311,7 @@ namespace fiducial_vlam
       cv_bridge::CvImage color_marked;
 //      if (cxt_.publish_image_marked_ &&
 //          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
-        if (cxt_.publish_image_marked_) {
+      if (cxt_.publish_image_marked_) {
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
         // data so I create another CvImage that is not const and steal the
@@ -541,12 +541,21 @@ namespace fiducial_vlam
 
         // If we are not in calibrate mode, then don't send the command.
         if (!cxt_.loc_calibrate_not_loocalize_) {
-          RCLCPP_ERROR(get_logger(), "Cannot execute calibrate_camera_cmd when not in calibrate mode");
+          RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
+
         } else {
-          auto ret_str = cc_pi_->calibrate_camera_cmd(cmd);
+          auto ret_str = cc_pi_->cal_cmd(cmd);
           if (!ret_str.empty()) {
-            RCLCPP_INFO(get_logger(), "calibrate_camera_cmd response: %s", ret_str.c_str());
+            RCLCPP_INFO(get_logger(), "cal_cmd '%s' response:\n%s", cmd.c_str(), ret_str.c_str());
           }
+        }
+      }
+
+      // Give the image processor some background time
+      if (cxt_.loc_calibrate_not_loocalize_) {
+        auto ret_str = cc_pi_->on_timer();
+        if (!ret_str.empty()) {
+          RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());
         }
       }
     }

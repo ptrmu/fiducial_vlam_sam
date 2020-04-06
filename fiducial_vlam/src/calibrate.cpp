@@ -6,10 +6,11 @@
 #include "fiducial_math.hpp"
 #include "observation.hpp"
 #include "opencv2/aruco.hpp"
-//#include "opencv2/aruco/charuco.hpp"
 #include "opencv2/calib3d.hpp"
-//#include "opencv2/imgcodecs.hpp"
+#include "opencv2/imgcodecs.hpp"
 #include "rclcpp/logging.hpp"
+#include "ros2_shared/string_printf.hpp"
+#include "task_thread.hpp"
 #include "transform_with_covariance.hpp"
 
 namespace fiducial_vlam
@@ -45,9 +46,9 @@ namespace fiducial_vlam
         p1 = currentMarker.ptr<cv::Point2f>(0)[(j + 1) % 4];
         cv::line(_image, p0, p1, borderColor, 1);
       }
-      // draw first corner mark
-      cv::rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
-                    currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
+//      // draw first corner mark
+//      cv::rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
+//                    currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
 
       // draw ID
 //      if (_ids.total() != 0) {
@@ -152,7 +153,7 @@ namespace fiducial_vlam
 
   struct ImageHolder
   {
-    std::shared_ptr<cv_bridge::CvImage> gray_;
+    cv::Mat gray_;
 
     std::vector<int> aruco_ids_;
     std::vector<std::vector<cv::Point2f> > aruco_corners_;
@@ -160,7 +161,7 @@ namespace fiducial_vlam
     cv::Mat homo_;
     BoardProjection board_projection_;
 
-    ImageHolder(std::shared_ptr<cv_bridge::CvImage> &gray,
+    ImageHolder(cv::Mat &gray,
                 std::vector<int> aruco_ids,
                 std::vector<std::vector<cv::Point2f> > aruco_corners,
                 cv::Mat homo,
@@ -186,6 +187,8 @@ namespace fiducial_vlam
   {
     cv::Size image_size_;
     std::vector<CalibrationImage> best_images_;
+
+    std::vector<std::shared_ptr<ImageHolder>> captured_images_{};
 
     static BoardProjection new_target(double board_width_per_height, const cv::Size &image_size,
                                       int x_alignment, float x_normalized, float width_normalized,
@@ -262,6 +265,16 @@ namespace fiducial_vlam
       return image_size_.height;
     }
 
+    std::vector<std::shared_ptr<ImageHolder>> &get_captured_images()
+    {
+      return captured_images_;
+    }
+
+    void capture_image(std::shared_ptr<ImageHolder> &image_holder)
+    {
+      captured_images_.emplace_back(image_holder);
+    }
+
     void compare_to_targets(std::shared_ptr<ImageHolder> &image_holder)
     {
       for (auto &best_image : best_images_) {
@@ -334,16 +347,19 @@ namespace fiducial_vlam
   class CalibrateCameraProcessImageImpl : public ProcessImageInterface
   {
     rclcpp::Logger &logger_;
+    const CalibrateContext &cal_cxt_;
     cv::Ptr<cv::aruco::DetectorParameters> detectorParams_;
     cv::Ptr<cv::aruco::Dictionary> dictionary_;
     CharucoboardConfig cbm_;
     BoardTargets board_targets_;
 
+    bool capture_next_image_{false};
+
   public:
     CalibrateCameraProcessImageImpl(rclcpp::Logger &logger,
                                     const CalibrateContext &cal_cxt,
                                     const cv::Size &image_size) :
-      logger_{logger},
+      logger_{logger}, cal_cxt_{cal_cxt},
       detectorParams_{cv::aruco::DetectorParameters::create()},
       dictionary_{cv::aruco::getPredefinedDictionary(
         cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt.cal_aruco_dictionary_id_))},
@@ -356,15 +372,38 @@ namespace fiducial_vlam
 //     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
 //     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
 //     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
-
-      // Use the new AprilTag 2 corner algorithm, much better but much slower
       detectorParams_->cornerRefinementMethod = cal_cxt.cal_cv4_corner_refinement_method_;
 #else
       // 0 = false
       // 1 = true
       detectorParameters->doCornerRefinement = cal_cxt.cal_cv3_do_corner_refinement_;
 #endif
+      RCLCPP_INFO(logger, "CalibrateCameraProcessImage created for %dx%d (wxh) images",
+                  image_size.width, image_size.height);
+    }
 
+    static std::unique_ptr<CalibrateCameraProcessImageImpl> load_images(rclcpp::Logger &logger,
+                                                                        const CalibrateContext &cal_cxt)
+    {
+      cv::FileStorage fs_header(std::string(cal_cxt.cal_images_file_name_).append(".yml"),
+                                cv::FileStorage::READ);
+
+      auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt,
+                                                                cv::Size{static_cast<int>( fs_header["width"]),
+                                                                         static_cast<int>(fs_header["height"])})};
+
+      cv::FileNode file_names = fs_header["imageNames"];
+      for (auto it = file_names.begin(); it != file_names.end(); ++it) {
+        std::string image_name;
+        (*it)["name"] >> image_name;
+
+        cv::Mat gray{cv::imread(image_name, cv::IMREAD_ANYCOLOR)};
+
+        auto image_holder = pi->new_image_holder(gray);
+        pi->board_targets_.capture_image(image_holder);
+      }
+
+      return pi;
     }
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
@@ -375,11 +414,16 @@ namespace fiducial_vlam
         return Observations{};
       }
 
-      auto image_holder = new_image_holder(gray);
+      auto image_holder = new_image_holder(gray->image);
 
 //      if (!image_holder->aruco_ids_.empty()) {
 //        board_targets_->compare_to_targets(image_holder);
 //      }
+
+      if (capture_next_image_) {
+        board_targets_.capture_image(image_holder);
+        capture_next_image_ = false;
+      }
 
       if (color_marked.image.dims != 0) {
 
@@ -391,7 +435,7 @@ namespace fiducial_vlam
         if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
           drawBoardCorners(color_marked.image, image_holder->board_projection_.ordered_board_corners_);
         }
-//
+
 //      mark_best_images(marked);
       }
       // Detect the markers in this image and create a list of
@@ -406,15 +450,57 @@ namespace fiducial_vlam
       return TransformWithCovariance{};
     }
 
+    std::string prep_image_capture()
+    {
+      capture_next_image_ = true;
+      return std::string("An image will be captured.");
+    }
+
+    std::string load_images()
+    {
+      return std::string{};
+    }
+
+    std::string save_images()
+    {
+      cv::FileStorage fs_header(std::string(cal_cxt_.cal_images_file_name_).append(".yml"),
+                                cv::FileStorage::WRITE);
+
+      fs_header << "width" << board_targets_.width()
+                << "height" << board_targets_.height()
+                << "imageNames" << "[";
+
+      auto captured_images = board_targets_.get_captured_images();
+      for (int i = 0; i < captured_images.size(); i += 1) {
+
+        auto image_file_name{ros2_shared::string_print::f("%s_%03d.png", cal_cxt_.cal_images_file_name_.c_str(), i)};
+        auto res = cv::imwrite(image_file_name, captured_images[i]->gray_);
+
+        fs_header << "{:" << "name" << image_file_name << "},";
+      }
+
+      fs_header << "]";
+      fs_header.release();
+      return std::string{};
+    }
+
+    std::string status()
+    {
+      return ros2_shared::string_print::f("# captured images:%d, w:%d, h:%d",
+                                          board_targets_.get_captured_images().size(),
+                                          board_targets_.width(),
+                                          board_targets_.height());
+    }
+
   private:
-    std::shared_ptr<ImageHolder> new_image_holder(std::shared_ptr<cv_bridge::CvImage> &gray)
+    std::shared_ptr<ImageHolder> new_image_holder(cv::Mat &gray)
     {
       std::vector<std::vector<cv::Point2f> > rejected;
 
       // detect markers
       std::vector<int> aruco_ids;
       std::vector<std::vector<cv::Point2f> > aruco_corners;
-      cv::aruco::detectMarkers(gray->image, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
+      cv::aruco::detectMarkers(gray, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
 
 //      // refind strategy to detect more markers
 //      if (cxt_.refind_strategy_) {
@@ -463,6 +549,47 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// CalibrateCameraWork class
+// ==============================================================================
+
+  class CalibrateCameraWork
+  {
+
+  };
+
+// ==============================================================================
+// CalibrateCameraTask class
+// ==============================================================================
+
+  class CalibrateCameraTask
+  {
+    const CalibrateContext &cal_cxt_;
+
+    task_thread::TaskThread<CalibrateCameraWork> task_thread_;
+
+  public:
+    CalibrateCameraTask(const CalibrateContext &cal_cxt) :
+      cal_cxt_{cal_cxt},
+      task_thread_{std::make_unique<CalibrateCameraWork>()}
+    {}
+
+    std::string check_completion()
+    {
+      return std::string{};
+    }
+
+    bool calibration_complete()
+    {
+      return false;
+    }
+
+    std::string save_calibration()
+    {
+      return std::string{};
+    }
+  };
+
+// ==============================================================================
 // CalibrateCameraImpl class
 // ==============================================================================
 
@@ -471,11 +598,7 @@ namespace fiducial_vlam
     rclcpp::Logger &logger_;
     const CalibrateContext &cal_cxt_;
     std::unique_ptr<CalibrateCameraProcessImageImpl> pi_{};
-
-    std::string prep_image_capture(int i)
-    {
-
-    }
+    std::unique_ptr<CalibrateCameraTask> cct_{};
 
   public:
     explicit CalibrateCameraImpl(rclcpp::Logger &logger,
@@ -504,7 +627,7 @@ namespace fiducial_vlam
       return pi_ ? pi_->solve_t_map_camera(observations, camera_info, map) : TransformWithCovariance{};
     }
 
-    std::string calibrate_camera_cmd(const std::string &cmd) override
+    std::string cal_cmd(const std::string &cmd) override
     {
       std::string ret_str;
 
@@ -512,25 +635,60 @@ namespace fiducial_vlam
         return ret_str;
       }
 
-      if (cmd.compare("cap0") == 0) {
-        ret_str = prep_image_capture(0);
-      } else if (cmd.compare("cap1") == 0) {
-        ret_str = prep_image_capture(1);
-      } else if (cmd.compare("cap2") == 0) {
-        ret_str = prep_image_capture(2);
-      } else if (cmd.compare("cap3") == 0) {
-        ret_str = prep_image_capture(3);
-      } else if (cmd.compare("cap4") == 0) {
-        ret_str = prep_image_capture(4);
+      if (cmd.compare("capture") == 0) {
+        ret_str = pi_->prep_image_capture();
 
       } else if (cmd.compare("save_images") == 0) {
+        ret_str = pi_->save_images();
+
       } else if (cmd.compare("load_images") == 0) {
+        pi_.reset(nullptr);
+        pi_ = CalibrateCameraProcessImageImpl::load_images(logger_, cal_cxt_);
+        ret_str = pi_->status();
+
+      } else if (cmd.compare("status") == 0) {
+        ret_str = pi_->status();
+
+      } else if (cmd.compare("calibrate") == 0) {
+        ret_str = do_calibrate();
 
       } else if (cmd.compare("save_calibration") == 0) {
-      } else if (cmd.compare("load_calibration") == 0) {
+        ret_str = do_save_calibration();
+
+      } else if (cmd.compare("reset") == 0) {
+        pi_.reset(nullptr);
+        cct_.reset(nullptr);
       }
 
       return ret_str;
+    }
+
+    std::string on_timer() override
+    {
+      return cct_ ? cct_->check_completion() : std::string{};
+    }
+
+  private:
+    std::string do_calibrate()
+    {
+      if (cct_) {
+        cct_.reset(nullptr);
+      }
+
+
+    }
+
+    std::string do_save_calibration()
+    {
+      if (!cct_) {
+        return std::string("No calibration available");
+      }
+
+      if (!cct_->calibration_complete()) {
+        return std::string("Calibration not complete");
+      }
+
+      return cct_->save_calibration();
     }
   };
 

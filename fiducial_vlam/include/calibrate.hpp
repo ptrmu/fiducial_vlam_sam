@@ -19,6 +19,7 @@ namespace fiducial_vlam
 
 #define CAL_ALL_PARAMS \
   CXT_MACRO_MEMBER(cal_compute_on_thread, int, 1)             /* Do heavy-duty computation on a thread. */\
+  CXT_MACRO_MEMBER(cal_images_file_name, std::string, "cal_img") /* Calibrate command. */\
   CXT_MACRO_MEMBER(cal_cmd, std::string, "")                  /* Calibrate command. */\
   CXT_MACRO_MEMBER(cal_aruco_dictionary_id, int, 5)           /* dictionary id  */ \
   CXT_MACRO_MEMBER(cal_squares_x, int, 12)                    /* number of squares in the x direction on the charuco board  */ \
@@ -44,7 +45,8 @@ namespace fiducial_vlam
   class CalibrateCameraInterface : public ProcessImageInterface
   {
   public:
-    virtual std::string calibrate_camera_cmd(const std::string &cmd) = 0;
+    virtual std::string cal_cmd(const std::string &cmd) = 0; //
+    virtual std::string on_timer() = 0; //
   };
 
   std::unique_ptr<CalibrateCameraInterface> make_calibrate_camera(rclcpp::Logger &logger,
