@@ -549,6 +549,15 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
+// CalibrateCameraResult class
+// ==============================================================================
+
+  class CalibrateCameraResult
+  {
+
+  };
+
+// ==============================================================================
 // CalibrateCameraWork class
 // ==============================================================================
 
@@ -564,8 +573,9 @@ namespace fiducial_vlam
   class CalibrateCameraTask
   {
     const CalibrateContext &cal_cxt_;
-
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
+    std::future<CalibrateCameraResult> calibrate_camera_future_{};
+    CalibrateCameraResult calibrate_camera_result{};
 
   public:
     CalibrateCameraTask(const CalibrateContext &cal_cxt) :
