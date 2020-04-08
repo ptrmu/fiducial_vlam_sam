@@ -45,6 +45,7 @@ endif ()
 
 # Find packages
 find_package(ament_cmake REQUIRED)
+find_package(camera_calibration_parsers REQUIRED)
 find_package(class_loader REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fiducial_vlam_msgs REQUIRED)
@@ -104,6 +105,7 @@ set(VLOC_NODE_SOURCES
   )
 
 set(VLOC_NODE_DEPS
+  camera_calibration_parsers
   class_loader
   cv_bridge
   fiducial_vlam_msgs
