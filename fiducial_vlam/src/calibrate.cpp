@@ -492,6 +492,11 @@ namespace fiducial_vlam
                                           board_targets_.height());
     }
 
+    std::vector<std::shared_ptr<ImageHolder>> &get_captured_images()
+    {
+      return board_targets_.get_captured_images();
+    }
+
   private:
     std::shared_ptr<ImageHolder> new_image_holder(cv::Mat &gray)
     {
@@ -554,7 +559,10 @@ namespace fiducial_vlam
 
   class CalibrateCameraResult
   {
-
+  public:
+    bool valid_{false};
+    cv::Matx33d camera_matrix_{};
+    cv::Matx<double, 5, 1> dist_coeffs_{};
   };
 
 // ==============================================================================
@@ -563,7 +571,19 @@ namespace fiducial_vlam
 
   class CalibrateCameraWork
   {
+    std::vector<std::shared_ptr<ImageHolder>> captured_images_;
 
+  public:
+    CalibrateCameraWork(std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
+      captured_images_{captured_images}
+    {}
+
+    CalibrateCameraResult solve_calibration()
+    {
+      CalibrateCameraResult res;
+      res.valid_ = true;
+      return res;
+    }
   };
 
 // ==============================================================================
@@ -575,27 +595,65 @@ namespace fiducial_vlam
     const CalibrateContext &cal_cxt_;
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
     std::future<CalibrateCameraResult> calibrate_camera_future_{};
-    CalibrateCameraResult calibrate_camera_result{};
+    CalibrateCameraResult calibrate_camera_result_{};
 
   public:
-    CalibrateCameraTask(const CalibrateContext &cal_cxt) :
+    CalibrateCameraTask(const CalibrateContext &cal_cxt,
+                        std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
       cal_cxt_{cal_cxt},
-      task_thread_{std::make_unique<CalibrateCameraWork>()}
+      task_thread_{std::make_unique<CalibrateCameraWork>(captured_images)}
     {}
 
     std::string check_completion()
     {
-      return std::string{};
+      // If the results are valid, then the useer has already been notified
+      if (calibrate_camera_result_.valid_) {
+        return std::string{};
+      }
+
+      // If the future is valid_, then the camera calibration task has been queued and we should check
+      // to see if it is complete
+      if (calibrate_camera_future_.valid()) {
+
+        // Is it complete?
+        bool complete = calibrate_camera_future_.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+        if (!complete) {
+          return std::string{};
+        }
+
+        calibrate_camera_result_ = calibrate_camera_future_.get();
+        return std::string("Calibrate camera task complete.");
+      }
+
+      // The calibration task has not been queued, so queue it up.
+      std::promise<CalibrateCameraResult> solve_map_promise{};
+      calibrate_camera_future_ = solve_map_promise.get_future();
+
+      auto func = [promise = std::move(solve_map_promise)](CalibrateCameraWork &ccw) mutable -> void
+      {
+        promise.set_value(ccw.solve_calibration());
+      };
+
+      task_thread_.push(std::move(func));
+
+      return std::string("Calibrate camera task queued.");
     }
 
     bool calibration_complete()
     {
-      return false;
+      return calibrate_camera_result_.valid_;
     }
 
     std::string save_calibration()
     {
-      return std::string{};
+      return std::string{""};
+    }
+
+    std::string status()
+    {
+      return ros2_shared::string_print::f("CalibrateCameraTask status: %s",
+                                          calibrate_camera_result_.valid_ ? "done" :
+                                          calibrate_camera_future_.valid() ? "working" : "pending");
     }
   };
 
@@ -641,26 +699,35 @@ namespace fiducial_vlam
     {
       std::string ret_str;
 
-      if (!pi_) {
-        return ret_str;
-      }
-
       if (cmd.compare("capture") == 0) {
-        ret_str = pi_->prep_image_capture();
+        if (pi_) {
+          ret_str = pi_->prep_image_capture();
+        }
 
       } else if (cmd.compare("save_images") == 0) {
-        ret_str = pi_->save_images();
+        if (pi_) {
+          ret_str = pi_->save_images();
+        }
+
+      } else if (cmd.compare("status") == 0) {
+        if (pi_) {
+          ret_str = pi_->status();
+          if (cct_) {
+            ret_str.append("\n");
+          }
+        }
+        if (cct_) {
+          ret_str.append(cct_->status());
+        }
 
       } else if (cmd.compare("load_images") == 0) {
         pi_.reset(nullptr);
         pi_ = CalibrateCameraProcessImageImpl::load_images(logger_, cal_cxt_);
         ret_str = pi_->status();
 
-      } else if (cmd.compare("status") == 0) {
-        ret_str = pi_->status();
-
       } else if (cmd.compare("calibrate") == 0) {
-        ret_str = do_calibrate();
+        cct_.reset(nullptr);
+        cct_ = std::make_unique<CalibrateCameraTask>(cal_cxt_, pi_->get_captured_images());
 
       } else if (cmd.compare("save_calibration") == 0) {
         ret_str = do_save_calibration();
@@ -679,14 +746,6 @@ namespace fiducial_vlam
     }
 
   private:
-    std::string do_calibrate()
-    {
-      if (cct_) {
-        cct_.reset(nullptr);
-      }
-
-
-    }
 
     std::string do_save_calibration()
     {
