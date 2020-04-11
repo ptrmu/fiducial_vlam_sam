@@ -112,13 +112,23 @@ namespace fiducial_vlam
 
     // A junction is the point where two black squares touch. On a board, there
     // are (squares_x - 1) * (squares_y - 1) junctions.
-    PointFFacade to_junction_location(JunctionId junction_id) const
+    SquareAddress junction_id_to_square_address(JunctionId junction_id) const
     {
       assert(junction_id >= 0 && junction_id < max_junction_id_);
       auto x(junction_id % squares_x_m_1_ + 1);
       auto y(junction_id / squares_x_m_1_ + 1);
-      return to_square_point(SquareAddress(x, y));
-    }//
+      return SquareAddress(x, y);
+    }
+
+    SquareId junction_id_to_square_id(JunctionId junction_id) const
+    {
+
+    }
+
+    PointFFacade junction_id_to_junction_location(JunctionId junction_id) const
+    {
+      return to_square_point(junction_id_to_square_address(junction_id));
+    }
 
     PointFBoard to_point_f_board(const PointFFacade &point_f_facade) const
     {
@@ -175,7 +185,7 @@ namespace fiducial_vlam
     CharucoboardConfig(std::uint64_t squares_x, std::uint64_t squares_y, double square_length,
                        bool upper_left_white_not_black, double marker_length) :
       CheckerboardConfig{squares_x, squares_y, square_length},
-      upper_left_white_not_black_(upper_left_white_not_black ? 1 : 0),
+      upper_left_white_not_black_(upper_left_white_not_black ? 1U : 0),
       marker_length_{marker_length},
       offset_to_aruco_{(square_length - marker_length) / 2},
       squares_x_odd_{squares_x & 1U},
@@ -206,6 +216,22 @@ namespace fiducial_vlam
       return to_square_point(SquareAddress(ix, iy)).array() + square_length_half_;
     }//
 
+    // returns true if this square address holds an aruco marker
+    bool is_aruco_square_adddress(SquareAddress square_address)
+    {
+      std::uint64_t odd_col = square_address.x() & 1;
+      std::uint64_t odd_row = square_address.y() & 1;
+      return (upper_left_white_not_black_ ^ odd_row ^ odd_col) != 0;
+    }
+
+    ArucoId to_aruco_id(SquareAddress square_address)
+    {
+      assert(is_aruco_square_adddress(square_address));
+      std::uint64_t y_group = square_address.y() / 2;
+      std::uint64_t odd_row = square_address.y() % 2;
+      return y_group * squares_x_ + (odd_row * arucos_on_even_row_) + square_address.x() / 2;
+    }
+
     // Returns the location of the corners relative to the center of the aruco marker,
     // The corners of an aruco marker are always stored moving clockwise (looking at
     // the marker) around the marker. If looking at the board with the origin at the
@@ -235,6 +261,16 @@ namespace fiducial_vlam
       temp_corners_f_facade.row(0) = temp_corners_f_facade.row(0).array() - board_width_half_;
       temp_corners_f_facade.row(1) = -(temp_corners_f_facade.row(1).array() - board_height_half_);
       return (CornerPointsFBoard{} << temp_corners_f_facade, gtsam::Matrix14{}.setZero()).finished();
+    }
+
+    std::pair<ArucoId, ArucoId> get_adjacent_arucos(JunctionId junction_id)
+    {
+      auto junction_square_address = junction_id_to_square_address(junction_id);
+      auto is_junction_aruco = is_aruco_square_adddress(junction_square_address) ? 1U : 0;
+      return std::pair<ArucoId, ArucoId>(
+        to_aruco_id(SquareAddress(junction_square_address.x() - is_junction_aruco, junction_square_address.y() - 1)),
+        to_aruco_id(SquareAddress(junction_square_address.x() - 1 + is_junction_aruco, junction_square_address.y()))
+      );
     }
   };
 }

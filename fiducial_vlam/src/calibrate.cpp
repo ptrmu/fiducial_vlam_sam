@@ -13,6 +13,8 @@
 #include "task_thread.hpp"
 #include "transform_with_covariance.hpp"
 
+#include <map>
+
 namespace fiducial_vlam
 {
 
@@ -572,17 +574,65 @@ namespace fiducial_vlam
   class CalibrateCameraWork
   {
     std::vector<std::shared_ptr<ImageHolder>> captured_images_;
+    CharucoboardConfig cbm_;
 
   public:
-    CalibrateCameraWork(std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
-      captured_images_{captured_images}
+    CalibrateCameraWork(const CalibrateContext &cal_cxt,
+                        std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
+      captured_images_{captured_images},
+      cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
+           cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_)
     {}
 
     CalibrateCameraResult solve_calibration()
     {
+      // Loop over the images finding the checkerboard junctions
+      for (auto &captured_iamge : captured_images_) {
+
+        std::vector<std::vector<cv::Vec3f>> junctions_f_board;
+        std::vector<std::vector<cv::Vec2f>> junctions_f_image;
+        interpolate_junction_locations(captured_iamge,
+                                       junctions_f_board,
+                                       junctions_f_image);
+      }
+
       CalibrateCameraResult res;
       res.valid_ = true;
       return res;
+    }
+
+  private:
+    void interpolate_junction_locations(std::shared_ptr<ImageHolder> captured_image,
+                                        std::vector<std::vector<cv::Vec3f>> &junctions_f_board,
+                                        std::vector<std::vector<cv::Vec2f>> &junctions_f_image)
+    {
+
+      auto markers_homography = calculate_markers_homography(captured_image);
+
+      int i = 0;
+
+    }
+
+    std::map<ArucoId, cv::Mat> calculate_markers_homography(std::shared_ptr<ImageHolder> captured_image)
+    {
+      std::map<ArucoId, cv::Mat> markers_homography{};
+
+      for (std::size_t idx = 0; idx < captured_image->aruco_ids_.size(); idx += 1) {
+        ArucoId aruco_id(captured_image->aruco_ids_[idx]);
+        auto &aruco_corners_f_image(captured_image->aruco_corners_[idx]);
+
+        std::vector<cv::Point2f> aruco_corners_f_facad{};
+        auto const &acff(cbm_.to_aruco_corners_f_facade(aruco_id));
+        for (std::size_t c = 0; c < 4; c += 1) {
+          aruco_corners_f_facad.emplace_back(cv::Point2f(acff(0, c), acff(1, c)));
+        }
+
+        auto homo = findHomography(aruco_corners_f_facad, aruco_corners_f_image);
+
+        markers_homography.emplace(aruco_id, homo);
+      }
+
+      return markers_homography;
     }
   };
 
@@ -592,7 +642,6 @@ namespace fiducial_vlam
 
   class CalibrateCameraTask
   {
-    const CalibrateContext &cal_cxt_;
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
     std::future<CalibrateCameraResult> calibrate_camera_future_{};
     CalibrateCameraResult calibrate_camera_result_{};
@@ -600,8 +649,7 @@ namespace fiducial_vlam
   public:
     CalibrateCameraTask(const CalibrateContext &cal_cxt,
                         std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
-      cal_cxt_{cal_cxt},
-      task_thread_{std::make_unique<CalibrateCameraWork>(captured_images)}
+      task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images)}
     {}
 
     std::string check_completion()
