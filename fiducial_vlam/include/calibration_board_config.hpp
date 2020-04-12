@@ -263,14 +263,23 @@ namespace fiducial_vlam
       return (CornerPointsFBoard{} << temp_corners_f_facade, gtsam::Matrix14{}.setZero()).finished();
     }
 
-    std::pair<ArucoId, ArucoId> get_adjacent_arucos(JunctionId junction_id)
+    std::array<ArucoId, 2> get_adjacent_arucos(JunctionId junction_id)
     {
       auto junction_square_address = junction_id_to_square_address(junction_id);
-      auto is_junction_aruco = is_aruco_square_adddress(junction_square_address) ? 1U : 0;
-      return std::pair<ArucoId, ArucoId>(
+      auto is_junction_aruco = is_aruco_square_adddress(junction_square_address) ? 1 : 0;
+      return std::array<ArucoId, 2>{
         to_aruco_id(SquareAddress(junction_square_address.x() - is_junction_aruco, junction_square_address.y() - 1)),
         to_aruco_id(SquareAddress(junction_square_address.x() - 1 + is_junction_aruco, junction_square_address.y()))
-      );
+      };
+    }
+
+    std::array<int, 2> get_adjacent_arucos_closest_corner(JunctionId junction_id)
+    {
+      auto is_junction_aruco = is_aruco_square_adddress(junction_id_to_square_address(junction_id)) ? 1 : 0;
+      return std::array<int, 2>{
+        3 - is_junction_aruco,
+        1 - is_junction_aruco
+      };
     }
   };
 }

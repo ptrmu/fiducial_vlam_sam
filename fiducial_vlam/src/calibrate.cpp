@@ -606,11 +606,58 @@ namespace fiducial_vlam
                                         std::vector<std::vector<cv::Vec3f>> &junctions_f_board,
                                         std::vector<std::vector<cv::Vec2f>> &junctions_f_image)
     {
+      std::vector<cv::Vec3f> js_f_board{};
+      std::vector<cv::Vec2f> js_f_image{};
 
+      // Calculate the local homography for each found marker and build a map indexed by
+      // the ArucoId.
       auto markers_homography = calculate_markers_homography(captured_image);
 
-      int i = 0;
+      // Walk over all the junctions on the board.
+      for (JunctionId junction_id = 0; junction_id < cbm_.max_junction_id_; junction_id += 1) {
 
+        // Get the two adjacent aruco ids.
+        auto adjacent_aruco_ids = cbm_.get_adjacent_arucos(junction_id);
+
+        // Figure out where this junction is on the facade.
+        auto junction_location = cbm_.junction_id_to_junction_location(junction_id);
+        std::vector<cv::Point2f> junction_f_facade{cv::Point2f(junction_location(0), junction_location(1))};
+
+        // For both of the adjacent aruco markers, check that they have been detected, and
+        // use the local marker homography to figure out where the junction should be in the
+        // image.
+        std::vector<cv::Point2f> junctions_f_image{};
+        for (std::size_t i = 0; i < adjacent_aruco_ids.size(); i += 1) {
+
+          // Find the local homography for this marker
+          auto find_ptr = markers_homography.find(adjacent_aruco_ids[i]);
+          if (find_ptr != markers_homography.end()) {
+
+            std::vector<cv::Point2f> junction_f_image;
+            cv::perspectiveTransform(junction_f_facade, junction_f_image, find_ptr->second);
+
+            junctions_f_image.emplace_back(junction_f_image[0]);
+          }
+        }
+
+        // If neither of the markers was found, then continue to the next
+        // junction
+        if (junctions_f_image.size() < 1) {
+          continue;
+        }
+
+        // Average the junction image location if both of the markers have been detected.
+        if (junctions_f_image.size() > 1) {
+          junctions_f_image[0] = (junctions_f_image[0] + junctions_f_image[1]) / 2.0;
+        }
+
+        // Add these junction locations (f_image, f_board) to the list
+        js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
+        js_f_image.emplace_back(junctions_f_image[0]);
+      }
+
+      junctions_f_board.emplace_back(std::move(js_f_board));
+      junctions_f_image.emplace_back(std::move(js_f_image));
     }
 
     std::map<ArucoId, cv::Mat> calculate_markers_homography(std::shared_ptr<ImageHolder> captured_image)
@@ -621,13 +668,13 @@ namespace fiducial_vlam
         ArucoId aruco_id(captured_image->aruco_ids_[idx]);
         auto &aruco_corners_f_image(captured_image->aruco_corners_[idx]);
 
-        std::vector<cv::Point2f> aruco_corners_f_facad{};
+        std::vector<cv::Point2f> aruco_corners_f_facade{};
         auto const &acff(cbm_.to_aruco_corners_f_facade(aruco_id));
         for (std::size_t c = 0; c < 4; c += 1) {
-          aruco_corners_f_facad.emplace_back(cv::Point2f(acff(0, c), acff(1, c)));
+          aruco_corners_f_facade.emplace_back(cv::Point2f(acff(0, c), acff(1, c)));
         }
 
-        auto homo = findHomography(aruco_corners_f_facad, aruco_corners_f_image);
+        auto homo = findHomography(aruco_corners_f_facade, aruco_corners_f_image);
 
         markers_homography.emplace(aruco_id, homo);
       }
