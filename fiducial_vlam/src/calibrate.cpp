@@ -576,6 +576,8 @@ namespace fiducial_vlam
     std::vector<std::shared_ptr<ImageHolder>> captured_images_;
     CharucoboardConfig cbm_;
 
+    using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
+
   public:
     CalibrateCameraWork(const CalibrateContext &cal_cxt,
                         std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
@@ -618,6 +620,7 @@ namespace fiducial_vlam
 
         // Get the two adjacent aruco ids.
         auto adjacent_aruco_ids = cbm_.get_adjacent_arucos(junction_id);
+        auto adjacent_aruco_closest_corner_idx = cbm_.get_adjacent_arucos_closest_corner(junction_id);
 
         // Figure out where this junction is on the facade.
         auto junction_location = cbm_.junction_id_to_junction_location(junction_id);
@@ -627,16 +630,23 @@ namespace fiducial_vlam
         // use the local marker homography to figure out where the junction should be in the
         // image.
         std::vector<cv::Point2f> junctions_f_image{};
+        std::vector<cv::Point2f> closest_corners_f_image{};
         for (std::size_t i = 0; i < adjacent_aruco_ids.size(); i += 1) {
 
           // Find the local homography for this marker
           auto find_ptr = markers_homography.find(adjacent_aruco_ids[i]);
           if (find_ptr != markers_homography.end()) {
 
+            // Map the junction location on the board to a the junction location in the image using the
+            // homography transformation of the adjacent aruco marker.
             std::vector<cv::Point2f> junction_f_image;
-            cv::perspectiveTransform(junction_f_facade, junction_f_image, find_ptr->second);
-
+            cv::perspectiveTransform(junction_f_facade, junction_f_image, std::get<0>(find_ptr->second));
             junctions_f_image.emplace_back(junction_f_image[0]);
+
+            // Pick out the location of the corner of this marker that is closest to the
+            // junction.
+            auto &aruco_corners = captured_image->aruco_corners_[std::get<1>(find_ptr->second)];
+            closest_corners_f_image.emplace_back(aruco_corners[adjacent_aruco_closest_corner_idx[i]]);
           }
         }
 
@@ -651,6 +661,18 @@ namespace fiducial_vlam
           junctions_f_image[0] = (junctions_f_image[0] + junctions_f_image[1]) / 2.0;
         }
 
+        // We want to figure a custom window size for doing the sub-pixel corner refinement.
+        // This is done by using a window size that is smaller than the distance from the
+        // junction to the closest aruco corner.
+
+        // Find the junction image location with sub pixel accuracy.
+        std::vector<cv::Point2f> in{junctions_f_image[0]};
+//        cv::cornerSubPix(captured_image->gray_, in, winSize, Size(),
+//                     TermCriteria(TermCriteria::MAX_ITER | TermCriteria::EPS,
+//                                  params->cornerRefinementMaxIterations,
+//                                  params->cornerRefinementMinAccuracy));
+
+
         // Add these junction locations (f_image, f_board) to the list
         js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
         js_f_image.emplace_back(junctions_f_image[0]);
@@ -660,9 +682,9 @@ namespace fiducial_vlam
       junctions_f_image.emplace_back(std::move(js_f_image));
     }
 
-    std::map<ArucoId, cv::Mat> calculate_markers_homography(std::shared_ptr<ImageHolder> captured_image)
+    MarkersHomography calculate_markers_homography(std::shared_ptr<ImageHolder> captured_image)
     {
-      std::map<ArucoId, cv::Mat> markers_homography{};
+      MarkersHomography markers_homography{};
 
       for (std::size_t idx = 0; idx < captured_image->aruco_ids_.size(); idx += 1) {
         ArucoId aruco_id(captured_image->aruco_ids_[idx]);
@@ -676,7 +698,7 @@ namespace fiducial_vlam
 
         auto homo = findHomography(aruco_corners_f_facade, aruco_corners_f_image);
 
-        markers_homography.emplace(aruco_id, homo);
+        markers_homography.emplace(aruco_id, std::tuple<cv::Mat, std::size_t>{homo, idx});
       }
 
       return markers_homography;
