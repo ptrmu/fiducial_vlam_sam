@@ -629,7 +629,7 @@ namespace fiducial_vlam
         // For both of the adjacent aruco markers, check that they have been detected, and
         // use the local marker homography to figure out where the junction should be in the
         // image.
-        std::vector<cv::Point2f> junctions_f_image{};
+        std::vector<cv::Point2f> local_junctions_f_image{};
         std::vector<cv::Point2f> closest_corners_f_image{};
         for (std::size_t i = 0; i < adjacent_aruco_ids.size(); i += 1) {
 
@@ -641,7 +641,7 @@ namespace fiducial_vlam
             // homography transformation of the adjacent aruco marker.
             std::vector<cv::Point2f> junction_f_image;
             cv::perspectiveTransform(junction_f_facade, junction_f_image, std::get<0>(find_ptr->second));
-            junctions_f_image.emplace_back(junction_f_image[0]);
+            local_junctions_f_image.emplace_back(junction_f_image[0]);
 
             // Pick out the location of the corner of this marker that is closest to the
             // junction.
@@ -652,21 +652,22 @@ namespace fiducial_vlam
 
         // If neither of the markers was found, then continue to the next
         // junction
-        if (junctions_f_image.size() < 1) {
+        if (local_junctions_f_image.size() < 1) {
           continue;
         }
 
         // Average the junction image location if both of the markers have been detected.
-        if (junctions_f_image.size() > 1) {
-          junctions_f_image[0] = (junctions_f_image[0] + junctions_f_image[1]) / 2.0;
+        if (local_junctions_f_image.size() > 1) {
+          local_junctions_f_image[0] = (local_junctions_f_image[0] + local_junctions_f_image[1]) / 2.0;
         }
 
         // We want to figure a custom window size for doing the sub-pixel corner refinement.
         // This is done by using a window size that is smaller than the distance from the
         // junction to the closest aruco corner.
+        auto winSize = calculate_sub_pix_win_size(local_junctions_f_image[0], closest_corners_f_image);
 
         // Find the junction image location with sub pixel accuracy.
-        std::vector<cv::Point2f> in{junctions_f_image[0]};
+        std::vector<cv::Point2f> in{local_junctions_f_image[0]};
 //        cv::cornerSubPix(captured_image->gray_, in, winSize, Size(),
 //                     TermCriteria(TermCriteria::MAX_ITER | TermCriteria::EPS,
 //                                  params->cornerRefinementMaxIterations,
@@ -675,7 +676,7 @@ namespace fiducial_vlam
 
         // Add these junction locations (f_image, f_board) to the list
         js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
-        js_f_image.emplace_back(junctions_f_image[0]);
+        js_f_image.emplace_back(local_junctions_f_image[0]);
       }
 
       junctions_f_board.emplace_back(std::move(js_f_board));
@@ -702,6 +703,21 @@ namespace fiducial_vlam
       }
 
       return markers_homography;
+    }
+
+    cv::Size calculate_sub_pix_win_size(cv::Point2f &mean_junction_f_image,
+                                        std::vector<cv::Point2f> &closest_corners_f_image)
+    {
+      auto size2f{cv::Size2f(std::abs(mean_junction_f_image.x - closest_corners_f_image[0].x),
+                             std::abs(mean_junction_f_image.y - closest_corners_f_image[0].y))};
+      if (closest_corners_f_image.size() > 1) {
+        auto size2f1{cv::Size2f(std::abs(mean_junction_f_image.x - closest_corners_f_image[1].x),
+                                std::abs(mean_junction_f_image.y - closest_corners_f_image[1].y))};
+        size2f = cv::Size2f(std::min(size2f.width, size2f1.width),
+                            std::min(size2f.height, size2f1.height));
+      }
+      return cv::Size{static_cast<int>(std::floor(size2f.width)),
+                      static_cast<int>(std::floor(size2f.height))};
     }
   };
 
