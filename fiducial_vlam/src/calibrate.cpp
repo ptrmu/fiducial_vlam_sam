@@ -588,17 +588,32 @@ namespace fiducial_vlam
 
     CalibrateCameraResult solve_calibration()
     {
+      std::vector<std::vector<cv::Vec3f>> junctions_f_board;
+      std::vector<std::vector<cv::Vec2f>> junctions_f_image;
+
       // Loop over the images finding the checkerboard junctions
       for (auto &captured_iamge : captured_images_) {
-
-        std::vector<std::vector<cv::Vec3f>> junctions_f_board;
-        std::vector<std::vector<cv::Vec2f>> junctions_f_image;
         interpolate_junction_locations(captured_iamge,
                                        junctions_f_board,
                                        junctions_f_image);
       }
 
+      cv::Mat rvecs;
+      cv::Mat tvecs;
+      cv::Mat stdDeviationsIntrinsics;
+      cv::Mat stdDeviationsExtrinsics;
+      cv::Mat perViewErrors;
+
       CalibrateCameraResult res;
+
+      auto err = calibrateCamera(junctions_f_board, junctions_f_image,
+                                 cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
+                                 res.camera_matrix_, res.dist_coeffs_,
+                                 rvecs, tvecs,
+                                 stdDeviationsIntrinsics,
+                                 stdDeviationsExtrinsics,
+                                 perViewErrors);
+
       res.valid_ = true;
       return res;
     }
@@ -667,12 +682,10 @@ namespace fiducial_vlam
         auto winSize = calculate_sub_pix_win_size(local_junctions_f_image[0], closest_corners_f_image);
 
         // Find the junction image location with sub pixel accuracy.
-        std::vector<cv::Point2f> in{local_junctions_f_image[0]};
-//        cv::cornerSubPix(captured_image->gray_, in, winSize, Size(),
-//                     TermCriteria(TermCriteria::MAX_ITER | TermCriteria::EPS,
-//                                  params->cornerRefinementMaxIterations,
-//                                  params->cornerRefinementMinAccuracy));
-
+        local_junctions_f_image.resize(1);
+        cv::cornerSubPix(captured_image->gray_, local_junctions_f_image, winSize, cv::Size(),
+                         cv::TermCriteria(cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS,
+                                          30, DBL_EPSILON));
 
         // Add these junction locations (f_image, f_board) to the list
         js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
@@ -705,19 +718,35 @@ namespace fiducial_vlam
       return markers_homography;
     }
 
+    // Figure out how big to make the window that will be used for the sub-pixel refinement to find
+    // the image location at the junction of two black squares on the configuration target.
+    // As input to the routine, we have the image coordinates where we think the junction will
+    // be and the image coordinates of the closest corners of the aruco markers. We want the window
+    // size as large as possible be it can't include the aruco corner because the sub-pixel algorithm
+    // might lock on to the aruco corner instead of the black square junction.
     cv::Size calculate_sub_pix_win_size(cv::Point2f &mean_junction_f_image,
                                         std::vector<cv::Point2f> &closest_corners_f_image)
     {
+      // Figure out the window using one of the aruco corners.
       auto size2f{cv::Size2f(std::abs(mean_junction_f_image.x - closest_corners_f_image[0].x),
                              std::abs(mean_junction_f_image.y - closest_corners_f_image[0].y))};
+
+      // If two aruco markers were found, then pick the smallest window.
       if (closest_corners_f_image.size() > 1) {
         auto size2f1{cv::Size2f(std::abs(mean_junction_f_image.x - closest_corners_f_image[1].x),
                                 std::abs(mean_junction_f_image.y - closest_corners_f_image[1].y))};
         size2f = cv::Size2f(std::min(size2f.width, size2f1.width),
                             std::min(size2f.height, size2f1.height));
       }
-      return cv::Size{static_cast<int>(std::floor(size2f.width)),
-                      static_cast<int>(std::floor(size2f.height))};
+
+      cv::Size win_size{static_cast<int>(std::floor(size2f.width)),
+                        static_cast<int>(std::floor(size2f.height))};
+
+      // do some sanity checks.
+      win_size = cv::Size{win_size.width - 2, win_size.height - 2}; // remove 2 pixels for safety
+      win_size = cv::Size{std::min(10, std::max(1, win_size.width)),  // min: 1, max: 10
+                          std::min(10, std::max(1, win_size.height))};
+      return win_size;
     }
   };
 
@@ -860,7 +889,12 @@ namespace fiducial_vlam
 
       } else if (cmd.compare("calibrate") == 0) {
         cct_.reset(nullptr);
-        cct_ = std::make_unique<CalibrateCameraTask>(cal_cxt_, pi_->get_captured_images());
+        if (pi_ && pi_->get_captured_images().size() > 0) {
+          cct_ = std::make_unique<CalibrateCameraTask>(cal_cxt_, pi_->get_captured_images());
+          ret_str = std::string("Calibration queued.");
+        } else {
+          ret_str = std::string("Cannot calibrate with zero images.");
+        }
 
       } else if (cmd.compare("save_calibration") == 0) {
         ret_str = do_save_calibration();
