@@ -92,7 +92,8 @@ namespace fiducial_vlam
     }
   }
 
-  static void drawBoardCorners(cv::InputOutputArray image, std::vector<cv::Point2f> &board_corners,
+  static void drawBoardCorners(cv::InputOutputArray image,
+                               const std::vector<cv::Point2f> &board_corners,
                                cv::Scalar borderColor = cv::Scalar(0, 0, 255))
   {
     for (int j = 0; j < 4; j++) {
@@ -135,7 +136,7 @@ namespace fiducial_vlam
   struct BoardProjection
   {
     // Hold the image coordinates of the four corners of the board location.
-    std::vector<cv::Point2f> ordered_board_corners_;
+    const std::vector<cv::Point2f> ordered_board_corners_;
 
     BoardProjection(std::vector<cv::Point2f> &&ordered_board_corners) :
       ordered_board_corners_{ordered_board_corners}
@@ -438,8 +439,13 @@ namespace fiducial_vlam
           drawBoardCorners(color_marked.image, image_holder->board_projection_.ordered_board_corners_);
         }
 
-//      mark_best_images(marked);
+        for (auto &captured_image : board_targets_.get_captured_images()) {
+          drawBoardCorners(color_marked.image,
+                           captured_image->board_projection_.ordered_board_corners_,
+                           cv::Scalar(255, 0, 0));
+        }
       }
+
       // Detect the markers in this image and create a list of
       // observations.
       return Observations{};
