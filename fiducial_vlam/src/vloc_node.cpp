@@ -175,7 +175,7 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cal_cxt_, n, t, d)
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "Calibrate Parameters", CAL_ALL_PARAMS)
 
-      // Check that all command line parameters are defined
+      // Check that all command line parameters are registered
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
       CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS CAL_ALL_PARAMS)

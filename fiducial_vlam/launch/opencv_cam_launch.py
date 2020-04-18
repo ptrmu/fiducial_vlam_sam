@@ -6,8 +6,23 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 
 
-# Full teleop launch: driver, base, joystick, etc.
+opencv_zed_params = [{
+    'file': False,
+    'index': 0,
+    'half_image': 1,
+    'vcp_property0': 'CAP_PROP_FRAME_WIDTH', 'vcp_value0': 2560.,
+    'vcp_property1': 'CAP_PROP_FRAME_HEIGHT', 'vcp_value1': 720.,
+}]
 
+
+opencv_lifecam_params = [{
+    'file': False,
+    'index': 0,
+    'vcp_property0': 'CAP_PROP_FRAME_WIDTH', 'vcp_value0': 1280.,
+    'vcp_property1': 'CAP_PROP_FRAME_HEIGHT', 'vcp_value1': 720.,
+    'vcp_property2': 'CAP_PROP_AUTOFOCUS', 'vcp_value2': 0.,
+    'vcp_property3': 'CAP_PROP_FOCUS', 'vcp_value3': 1.0,
+}]
 
 def generate_launch_description():
     return LaunchDescription([
@@ -15,11 +30,7 @@ def generate_launch_description():
         # ExecuteProcess(cmd=['rviz2'], output='screen'),
 
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
-             node_name='opencv_cam', parameters=[{
-                'file': False,
-                # 'filename': '/home/peter/VID_20191219_210200.mp4',
-                'fps': 15,
-            }]),
+             node_name='opencv_cam', parameters=opencv_lifecam_params),
 
         # Node(package='charuco_ros2', node_executable='charuco_ros2', output='screen'),
     ])
