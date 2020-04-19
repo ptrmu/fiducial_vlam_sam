@@ -102,6 +102,7 @@ set(VLOC_NODE_SOURCES
   src/vloc_node.cpp
   src/slam_task.cpp
   src/calibrate.cpp
+  src/calibrate_capture_stationary.cpp
   )
 
 set(VLOC_NODE_DEPS
@@ -133,7 +134,8 @@ set(node_plugins "${node_plugins}fiducial_vlam::VlocNode;$<TARGET_FILE:vloc_node
 
 add_executable(vloc_main
   src/vloc_main.cpp
-  ${VLOC_NODE_SOURCES})
+  ${VLOC_NODE_SOURCES} 
+  )
 
 ament_target_dependencies(vloc_main
   ${VLOC_NODE_DEPS})

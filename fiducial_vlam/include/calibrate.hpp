@@ -13,6 +13,8 @@ namespace rclcpp
 namespace fiducial_vlam
 {
 
+  class BoardProjection;
+
 // ==============================================================================
 // CalibrateContext class
 // ==============================================================================
@@ -51,6 +53,21 @@ namespace fiducial_vlam
 
   std::unique_ptr<CalibrateCameraInterface> make_calibrate_camera(rclcpp::Logger &logger,
                                                                   const CalibrateContext &cxt);
+
+// ==============================================================================
+// CalibrateCaptureInterface class
+// ==============================================================================
+
+  class CalibrateCaptureInterface
+  {
+  public:
+    virtual ~CalibrateCaptureInterface() = default; //
+    virtual void process_image(const BoardProjection &board_projection,
+                               cv_bridge::CvImage &color_marked) = 0; //
+  };
+
+  std::unique_ptr<CalibrateCaptureInterface> make_calibrate_capture_stationary(rclcpp::Logger &logger,
+                                                                               const CalibrateContext &cxt);
 
 }
 #endif //VLAM_CALIBRATE_HPP
