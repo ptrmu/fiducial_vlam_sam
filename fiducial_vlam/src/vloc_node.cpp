@@ -74,6 +74,7 @@ namespace fiducial_vlam
     {}
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                               const rclcpp::Time &time_stamp,
                                cv_bridge::CvImage &color_marked) override
     {
       // Detect the markers in this image and create a list of
@@ -299,8 +300,10 @@ namespace fiducial_vlam
   private:
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
                        std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg,
-                       std_msgs::msg::Header::_stamp_type stamp)
+                       const std_msgs::msg::Header::_stamp_type &stamp)
     {
+      rclcpp::Time time_stamp{stamp};
+
       // Convert ROS to OpenCV
       cv_bridge::CvImagePtr gray{cv_bridge::toCvCopy(*image_msg, "mono8")};
 
@@ -339,7 +342,7 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = pi().process_image(gray, color_marked);
+      auto observations = pi().process_image(gray, time_stamp, color_marked);
 
       // Publish the observations.
       if (observations.size()) {

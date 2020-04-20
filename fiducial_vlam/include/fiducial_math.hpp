@@ -17,6 +17,11 @@ namespace cv
   class Mat;
 }
 
+namespace rclcpp
+{
+  class Time;
+}
+
 namespace fiducial_vlam
 {
   class CalibrateContext; //
@@ -144,6 +149,7 @@ namespace fiducial_vlam
     virtual ~ProcessImageInterface() = default;
 
     virtual Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                                       const rclcpp::Time &time_stamp,
                                        cv_bridge::CvImage &color_marked) = 0;
 
     virtual TransformWithCovariance solve_t_map_camera(const Observations &observations,

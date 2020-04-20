@@ -1,6 +1,7 @@
 
 #include "calibrate.hpp"
 #include "calibrate_classes.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace fiducial_vlam
 {
@@ -32,9 +33,12 @@ namespace fiducial_vlam
         State(impl)
       {}
 
-      void process_image(const BoardProjection &board_projection,
-                         cv_bridge::CvImage &color_marked) override
-      {}
+      bool test_capture(const BoardProjection &board_projection,
+                        const rclcpp::Time &time_stamp,
+                        cv_bridge::CvImage &color_marked) override
+      {
+        return false;
+      }
 
       void activate()
       {
@@ -49,9 +53,12 @@ namespace fiducial_vlam
         State(impl)
       {}
 
-      void process_image(const BoardProjection &board_projection,
-                         cv_bridge::CvImage &color_marked) override
-      {}
+      bool test_capture(const BoardProjection &board_projection,
+                        const rclcpp::Time &time_stamp,
+                        cv_bridge::CvImage &color_marked) override
+      {
+        return false;
+      }
 
       void activate()
       {
@@ -66,9 +73,12 @@ namespace fiducial_vlam
         State(impl)
       {}
 
-      void process_image(const BoardProjection &board_projection,
-                         cv_bridge::CvImage &color_marked) override
-      {}
+      bool test_capture(const BoardProjection &board_projection,
+                        const rclcpp::Time &time_stamp,
+                        cv_bridge::CvImage &color_marked) override
+      {
+        return false;
+      }
 
       void activate()
       {
@@ -83,9 +93,12 @@ namespace fiducial_vlam
         State(impl)
       {}
 
-      void process_image(const BoardProjection &board_projection,
-                         cv_bridge::CvImage &color_marked) override
-      {}
+      bool test_capture(const BoardProjection &board_projection,
+                        const rclcpp::Time &time_stamp,
+                        cv_bridge::CvImage &color_marked) override
+      {
+        return false;
+      }
 
       void activate()
       {
@@ -113,9 +126,12 @@ namespace fiducial_vlam
       ready_.activate();
     }
 
-    void process_image(const BoardProjection &board_projection,
-                       cv_bridge::CvImage &color_marked) override
-    {}
+    bool test_capture(const BoardProjection &board_projection,
+                      const rclcpp::Time &time_stamp,
+                      cv_bridge::CvImage &color_marked) override
+    {
+      return state_->test_capture(board_projection, time_stamp, color_marked);
+    }
 
   private:
   };

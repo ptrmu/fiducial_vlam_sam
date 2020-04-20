@@ -365,6 +365,7 @@ namespace fiducial_vlam
     }
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                               const rclcpp::Time &time_stamp,
                                cv_bridge::CvImage &color_marked) override
     {
       // Don't process images that happen to be a different size.
@@ -799,6 +800,7 @@ namespace fiducial_vlam
     {}
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
+                               const rclcpp::Time &time_stamp,
                                cv_bridge::CvImage &color_marked) override
     {
       // The first time this is called, we have to initialize the targets with the size
@@ -808,7 +810,7 @@ namespace fiducial_vlam
                                                                 cv::Size{gray->image.cols, gray->image.rows});
       }
 
-      return pi_->process_image(gray, color_marked);
+      return pi_->process_image(gray, time_stamp, color_marked);
     }
 
     TransformWithCovariance solve_t_map_camera(const Observations &observations,

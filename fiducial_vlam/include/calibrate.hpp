@@ -62,8 +62,9 @@ namespace fiducial_vlam
   {
   public:
     virtual ~CalibrateCaptureInterface() = default; //
-    virtual void process_image(const BoardProjection &board_projection,
-                               cv_bridge::CvImage &color_marked) = 0; //
+    virtual bool test_capture(const BoardProjection &board_projection,
+                              const rclcpp::Time &stamp,
+                              cv_bridge::CvImage &color_marked) = 0; //
   };
 
   std::unique_ptr<CalibrateCaptureInterface> make_calibrate_capture_stationary(rclcpp::Logger &logger,
