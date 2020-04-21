@@ -3,6 +3,7 @@
 #define _CALIBRATE_CLASSES_HPP
 
 #include "opencv2/core.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 namespace fiducial_vlam
 {
@@ -20,7 +21,7 @@ namespace fiducial_vlam
       ordered_board_corners_{ordered_board_corners}
     {}
 
-    float difference(BoardProjection &other)
+    float difference(const BoardProjection &other) const
     {
       auto diff = (
                     cv::norm(ordered_board_corners_[0] - other.ordered_board_corners_[0]) +
@@ -34,20 +35,20 @@ namespace fiducial_vlam
 
   struct ImageHolder
   {
-    cv::Mat gray_;
+    const cv::Mat gray_;
+    const rclcpp::Time time_stamp_;
+    const std::vector<int> aruco_ids_;
+    const std::vector<std::vector<cv::Point2f> > aruco_corners_;
+    const cv::Mat homo_;
+    const BoardProjection board_projection_;
 
-    std::vector<int> aruco_ids_;
-    std::vector<std::vector<cv::Point2f> > aruco_corners_;
-
-    cv::Mat homo_;
-    BoardProjection board_projection_;
-
-    ImageHolder(cv::Mat &gray,
+    ImageHolder(const cv::Mat &gray,
+                const rclcpp::Time &time_stamp,
                 std::vector<int> aruco_ids,
                 std::vector<std::vector<cv::Point2f> > aruco_corners,
                 cv::Mat homo,
                 BoardProjection board_projection) :
-      gray_{gray},
+      gray_{gray}, time_stamp_{time_stamp},
       aruco_ids_{std::move(aruco_ids)}, aruco_corners_{std::move(aruco_corners)},
       homo_{std::move(homo)}, board_projection_{std::move(board_projection)}
     {}
