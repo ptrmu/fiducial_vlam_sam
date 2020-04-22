@@ -9,6 +9,7 @@
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d.hpp"
 #include "opencv2/imgcodecs.hpp"
+#include "opencv2/imgproc.hpp"
 #include "rclcpp/logging.hpp"
 #include "ros2_shared/string_printf.hpp"
 #include "task_thread.hpp"
@@ -104,7 +105,8 @@ namespace fiducial_vlam
     }
   }
 
-  static void drawPolygonAtCenter(std::shared_ptr<cv_bridge::CvImage> &color, std::vector<cv::Point2f> &board_corners,
+  static void drawPolygonAtCenter(cv::Mat &color,
+                                  std::vector<cv::Point2f> &board_corners,
                                   cv::Scalar borderColor = cv::Scalar(0, 0, 255))
   {
     cv::Point2f avg;
@@ -112,15 +114,15 @@ namespace fiducial_vlam
       avg = avg + board_corners[i];
     }
     avg = avg / double(board_corners.size());
-    avg.x -= color->image.cols / 2;
-    avg.y -= color->image.rows / 2;
+    avg.x -= color.cols / 2;
+    avg.y -= color.rows / 2;
     std::vector<cv::Point> bc = {
       cv::Point{int(round(board_corners[0].x - avg.x)), int(round(board_corners[0].y - avg.y))},
       cv::Point{int(round(board_corners[1].x - avg.x)), int(round(board_corners[1].y - avg.y))},
       cv::Point{int(round(board_corners[2].x - avg.x)), int(round(board_corners[2].y - avg.y))},
       cv::Point{int(round(board_corners[3].x - avg.x)), int(round(board_corners[3].y - avg.y))},
     };
-    cv::fillConvexPoly(color->image, bc, borderColor);
+    cv::fillConvexPoly(color, bc, borderColor);
 //    for (int j = 0; j < 4; j++) {
 //      cv::Point2f p0, p1;
 //      p0 = board_corners[j];
@@ -129,6 +131,7 @@ namespace fiducial_vlam
 //    }
   }
 
+#if 0
 
   struct CalibrationImage
   {
@@ -248,7 +251,6 @@ namespace fiducial_vlam
     }
   };
 
-#if 0
   struct FrameData
   {
     std::vector<int> ids_;
@@ -309,7 +311,7 @@ namespace fiducial_vlam
     cv::Ptr<cv::aruco::DetectorParameters> detectorParams_;
     cv::Ptr<cv::aruco::Dictionary> dictionary_;
     CharucoboardConfig cbm_;
-    BoardTargets board_targets_;
+    CapturedImages captured_images_;
     std::unique_ptr<CalibrateCaptureInterface> test_capture_;
 
     bool capture_next_image_{false};
@@ -325,8 +327,8 @@ namespace fiducial_vlam
         cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt.cal_aruco_dictionary_id_))},
       cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
            cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_),
-      board_targets_(logger, cbm_.board_width_per_height(), image_size),
-      test_capture_(make_calibrate_capture_stationary(logger, cal_cxt, time_stamp))
+      captured_images_(image_size),
+      test_capture_(make_calibrate_capture_stationary(logger, cal_cxt, time_stamp, captured_images_))
     {
 #if (CV_VERSION_MAJOR == 4)
 //     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
@@ -344,12 +346,13 @@ namespace fiducial_vlam
     }
 
     static std::unique_ptr<CalibrateCameraProcessImageImpl> load_images(rclcpp::Logger &logger,
-                                                                        const CalibrateContext &cal_cxt)
+                                                                        const CalibrateContext &cal_cxt,
+                                                                        const rclcpp::Time &now)
     {
       cv::FileStorage fs_header(std::string(cal_cxt.cal_images_file_name_).append(".yml"),
                                 cv::FileStorage::READ);
 
-      auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt, rclcpp::Time{0, 0},  // TODO: get real time from file
+      auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt, now,
                                                                 cv::Size{static_cast<int>( fs_header["width"]),
                                                                          static_cast<int>(fs_header["height"])})};
 
@@ -360,8 +363,8 @@ namespace fiducial_vlam
 
         cv::Mat gray{cv::imread(image_name, cv::IMREAD_ANYCOLOR)};
 
-        auto image_holder = pi->new_image_holder(gray, rclcpp::Time{0, 0}); // TODO: get real time from file
-        pi->board_targets_.capture_image(image_holder);
+        auto image_holder = pi->new_image_holder(gray, now);
+        pi->captured_images_.capture(image_holder);
       }
 
       return pi;
@@ -369,10 +372,11 @@ namespace fiducial_vlam
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                const rclcpp::Time &time_stamp,
-                               cv_bridge::CvImage &color_marked) override
+                               cv::Mat &color_marked) override
     {
       // Don't process images that happen to be a different size.
-      if (gray->image.size[1] != board_targets_.width() || gray->image.size[0] != board_targets_.height()) {
+      if (gray->image.size[1] != captured_images_.image_size().width ||
+          gray->image.size[0] != captured_images_.image_size().height) {
         return Observations{};
       }
 
@@ -384,26 +388,26 @@ namespace fiducial_vlam
 
       // Check if a manual capture has been requested
       if (capture_next_image_) {
-        board_targets_.capture_image(image_holder);
+        captured_images_.capture(image_holder);
         capture_next_image_ = false;
       }
 
       // Evaluate if we should capture this image
       test_capture_->test_capture(image_holder, color_marked);
 
-      if (color_marked.image.dims != 0) {
+      if (color_marked.dims != 0) {
 
         // Annotate the image with info we have collected so far.
         if (!image_holder->aruco_ids_.empty()) {
-          drawDetectedMarkers(color_marked.image, image_holder->aruco_corners_);
+          drawDetectedMarkers(color_marked, image_holder->aruco_corners_);
         }
 
-        if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
-          drawBoardCorners(color_marked.image, image_holder->board_projection_.ordered_board_corners_);
-        }
+//        if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
+//          drawBoardCorners(color_marked, image_holder->board_projection_.ordered_board_corners_);
+//        }
 
-        for (auto &captured_image : board_targets_.get_captured_images()) {
-          drawBoardCorners(color_marked.image,
+        for (auto &captured_image : captured_images_()) {
+          drawBoardCorners(color_marked,
                            captured_image->board_projection_.ordered_board_corners_,
                            cv::Scalar(255, 0, 0));
         }
@@ -437,11 +441,11 @@ namespace fiducial_vlam
       cv::FileStorage fs_header(std::string(cal_cxt_.cal_images_file_name_).append(".yml"),
                                 cv::FileStorage::WRITE);
 
-      fs_header << "width" << board_targets_.width()
-                << "height" << board_targets_.height()
+      fs_header << "width" << captured_images_.image_size().width
+                << "height" << captured_images_.image_size().height
                 << "imageNames" << "[";
 
-      auto captured_images = board_targets_.get_captured_images();
+      auto captured_images = captured_images_();
       for (int i = 0; i < captured_images.size(); i += 1) {
 
         auto image_file_name{ros2_shared::string_print::f("%s_%03d.png", cal_cxt_.cal_images_file_name_.c_str(), i)};
@@ -458,14 +462,14 @@ namespace fiducial_vlam
     std::string status()
     {
       return ros2_shared::string_print::f("# captured images:%d, w:%d, h:%d",
-                                          board_targets_.get_captured_images().size(),
-                                          board_targets_.width(),
-                                          board_targets_.height());
+                                          captured_images_().size(),
+                                          captured_images_.image_size().width,
+                                          captured_images_.image_size().height);
     }
 
-    std::vector<std::shared_ptr<ImageHolder>> &get_captured_images()
+    const std::vector<std::shared_ptr<ImageHolder>> &get_captured_images()
     {
-      return board_targets_.get_captured_images();
+      return captured_images_();
     }
 
   private:
@@ -542,14 +546,14 @@ namespace fiducial_vlam
 
   class CalibrateCameraWork
   {
-    std::vector<std::shared_ptr<ImageHolder>> captured_images_;
+    const std::vector<std::shared_ptr<ImageHolder>> captured_images_;
     CharucoboardConfig cbm_;
 
     using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
 
   public:
     CalibrateCameraWork(const CalibrateContext &cal_cxt,
-                        std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
+                        const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
       captured_images_{captured_images},
       cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
            cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_)
@@ -731,7 +735,7 @@ namespace fiducial_vlam
 
   public:
     CalibrateCameraTask(const CalibrateContext &cal_cxt,
-                        std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
+                        const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
       task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images)}
     {}
 
@@ -808,7 +812,7 @@ namespace fiducial_vlam
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                const rclcpp::Time &time_stamp,
-                               cv_bridge::CvImage &color_marked) override
+                               cv::Mat &color_marked) override
     {
       // The first time this is called, we have to initialize the targets with the size
       // of the image passed in.
@@ -827,7 +831,8 @@ namespace fiducial_vlam
       return pi_ ? pi_->solve_t_map_camera(observations, camera_info, map) : TransformWithCovariance{};
     }
 
-    std::string cal_cmd(const std::string &cmd) override
+    std::string cal_cmd(const std::string &cmd,
+                        const rclcpp::Time &now) override
     {
       std::string ret_str;
 
@@ -854,7 +859,7 @@ namespace fiducial_vlam
 
       } else if (cmd.compare("load_images") == 0) {
         pi_.reset(nullptr);
-        pi_ = CalibrateCameraProcessImageImpl::load_images(logger_, cal_cxt_);
+        pi_ = CalibrateCameraProcessImageImpl::load_images(logger_, cal_cxt_, now);
         ret_str = pi_->status();
 
       } else if (cmd.compare("calibrate") == 0) {

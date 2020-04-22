@@ -33,6 +33,10 @@ namespace fiducial_vlam
     }
   };
 
+// ==============================================================================
+// ImageHolder struct
+// ==============================================================================
+
   struct ImageHolder
   {
     const cv::Mat gray_;
@@ -52,6 +56,36 @@ namespace fiducial_vlam
       aruco_ids_{std::move(aruco_ids)}, aruco_corners_{std::move(aruco_corners)},
       homo_{std::move(homo)}, board_projection_{std::move(board_projection)}
     {}
+  };
+
+// ==============================================================================
+// CapturedImages struct
+// ==============================================================================
+
+  class CapturedImages
+  {
+    const cv::Size image_size_;
+    std::vector<std::shared_ptr<ImageHolder>> captured_images_{};
+
+  public:
+    explicit CapturedImages(const cv::Size &image_size) :
+      image_size_{image_size}
+    {}
+
+    void capture(std::shared_ptr<ImageHolder> &image_holder)
+    {
+      captured_images_.emplace_back(image_holder);
+    }
+
+    const cv::Size image_size()
+    {
+      return image_size_;
+    }
+
+    const std::vector<std::shared_ptr<ImageHolder>> &operator()()
+    {
+      return captured_images_;
+    }
   };
 }
 #endif //_CALIBRATE_CLASSES_HPP

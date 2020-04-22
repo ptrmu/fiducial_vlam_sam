@@ -75,7 +75,7 @@ namespace fiducial_vlam
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                const rclcpp::Time &time_stamp,
-                               cv_bridge::CvImage &color_marked) override
+                               cv::Mat &color_marked) override
     {
       // Detect the markers in this image and create a list of
       // observations.
@@ -342,7 +342,7 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = pi().process_image(gray, time_stamp, color_marked);
+      auto observations = pi().process_image(gray, time_stamp, color_marked.image);
 
       // Publish the observations.
       if (observations.size()) {
@@ -547,7 +547,7 @@ namespace fiducial_vlam
           RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
 
         } else {
-          auto ret_str = cc_pi_->cal_cmd(cmd);
+          auto ret_str = cc_pi_->cal_cmd(cmd, now());
           if (!ret_str.empty()) {
             RCLCPP_INFO(get_logger(), "cal_cmd '%s' response:\n%s", cmd.c_str(), ret_str.c_str());
           }

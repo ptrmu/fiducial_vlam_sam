@@ -90,7 +90,7 @@ namespace fiducial_vlam
                                                           double marker_length) = 0;
 
     virtual Observations detect_markers(cv_bridge::CvImage &gray,
-                                        cv_bridge::CvImage &color_marked) = 0;
+                                        cv::Mat &color_marked) = 0;
 
     virtual void annotate_image_with_marker_axis(cv_bridge::CvImage &color_marked,
                                                  const TransformWithCovariance &t_camera_marker,
@@ -150,7 +150,7 @@ namespace fiducial_vlam
 
     virtual Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                        const rclcpp::Time &time_stamp,
-                                       cv_bridge::CvImage &color_marked) = 0;
+                                       cv::Mat &color_marked) = 0;
 
     virtual TransformWithCovariance solve_t_map_camera(const Observations &observations,
                                                        const CameraInfoInterface &camera_info,

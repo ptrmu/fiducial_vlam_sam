@@ -253,7 +253,7 @@ namespace fiducial_vlam
     }
 
     Observations detect_markers(cv_bridge::CvImage &gray,
-                                cv_bridge::CvImage &color_marked) override
+                                cv::Mat &color_marked) override
     {
       // Todo: make the dictionary a parameter
       auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -278,8 +278,8 @@ namespace fiducial_vlam
       cv::aruco::detectMarkers(gray.image, dictionary, corners, ids, detectorParameters);
 
       // Annotate the markers
-      if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
-        drawDetectedMarkers(color_marked.image, corners, ids);
+      if (color_marked.dims != 0) {
+        drawDetectedMarkers(color_marked, corners, ids);
       }
 
       // return the corners as a list of observations
