@@ -579,13 +579,17 @@ namespace fiducial_vlam
 
       CalibrateCameraResult res;
 
+      res.camera_matrix_(0, 0) = 1.0;
+      res.camera_matrix_(1, 1) = 1.0;
+
       auto err = calibrateCamera(junctions_f_board, junctions_f_image,
                                  cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
                                  res.camera_matrix_, res.dist_coeffs_,
                                  rvecs, tvecs,
                                  stdDeviationsIntrinsics,
                                  stdDeviationsExtrinsics,
-                                 perViewErrors);
+                                 perViewErrors,
+                                 cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_K3);
 
       res.valid_ = true;
       return res;
