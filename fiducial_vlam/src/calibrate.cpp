@@ -345,31 +345,6 @@ namespace fiducial_vlam
                   image_size.width, image_size.height);
     }
 
-    static std::unique_ptr<CalibrateCameraProcessImageImpl> load_images(rclcpp::Logger &logger,
-                                                                        const CalibrateContext &cal_cxt,
-                                                                        const rclcpp::Time &now)
-    {
-      cv::FileStorage fs_header(std::string(cal_cxt.cal_images_file_name_).append(".yml"),
-                                cv::FileStorage::READ);
-
-      auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt, now,
-                                                                cv::Size{static_cast<int>( fs_header["width"]),
-                                                                         static_cast<int>(fs_header["height"])})};
-
-      cv::FileNode file_names = fs_header["imageNames"];
-      for (auto it = file_names.begin(); it != file_names.end(); ++it) {
-        std::string image_name;
-        (*it)["name"] >> image_name;
-
-        cv::Mat gray{cv::imread(image_name, cv::IMREAD_ANYCOLOR)};
-
-        auto image_holder = pi->new_image_holder(gray, now);
-        pi->captured_images_.capture(image_holder);
-      }
-
-      return pi;
-    }
-
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
                                const rclcpp::Time &time_stamp,
                                cv::Mat &color_marked) override
@@ -451,12 +426,45 @@ namespace fiducial_vlam
         auto image_file_name{ros2_shared::string_print::f("%s_%03d.png", cal_cxt_.cal_images_file_name_.c_str(), i)};
         auto res = cv::imwrite(image_file_name, captured_images[i]->gray_);
 
-        fs_header << "{:" << "name" << image_file_name << "},";
+        fs_header << "{:"
+                  << "name" << image_file_name
+                  << "stamp" << std::to_string(captured_images[i]->time_stamp_.nanoseconds())
+                  << "clock" << captured_images[i]->time_stamp_.get_clock_type()
+                  << "},";
       }
 
       fs_header << "]";
       fs_header.release();
       return std::string{};
+    }
+
+    static std::unique_ptr<CalibrateCameraProcessImageImpl> load_images(rclcpp::Logger &logger,
+                                                                        const CalibrateContext &cal_cxt,
+                                                                        const rclcpp::Time &now)
+    {
+      cv::FileStorage fs_header(std::string(cal_cxt.cal_images_file_name_).append(".yml"),
+                                cv::FileStorage::READ);
+
+      auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt, now,
+                                                                cv::Size{static_cast<int>( fs_header["width"]),
+                                                                         static_cast<int>(fs_header["height"])})};
+
+      cv::FileNode file_names = fs_header["imageNames"];
+      for (auto it = file_names.begin(); it != file_names.end(); ++it) {
+        std::string image_name;
+        std::string time_str;
+        rcl_clock_type_t clock;
+        (*it)["name"] >> image_name;
+        (*it)["stamp"] >> time_str;
+        (*it)["clock"] >> clock;
+
+        cv::Mat gray{cv::imread(image_name, cv::IMREAD_ANYCOLOR)};
+
+        auto image_holder = pi->new_image_holder(gray, rclcpp::Time(std::stoul(time_str), clock));
+        pi->captured_images_.capture(image_holder);
+      }
+
+      return pi;
     }
 
     std::string status()
@@ -536,8 +544,15 @@ namespace fiducial_vlam
   {
   public:
     bool valid_{false};
+    int flags_{0};
+    double reproject_error_{0.};
     cv::Matx33d camera_matrix_{};
     cv::Matx<double, 5, 1> dist_coeffs_{};
+    cv::Mat rvecs_{};
+    cv::Mat tvecs_{};
+    cv::Mat stdDeviationsIntrinsics_{};
+    cv::Mat stdDeviationsExtrinsics_{};
+    cv::Mat perViewErrors_{};
   };
 
 // ==============================================================================
@@ -546,7 +561,7 @@ namespace fiducial_vlam
 
   class CalibrateCameraWork
   {
-    const std::vector<std::shared_ptr<ImageHolder>> captured_images_;
+    const std::vector<std::shared_ptr<ImageHolder>> &captured_images_;
     CharucoboardConfig cbm_;
 
     using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
@@ -571,25 +586,25 @@ namespace fiducial_vlam
                                        junctions_f_image);
       }
 
-      cv::Mat rvecs;
-      cv::Mat tvecs;
-      cv::Mat stdDeviationsIntrinsics;
-      cv::Mat stdDeviationsExtrinsics;
-      cv::Mat perViewErrors;
-
       CalibrateCameraResult res;
+
+      res.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_K3;
 
       res.camera_matrix_(0, 0) = 1.0;
       res.camera_matrix_(1, 1) = 1.0;
 
-      auto err = calibrateCamera(junctions_f_board, junctions_f_image,
-                                 cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
-                                 res.camera_matrix_, res.dist_coeffs_,
-                                 rvecs, tvecs,
-                                 stdDeviationsIntrinsics,
-                                 stdDeviationsExtrinsics,
-                                 perViewErrors,
-                                 cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_K3);
+      res.reproject_error_ = calibrateCamera(
+        junctions_f_board, junctions_f_image,
+        cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
+        res.camera_matrix_, res.dist_coeffs_,
+        res.rvecs_, res.tvecs_,
+        res.stdDeviationsIntrinsics_, res.stdDeviationsExtrinsics_, res.perViewErrors_,
+        res.flags_);
+
+
+      for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
+        std::cout << res.perViewErrors_.at<float>(i, 0) << std::endl;
+      }
 
       res.valid_ = true;
       return res;
@@ -733,19 +748,24 @@ namespace fiducial_vlam
 
   class CalibrateCameraTask
   {
+    rclcpp::Logger &logger_;
+    const std::vector<std::shared_ptr<ImageHolder>> captured_images_;
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
     std::future<CalibrateCameraResult> calibrate_camera_future_{};
     CalibrateCameraResult calibrate_camera_result_{};
 
   public:
-    CalibrateCameraTask(const CalibrateContext &cal_cxt,
+    CalibrateCameraTask(rclcpp::Logger &logger,
+                        const CalibrateContext &cal_cxt,
                         const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
-      task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images)}
+      logger_{logger},
+      captured_images_{captured_images},
+      task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images_)}
     {}
 
     std::string check_completion()
     {
-      // If the results are valid, then the useer has already been notified
+      // If the results are valid, then the user has already been notified
       if (calibrate_camera_result_.valid_) {
         return std::string{};
       }
@@ -761,6 +781,7 @@ namespace fiducial_vlam
         }
 
         calibrate_camera_result_ = calibrate_camera_future_.get();
+        dump_calibration_stats();
         return std::string("Calibrate camera task complete.");
       }
 
@@ -793,6 +814,16 @@ namespace fiducial_vlam
       return ros2_shared::string_print::f("CalibrateCameraTask status: %s",
                                           calibrate_camera_result_.valid_ ? "done" :
                                           calibrate_camera_future_.valid() ? "working" : "pending");
+    }
+
+    void dump_calibration_stats()
+    {
+      auto &res = calibrate_camera_result_;
+      RCLCPP_INFO(logger_, "Reproject error %f", res.reproject_error_);
+
+      for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
+        RCLCPP_INFO(logger_, "Captured Image %d - Reproject error %f", i, res.perViewErrors_.at<float>(i, 0));
+      }
     }
   };
 
@@ -869,7 +900,7 @@ namespace fiducial_vlam
       } else if (cmd.compare("calibrate") == 0) {
         cct_.reset(nullptr);
         if (pi_ && pi_->get_captured_images().size() > 0) {
-          cct_ = std::make_unique<CalibrateCameraTask>(cal_cxt_, pi_->get_captured_images());
+          cct_ = std::make_unique<CalibrateCameraTask>(logger_, cal_cxt_, pi_->get_captured_images());
           ret_str = std::string("Calibration queued.");
         } else {
           ret_str = std::string("Cannot calibrate with zero images.");
