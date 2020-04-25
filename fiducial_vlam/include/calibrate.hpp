@@ -49,7 +49,7 @@ namespace fiducial_vlam
   public:
     virtual std::string cal_cmd(const std::string &cmd,
                                 const rclcpp::Time &now) = 0; //
-    virtual std::string on_timer() = 0; //
+    virtual std::string on_timer(const rclcpp::Time &now) = 0; //
   };
 
   std::unique_ptr<CalibrateCameraInterface> make_calibrate_camera(rclcpp::Logger &logger,

@@ -8,6 +8,7 @@
 #include "observation.hpp"
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d.hpp"
+#include "opencv2/core.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include "rclcpp/logging.hpp"
@@ -483,11 +484,11 @@ namespace fiducial_vlam
   private:
     std::shared_ptr<ImageHolder> new_image_holder(const cv::Mat &gray, const rclcpp::Time &time_stamp)
     {
-      std::vector<std::vector<cv::Point2f> > rejected;
+      std::vector<std::vector<cv::Point2f>> rejected;
 
       // detect markers
       std::vector<int> aruco_ids;
-      std::vector<std::vector<cv::Point2f> > aruco_corners;
+      std::vector<std::vector<cv::Point2f>> aruco_corners;
       cv::aruco::detectMarkers(gray, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
 
 //      // refind strategy to detect more markers
@@ -545,7 +546,10 @@ namespace fiducial_vlam
   public:
     bool valid_{false};
     int flags_{0};
+    rclcpp::Time calibration_time_{0, 0};
     double reproject_error_{0.};
+    std::vector<std::vector<cv::Vec3f>> junctions_f_board_;
+    std::vector<std::vector<cv::Vec2f>> junctions_f_image_;
     cv::Matx33d camera_matrix_{};
     cv::Matx<double, 5, 1> dist_coeffs_{};
     cv::Mat rvecs_{};
@@ -576,17 +580,14 @@ namespace fiducial_vlam
 
     CalibrateCameraResult solve_calibration()
     {
-      std::vector<std::vector<cv::Vec3f>> junctions_f_board;
-      std::vector<std::vector<cv::Vec2f>> junctions_f_image;
+      CalibrateCameraResult res;
 
       // Loop over the images finding the checkerboard junctions
       for (auto &captured_iamge : captured_images_) {
         interpolate_junction_locations(captured_iamge,
-                                       junctions_f_board,
-                                       junctions_f_image);
+                                       res.junctions_f_board_,
+                                       res.junctions_f_image_);
       }
-
-      CalibrateCameraResult res;
 
       res.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_K3;
 
@@ -594,17 +595,31 @@ namespace fiducial_vlam
       res.camera_matrix_(1, 1) = 1.0;
 
       res.reproject_error_ = calibrateCamera(
-        junctions_f_board, junctions_f_image,
+        res.junctions_f_board_, res.junctions_f_image_,
         cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
         res.camera_matrix_, res.dist_coeffs_,
         res.rvecs_, res.tvecs_,
         res.stdDeviationsIntrinsics_, res.stdDeviationsExtrinsics_, res.perViewErrors_,
         res.flags_);
 
-
-      for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
-        std::cout << res.perViewErrors_.at<float>(i, 0) << std::endl;
-      }
+//
+//      for (size_t i = 0; i < res.stdDeviationsIntrinsics_.rows; i += 1) {
+//        std::cout
+//          << "stdDeviationsIntrinsics_ " << i << " "
+//          << res.stdDeviationsIntrinsics_.at<float>(i, 0) << std::endl;
+//      }
+//
+//      for (size_t i = 0; i < res.stdDeviationsExtrinsics_.rows; i += 1) {
+//        std::cout
+//          << "stdDeviationsExtrinsics_ " << i << " "
+//          << res.stdDeviationsExtrinsics_.at<float>(i, 0) << std::endl;
+//      }
+//
+//      for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
+//        std::cout
+//          << "perViewErrors_ " << i << " "
+//          << res.perViewErrors_.at<float>(i, 0) << std::endl;
+//      }
 
       res.valid_ = true;
       return res;
@@ -763,7 +778,7 @@ namespace fiducial_vlam
       task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images_)}
     {}
 
-    std::string check_completion()
+    std::string check_completion(const rclcpp::Time &now)
     {
       // If the results are valid, then the user has already been notified
       if (calibrate_camera_result_.valid_) {
@@ -781,8 +796,9 @@ namespace fiducial_vlam
         }
 
         calibrate_camera_result_ = calibrate_camera_future_.get();
-        dump_calibration_stats();
-        return std::string("Calibrate camera task complete.");
+        calibrate_camera_result_.calibration_time_ = now;
+        return std::string("Calibrate camera task complete.\n")
+          .append(create_calibration_report());
       }
 
       // The calibration task has not been queued, so queue it up.
@@ -816,14 +832,68 @@ namespace fiducial_vlam
                                           calibrate_camera_future_.valid() ? "working" : "pending");
     }
 
-    void dump_calibration_stats()
+    std::string to_date_string(const rclcpp::Time time)
+    {
+      auto nano = time.nanoseconds();
+      auto secs = nano / 1000000000L;
+      auto milli = (nano - secs * 1000000000L) / 1000000L;
+      char time_buf[64];
+      std::time_t t = secs;
+      if (0 == strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S.", localtime(&t))) {
+        time_buf[0] = 0;
+      }
+      std::string s(time_buf);
+      auto milli_str{std::to_string(milli)};
+      s.append(3 - milli_str.size(), '0').append(milli_str);
+      return s;
+    }
+
+    std::string calc_junction_error(const CalibrateCameraResult &res, std::size_t i)
+    {
+      std::vector<cv::Vec2f> image_points;
+
+      auto cn = CV_MAT_CN(res.rvecs_.flags);
+      auto dp = CV_MAT_DEPTH(res.rvecs_.flags);
+
+      cv::Matx<float, 3, 1> rvec, tvec;
+      auto rv = res.rvecs_.at<cv::Vec3f>(i, 0);
+      rvec(0, 0) = rv(0);
+      rvec(1, 0) = rv(1);
+      rvec(2, 0) = rv(2);
+      cv::Matx<float, 3, 3> r9;
+      cv::Rodrigues(rvec, r9);
+      cv::transpose(r9, r9);
+      auto tv = res.tvecs_.at<cv::Vec3f>(i, 0);
+      tvec(0, 0) = tv(0);
+      tvec(1, 0) = tv(1);
+      tvec(2, 0) = tv(2);
+      cv::projectPoints(res.junctions_f_board_[i],
+                        r9, tvec,
+                        res.camera_matrix_, res.dist_coeffs_,
+                        image_points);
+
+      return std::string{};
+    }
+
+    std::string create_calibration_report()
     {
       auto &res = calibrate_camera_result_;
-      RCLCPP_INFO(logger_, "Reproject error %f", res.reproject_error_);
+
+      std::string s{};
+      s.append(ros2_shared::string_print::f("Camera calibration done on %s\n",
+                                            to_date_string(res.calibration_time_).c_str()));
+
+      s.append(ros2_shared::string_print::f("Total reprojection error %f\n",
+                                            res.reproject_error_));
 
       for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
-        RCLCPP_INFO(logger_, "Captured Image %d - Reproject error %f", i, res.perViewErrors_.at<float>(i, 0));
+        s.append(ros2_shared::string_print::f("Image %d, %s - Reprojection error %f\n",
+                                              i, to_date_string(captured_images_[i]->time_stamp_).c_str(),
+                                              res.perViewErrors_.at<float>(i, 0)));
+        calc_junction_error(res, i);
       }
+
+      return s;
     }
   };
 
@@ -917,9 +987,9 @@ namespace fiducial_vlam
       return ret_str;
     }
 
-    std::string on_timer() override
+    std::string on_timer(const rclcpp::Time &now) override
     {
-      return cct_ ? cct_->check_completion() : std::string{};
+      return cct_ ? cct_->check_completion(now) : std::string{};
     }
 
   private:

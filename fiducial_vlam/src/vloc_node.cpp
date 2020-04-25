@@ -556,7 +556,7 @@ namespace fiducial_vlam
 
       // Give the image processor some background time
       if (cxt_.loc_calibrate_not_loocalize_) {
-        auto ret_str = cc_pi_->on_timer();
+        auto ret_str = cc_pi_->on_timer(now());
         if (!ret_str.empty()) {
           RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());
         }
