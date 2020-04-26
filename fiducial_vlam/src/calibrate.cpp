@@ -544,12 +544,15 @@ namespace fiducial_vlam
   class CalibrateCameraResult
   {
   public:
+    using JunctionIdIndexMap = std::map<JunctionId, std::size_t>;
+
     bool valid_{false};
     int flags_{0};
     rclcpp::Time calibration_time_{0, 0};
     double reproject_error_{0.};
     std::vector<std::vector<cv::Vec3f>> junctions_f_board_;
     std::vector<std::vector<cv::Vec2f>> junctions_f_image_;
+    std::vector<JunctionIdIndexMap> junction_id_index_maps_;
     cv::Matx33d camera_matrix_{};
     cv::Matx<double, 5, 1> dist_coeffs_{};
     cv::Mat rvecs_{};
@@ -565,17 +568,16 @@ namespace fiducial_vlam
 
   class CalibrateCameraWork
   {
+    const CharucoboardConfig &cbm_;
     const std::vector<std::shared_ptr<ImageHolder>> &captured_images_;
-    CharucoboardConfig cbm_;
 
     using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
 
   public:
-    CalibrateCameraWork(const CalibrateContext &cal_cxt,
+    CalibrateCameraWork(const CharucoboardConfig &cbm,
                         const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
-      captured_images_{captured_images},
-      cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
-           cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_)
+      cbm_{cbm},
+      captured_images_{captured_images}
     {}
 
     CalibrateCameraResult solve_calibration()
@@ -584,9 +586,7 @@ namespace fiducial_vlam
 
       // Loop over the images finding the checkerboard junctions
       for (auto &captured_iamge : captured_images_) {
-        interpolate_junction_locations(captured_iamge,
-                                       res.junctions_f_board_,
-                                       res.junctions_f_image_);
+        interpolate_junction_locations(captured_iamge, res);
       }
 
       res.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST | cv::CALIB_FIX_K3;
@@ -627,11 +627,12 @@ namespace fiducial_vlam
 
   private:
     void interpolate_junction_locations(std::shared_ptr<ImageHolder> captured_image,
-                                        std::vector<std::vector<cv::Vec3f>> &junctions_f_board,
-                                        std::vector<std::vector<cv::Vec2f>> &junctions_f_image)
+                                        CalibrateCameraResult &res)
     {
+      // Create a bunch of vectors to store the data we find.
       std::vector<cv::Vec3f> js_f_board{};
       std::vector<cv::Vec2f> js_f_image{};
+      CalibrateCameraResult::JunctionIdIndexMap j_id_index_map{};
 
       // Calculate the local homography for each found marker and build a map indexed by
       // the ArucoId.
@@ -694,13 +695,16 @@ namespace fiducial_vlam
                          cv::TermCriteria(cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS,
                                           30, DBL_EPSILON));
 
-        // Add these junction locations (f_image, f_board) to the list
+        // Add these junction locations (f_image, f_board) to the list.
+        std::size_t index = js_f_board.size();
         js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
         js_f_image.emplace_back(local_junctions_f_image[0]);
+        j_id_index_map.emplace(junction_id, index);
       }
 
-      junctions_f_board.emplace_back(std::move(js_f_board));
-      junctions_f_image.emplace_back(std::move(js_f_image));
+      res.junctions_f_board_.emplace_back(std::move(js_f_board));
+      res.junctions_f_image_.emplace_back(std::move(js_f_image));
+      res.junction_id_index_maps_.emplace_back(std::move(j_id_index_map));
     }
 
     MarkersHomography calculate_markers_homography(std::shared_ptr<ImageHolder> captured_image)
@@ -764,6 +768,7 @@ namespace fiducial_vlam
   class CalibrateCameraTask
   {
     rclcpp::Logger &logger_;
+    const CharucoboardConfig cbm_;
     const std::vector<std::shared_ptr<ImageHolder>> captured_images_;
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
     std::future<CalibrateCameraResult> calibrate_camera_future_{};
@@ -774,8 +779,10 @@ namespace fiducial_vlam
                         const CalibrateContext &cal_cxt,
                         const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
       logger_{logger},
+      cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
+           cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_),
       captured_images_{captured_images},
-      task_thread_{std::make_unique<CalibrateCameraWork>(cal_cxt, captured_images_)}
+      task_thread_{std::make_unique<CalibrateCameraWork>(cbm_, captured_images_)}
     {}
 
     std::string check_completion(const rclcpp::Time &now)
@@ -848,31 +855,35 @@ namespace fiducial_vlam
       return s;
     }
 
-    std::string calc_junction_error(const CalibrateCameraResult &res, std::size_t i)
+    std::string calc_junction_errors(const CalibrateCameraResult &res, std::size_t i)
     {
-      std::vector<cv::Vec2f> image_points;
+      std::string s{};
+      std::vector<cv::Vec2f> reproject_image_points;
 
-      auto cn = CV_MAT_CN(res.rvecs_.flags);
-      auto dp = CV_MAT_DEPTH(res.rvecs_.flags);
-
-      cv::Matx<float, 3, 1> rvec, tvec;
-      auto rv = res.rvecs_.at<cv::Vec3f>(i, 0);
-      rvec(0, 0) = rv(0);
-      rvec(1, 0) = rv(1);
-      rvec(2, 0) = rv(2);
-      cv::Matx<float, 3, 3> r9;
-      cv::Rodrigues(rvec, r9);
-      cv::transpose(r9, r9);
-      auto tv = res.tvecs_.at<cv::Vec3f>(i, 0);
-      tvec(0, 0) = tv(0);
-      tvec(1, 0) = tv(1);
-      tvec(2, 0) = tv(2);
+      // Project the object points onto the image so we can calculate the individual junction
+      // reprojection errors.
       cv::projectPoints(res.junctions_f_board_[i],
-                        r9, tvec,
+                        res.rvecs_.at<cv::Vec3d>(i, 0), res.tvecs_.at<cv::Vec3d>(i, 0),
                         res.camera_matrix_, res.dist_coeffs_,
-                        image_points);
+                        reproject_image_points);
 
-      return std::string{};
+      auto &junction_id_index_map_ = res.junction_id_index_maps_[i];
+      auto &junctions_f_image = res.junctions_f_image_[i];
+      for (JunctionId junction_id = 0; junction_id < cbm_.max_junction_id_; junction_id += 1) {
+        auto p = junction_id_index_map_.find(junction_id);
+        if (p == junction_id_index_map_.end()) {
+          s.append("0.000 ");
+        } else {
+          auto index = p->second;
+          auto error = cv::norm(reproject_image_points[index] - junctions_f_image[index]);
+          s.append(ros2_shared::string_print::f("%5.3f ", error));
+        }
+        if (junction_id % cbm_.squares_x_m_1_ == cbm_.squares_x_m_1_ - 1) {
+          s.append("\n");
+        }
+      }
+
+      return s;
     }
 
     std::string create_calibration_report()
@@ -883,14 +894,29 @@ namespace fiducial_vlam
       s.append(ros2_shared::string_print::f("Camera calibration done on %s\n",
                                             to_date_string(res.calibration_time_).c_str()));
 
-      s.append(ros2_shared::string_print::f("Total reprojection error %f\n",
+      s.append(ros2_shared::string_print::f("%f %f\n",
+                                            res.camera_matrix_(0, 0),
+                                            res.camera_matrix_(1, 1)));
+      s.append(ros2_shared::string_print::f("%f %f\n",
+                                            res.camera_matrix_(0, 2),
+                                            res.camera_matrix_(1, 2)));
+
+      s.append(ros2_shared::string_print::f("%f %f %f %f %f\n",
+                                            res.dist_coeffs_(0, 0),
+                                            res.dist_coeffs_(1, 0),
+                                            res.dist_coeffs_(2, 0),
+                                            res.dist_coeffs_(3, 0),
+                                            res.dist_coeffs_(4, 0)));
+
+      s.append(ros2_shared::string_print::f("Total reprojection error %5.3f\n",
                                             res.reproject_error_));
 
       for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
-        s.append(ros2_shared::string_print::f("Image %d, %s - Reprojection error %f\n",
+        s.append(ros2_shared::string_print::f("Image %d, %s - Reprojection error %5.3f\n",
                                               i, to_date_string(captured_images_[i]->time_stamp_).c_str(),
-                                              res.perViewErrors_.at<float>(i, 0)));
-        calc_junction_error(res, i);
+                                              res.perViewErrors_.at<double>(i, 0)));
+        s.append(calc_junction_errors(res, i));
+        s.append("\n");
       }
 
       return s;

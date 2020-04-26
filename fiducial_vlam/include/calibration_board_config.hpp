@@ -36,11 +36,9 @@ namespace fiducial_vlam
     const std::uint64_t max_square_id_;
     const double square_length_half_;
 
-  private:
     const std::uint64_t squares_x_m_1_;
     const std::uint64_t squares_y_m_1_;
 
-  public:
     const double board_width_half_;
     const double board_height_half_;
     const std::uint64_t max_junction_id_;
@@ -217,14 +215,14 @@ namespace fiducial_vlam
     }//
 
     // returns true if this square address holds an aruco marker
-    bool is_aruco_square_adddress(SquareAddress square_address)
+    bool is_aruco_square_adddress(SquareAddress square_address) const
     {
       std::uint64_t odd_col = square_address.x() & 1;
       std::uint64_t odd_row = square_address.y() & 1;
       return (upper_left_white_not_black_ ^ odd_row ^ odd_col) != 0;
     }
 
-    ArucoId to_aruco_id(SquareAddress square_address)
+    ArucoId to_aruco_id(SquareAddress square_address) const
     {
       assert(is_aruco_square_adddress(square_address));
       std::uint64_t y_group = square_address.y() / 2;
@@ -263,7 +261,7 @@ namespace fiducial_vlam
       return (CornerPointsFBoard{} << temp_corners_f_facade, gtsam::Matrix14{}.setZero()).finished();
     }
 
-    std::array<ArucoId, 2> get_adjacent_arucos(JunctionId junction_id)
+    std::array<ArucoId, 2> get_adjacent_arucos(JunctionId junction_id) const
     {
       auto junction_square_address = junction_id_to_square_address(junction_id);
       auto is_junction_aruco = is_aruco_square_adddress(junction_square_address) ? 1 : 0;
@@ -273,7 +271,7 @@ namespace fiducial_vlam
       };
     }
 
-    std::array<int, 2> get_adjacent_arucos_closest_corner(JunctionId junction_id)
+    std::array<int, 2> get_adjacent_arucos_closest_corner(JunctionId junction_id) const
     {
       auto is_junction_aruco = is_aruco_square_adddress(junction_id_to_square_address(junction_id)) ? 1 : 0;
       return std::array<int, 2>{
