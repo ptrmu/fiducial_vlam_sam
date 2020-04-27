@@ -187,6 +187,12 @@ namespace fiducial_vlam
       return cxt_.loc_calibrate_not_loocalize_ ? *cc_pi_ : *lc_pi_;
     }
 
+    bool publish_captured_image_marked()
+    {
+      return cxt_.loc_calibrate_not_loocalize_ &&
+             cc_pi_->calibration_complete();
+    }
+
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
@@ -261,7 +267,10 @@ namespace fiducial_vlam
           } else if ((stamp.nanosec == 0l && stamp.sec == 0l) || stamp == last_image_stamp_) {
             RCLCPP_DEBUG(get_logger(), "Ignore image message because stamp is zero or the same as the previous.");
 
-          } else {
+            // If we have just done a calibration and want to publish the marked captured
+            // images then there is nothing to do with this image so ignore it.
+          } else if (!publish_captured_image_marked()) {
+
             // rviz doesn't like it when time goes backward when a bag is played again.
             // The stamp_msgs_with_current_time_ parameter can help this by replacing the
             // image message time with the current time.
@@ -312,9 +321,11 @@ namespace fiducial_vlam
       // then just make an empty image pointer. The routines need to check
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImage color_marked;
+
 //      if (cxt_.publish_image_marked_ &&
 //          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
       if (cxt_.publish_image_marked_) {
+
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
         // data so I create another CvImage that is not const and steal the
@@ -535,6 +546,8 @@ namespace fiducial_vlam
 
     void calibrate_timer_callback()
     {
+      rclcpp::Time time_now{now()};
+
       // Figure out if there is a command to process.
       if (!cal_cxt_.cal_cmd_.empty()) {
         std::string cmd{cal_cxt_.cal_cmd_};
@@ -547,18 +560,34 @@ namespace fiducial_vlam
           RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
 
         } else {
-          auto ret_str = cc_pi_->cal_cmd(cmd, now());
+          auto ret_str = cc_pi_->cal_cmd(cmd, time_now);
           if (!ret_str.empty()) {
             RCLCPP_INFO(get_logger(), "cal_cmd '%s' response:\n%s", cmd.c_str(), ret_str.c_str());
           }
         }
       }
 
-      // Give the image processor some background time
+      // Give the camera calibrator process some background time
       if (cxt_.loc_calibrate_not_loocalize_) {
-        auto ret_str = cc_pi_->on_timer(now());
+        auto ret_str = cc_pi_->on_timer(time_now);
         if (!ret_str.empty()) {
           RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());
+        }
+      }
+
+      // If we have just done a calibration and want to publish the marked captured
+      // images then do it.
+      if (publish_captured_image_marked()) {
+        cv::Mat captured_image_marked;
+        cc_pi_->get_captured_image_marked(time_now, captured_image_marked);
+        if (captured_image_marked.dims != 0) {
+
+          // build up an image message and publish it.
+          std_msgs::msg::Header header;
+          header.stamp = time_now;
+          header.frame_id = "captured_image_marked";
+          cv_bridge::CvImage cv_image{header, "bgr8", captured_image_marked};
+          image_marked_pub_->publish(cv_image.toImageMsg());
         }
       }
     }

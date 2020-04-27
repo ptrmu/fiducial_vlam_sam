@@ -21,6 +21,8 @@
 namespace fiducial_vlam
 {
 
+  constexpr auto time_display_captured_image_marked = std::chrono::milliseconds(1500);
+
 // ==============================================================================
 // Drawing functions copied from opencv
 // ==============================================================================
@@ -93,6 +95,24 @@ namespace fiducial_vlam
 //                cornerColor, 2);
 //      }
     }
+  }
+
+
+  static void draw_detected_junction(cv::InputOutputArray captured_image_marked,
+                                     const cv::Point2f &junction_f_image,
+                                     const cv::Size &win_size,
+                                     cv::Scalar junction_color = cv::Scalar(255, 0, 0))
+  {
+    auto j_f_image = cv::Point2f{std::round(junction_f_image.x), std::round(junction_f_image.y)};
+    cv::rectangle(captured_image_marked,
+                  j_f_image - cv::Point2f(3, 3),
+                  j_f_image + cv::Point2f(3, 3),
+                  junction_color, 1, cv::LINE_4);
+
+    cv::rectangle(captured_image_marked,
+                  j_f_image - cv::Point2f(win_size.width, win_size.height),
+                  j_f_image + cv::Point2f(win_size.width, win_size.height),
+                  junction_color / 2, 1, cv::LINE_4);
   }
 
   static void drawBoardCorners(cv::InputOutputArray image,
@@ -547,12 +567,14 @@ namespace fiducial_vlam
     using JunctionIdIndexMap = std::map<JunctionId, std::size_t>;
 
     bool valid_{false};
+
+    std::vector<std::vector<cv::Vec3f>> junctions_f_board_{};
+    std::vector<std::vector<cv::Vec2f>> junctions_f_image_{};
+    std::vector<JunctionIdIndexMap> junction_id_index_maps_{};
     int flags_{0};
-    rclcpp::Time calibration_time_{0, 0};
+    std::vector<cv::Mat> captured_images_marked_{};
+
     double reproject_error_{0.};
-    std::vector<std::vector<cv::Vec3f>> junctions_f_board_;
-    std::vector<std::vector<cv::Vec2f>> junctions_f_image_;
-    std::vector<JunctionIdIndexMap> junction_id_index_maps_;
     cv::Matx33d camera_matrix_{};
     cv::Matx<double, 5, 1> dist_coeffs_{};
     cv::Mat rvecs_{};
@@ -560,6 +582,8 @@ namespace fiducial_vlam
     cv::Mat stdDeviationsIntrinsics_{};
     cv::Mat stdDeviationsExtrinsics_{};
     cv::Mat perViewErrors_{};
+
+    rclcpp::Time calibration_time_{0, 0};
   };
 
 // ==============================================================================
@@ -568,10 +592,10 @@ namespace fiducial_vlam
 
   class CalibrateCameraWork
   {
+    using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
+
     const CharucoboardConfig &cbm_;
     const std::vector<std::shared_ptr<ImageHolder>> &captured_images_;
-
-    using MarkersHomography = std::map<ArucoId, std::tuple<cv::Mat, std::size_t>>;
 
   public:
     CalibrateCameraWork(const CharucoboardConfig &cbm,
@@ -583,6 +607,9 @@ namespace fiducial_vlam
     CalibrateCameraResult solve_calibration()
     {
       CalibrateCameraResult res;
+
+      // Generate color images to draw on from the captured images.
+      prepare_captured_images_marked(res);
 
       // Loop over the images finding the checkerboard junctions
       for (auto &captured_iamge : captured_images_) {
@@ -633,6 +660,9 @@ namespace fiducial_vlam
       std::vector<cv::Vec3f> js_f_board{};
       std::vector<cv::Vec2f> js_f_image{};
       CalibrateCameraResult::JunctionIdIndexMap j_id_index_map{};
+
+      // Figure out which image we can mark.
+      auto &captured_image_marked = res.captured_images_marked_[res.junctions_f_board_.size()];
 
       // Calculate the local homography for each found marker and build a map indexed by
       // the ArucoId.
@@ -687,11 +717,11 @@ namespace fiducial_vlam
         // We want to figure a custom window size for doing the sub-pixel corner refinement.
         // This is done by using a window size that is smaller than the distance from the
         // junction to the closest aruco corner.
-        auto winSize = calculate_sub_pix_win_size(local_junctions_f_image[0], closest_corners_f_image);
+        auto win_size = calculate_sub_pix_win_size(local_junctions_f_image[0], closest_corners_f_image);
 
         // Find the junction image location with sub pixel accuracy.
         local_junctions_f_image.resize(1);
-        cv::cornerSubPix(captured_image->gray_, local_junctions_f_image, winSize, cv::Size(),
+        cv::cornerSubPix(captured_image->gray_, local_junctions_f_image, win_size, cv::Size(),
                          cv::TermCriteria(cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS,
                                           30, DBL_EPSILON));
 
@@ -700,6 +730,8 @@ namespace fiducial_vlam
         js_f_board.emplace_back(cv::Vec3f(junction_location(0), junction_location(1), 0.));
         js_f_image.emplace_back(local_junctions_f_image[0]);
         j_id_index_map.emplace(junction_id, index);
+
+        draw_detected_junction(captured_image_marked, local_junctions_f_image[0], win_size);
       }
 
       res.junctions_f_board_.emplace_back(std::move(js_f_board));
@@ -754,10 +786,19 @@ namespace fiducial_vlam
                         static_cast<int>(std::floor(size2f.height))};
 
       // do some sanity checks.
-      win_size = cv::Size{win_size.width - 2, win_size.height - 2}; // remove 2 pixels for safety
-      win_size = cv::Size{std::min(10, std::max(1, win_size.width)),  // min: 1, max: 10
-                          std::min(10, std::max(1, win_size.height))};
+      win_size = cv::Size{win_size.width - 1, win_size.height - 1}; // remove 1 pixel for safety
+      win_size = cv::Size{std::min(10, std::max(2, win_size.width)),  // min: 2, max: 10
+                          std::min(10, std::max(2, win_size.height))};
       return win_size;
+    }
+
+    void prepare_captured_images_marked(CalibrateCameraResult &res)
+    {
+      for (auto &ci : captured_images_) {
+        cv::Mat cim{};
+        cv::cvtColor(ci->gray_, cim, cv::COLOR_GRAY2BGR);
+        res.captured_images_marked_.push_back(cim);
+      }
     }
   };
 
@@ -839,6 +880,12 @@ namespace fiducial_vlam
                                           calibrate_camera_future_.valid() ? "working" : "pending");
     }
 
+    std::vector<cv::Mat> &get_captured_images_marked()
+    {
+      return calibrate_camera_result_.captured_images_marked_;
+    }
+
+  private:
     std::string to_date_string(const rclcpp::Time time)
     {
       auto nano = time.nanoseconds();
@@ -894,10 +941,10 @@ namespace fiducial_vlam
       s.append(ros2_shared::string_print::f("Camera calibration done on %s\n",
                                             to_date_string(res.calibration_time_).c_str()));
 
-      s.append(ros2_shared::string_print::f("%f %f\n",
+      s.append(ros2_shared::string_print::f("fx, fy: %f %f\n",
                                             res.camera_matrix_(0, 0),
                                             res.camera_matrix_(1, 1)));
-      s.append(ros2_shared::string_print::f("%f %f\n",
+      s.append(ros2_shared::string_print::f("cx, cy: %f %f\n",
                                             res.camera_matrix_(0, 2),
                                             res.camera_matrix_(1, 2)));
 
@@ -933,6 +980,8 @@ namespace fiducial_vlam
     const CalibrateContext &cal_cxt_;
     std::unique_ptr<CalibrateCameraProcessImageImpl> pi_{};
     std::unique_ptr<CalibrateCameraTask> cct_{};
+    std::size_t marked_index_{0};
+    rclcpp::Time last_time_display_marked_{0, 0, RCL_ROS_TIME};
 
   public:
     explicit CalibrateCameraImpl(rclcpp::Logger &logger,
@@ -990,6 +1039,7 @@ namespace fiducial_vlam
 
       } else if (cmd.compare("load_images") == 0) {
         pi_.reset(nullptr);
+        cct_.reset(nullptr);
         pi_ = CalibrateCameraProcessImageImpl::load_images(logger_, cal_cxt_, now);
         ret_str = pi_->status();
 
@@ -1016,6 +1066,34 @@ namespace fiducial_vlam
     std::string on_timer(const rclcpp::Time &now) override
     {
       return cct_ ? cct_->check_completion(now) : std::string{};
+    }
+
+    bool calibration_complete() override
+    {
+      return cct_ && cct_->calibration_complete();
+    }
+
+    void get_captured_image_marked(const rclcpp::Time &now,
+                                   cv::Mat &captured_image_marked) override
+    {
+      // Can not return a marked captured image unless the calibration is complete
+      if (!cct_ || !cct_->calibration_complete()) {
+        return;
+      }
+
+      auto &cim = cct_->get_captured_images_marked();
+      if (cim.size() < 0) {
+        return;
+      }
+
+      // Switch images every now and then
+      if ((now - last_time_display_marked_) > time_display_captured_image_marked) {
+        marked_index_ += 1;
+        last_time_display_marked_ = now;
+      }
+
+      marked_index_ = marked_index_ % cim.size();
+      captured_image_marked = cim[marked_index_];
     }
 
   private:

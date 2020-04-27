@@ -50,6 +50,9 @@ namespace fiducial_vlam
     virtual std::string cal_cmd(const std::string &cmd,
                                 const rclcpp::Time &now) = 0; //
     virtual std::string on_timer(const rclcpp::Time &now) = 0; //
+    virtual bool calibration_complete() = 0; //
+    virtual void get_captured_image_marked(const rclcpp::Time &now,
+                                           cv::Mat &captured_image_marked) = 0; //
   };
 
   std::unique_ptr<CalibrateCameraInterface> make_calibrate_camera(rclcpp::Logger &logger,
