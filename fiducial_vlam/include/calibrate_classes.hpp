@@ -5,21 +5,37 @@
 #include "opencv2/core.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+namespace cv
+{
+  namespace aruco
+  {
+    class Dictionary;
+  }
+}
+
 namespace fiducial_vlam
 {
+  class CharucoboardConfig;
 
 // ==============================================================================
-// BoardProjection struct
+// BoardProjection class
 // ==============================================================================
 
-  struct BoardProjection
+  class BoardProjection
   {
-    // Hold the image coordinates of the four corners of the board location.
-    const std::vector<cv::Point2f> ordered_board_corners_;
+    std::vector<cv::Point2f> ordered_board_corners_;
 
-    BoardProjection(std::vector<cv::Point2f> &&ordered_board_corners) :
+  public:
+    BoardProjection() :
+      ordered_board_corners_{}
+    {}
+
+    BoardProjection(std::vector<cv::Point2f> &ordered_board_corners) :
       ordered_board_corners_{ordered_board_corners}
     {}
+
+    inline const auto &ordered_board_corners() const
+    { return ordered_board_corners_; }  //
 
     float difference(const BoardProjection &other) const
     {
@@ -34,28 +50,45 @@ namespace fiducial_vlam
   };
 
 // ==============================================================================
-// ImageHolder struct
+// ImageHolder class
 // ==============================================================================
 
-  struct ImageHolder
+  class ImageHolder
   {
-    const cv::Mat gray_;
-    const rclcpp::Time time_stamp_;
-    const std::vector<int> aruco_ids_;
-    const std::vector<std::vector<cv::Point2f> > aruco_corners_;
-    const cv::Mat homo_;
-    const BoardProjection board_projection_;
+    cv::Mat gray_;
+    rclcpp::Time time_stamp_;
+    cv::Ptr<cv::aruco::Dictionary> aruco_dictionary_;
 
+    std::vector<int> aruco_ids_{};
+    std::vector<std::vector<cv::Point2f>> aruco_corners_{};
+    BoardProjection board_projection_{};
+
+  public:
     ImageHolder(const cv::Mat &gray,
                 const rclcpp::Time &time_stamp,
-                std::vector<int> aruco_ids,
-                std::vector<std::vector<cv::Point2f> > aruco_corners,
-                cv::Mat homo,
-                BoardProjection board_projection) :
+                const cv::Ptr<cv::aruco::Dictionary> &aruco_dictionary) :
       gray_{gray}, time_stamp_{time_stamp},
-      aruco_ids_{std::move(aruco_ids)}, aruco_corners_{std::move(aruco_corners)},
-      homo_{std::move(homo)}, board_projection_{std::move(board_projection)}
+      aruco_dictionary_{aruco_dictionary}
     {}
+
+    static std::shared_ptr<ImageHolder> make(const cv::Mat &gray,
+                                             const rclcpp::Time &time_stamp,
+                                             const cv::Ptr<cv::aruco::Dictionary> &aruco_dictionary,
+                                             const CharucoboardConfig &cbm);
+
+    inline const auto &gray() const
+    { return gray_; }  //
+    inline const auto &time_stamp() const
+    { return time_stamp_; } //
+    inline const auto &aruco_ids() const
+    { return aruco_ids_; } //
+    inline const auto &aruco_corners() const
+    { return aruco_corners_; } //
+    inline const auto &board_projection() const
+    { return board_projection_; } //
+
+    void detect_markers(const CharucoboardConfig &cbm,
+                        bool precise_not_quick);
   };
 
 // ==============================================================================

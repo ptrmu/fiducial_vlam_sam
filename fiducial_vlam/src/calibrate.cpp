@@ -322,6 +322,73 @@ namespace fiducial_vlam
 #endif
 
 // ==============================================================================
+// ImageHolder class
+// ==============================================================================
+
+  std::shared_ptr<ImageHolder> ImageHolder::make(const cv::Mat &gray,
+                                                 const rclcpp::Time &time_stamp,
+                                                 const cv::Ptr<cv::aruco::Dictionary> &aruco_dictionary,
+                                                 const CharucoboardConfig &cbm)
+  {
+    auto image_holder{std::make_shared<ImageHolder>(gray, time_stamp, aruco_dictionary)};
+    image_holder->detect_markers(cbm, false);
+    return image_holder;
+  }
+
+  void ImageHolder::detect_markers(const CharucoboardConfig &cbm,
+                                   bool precise_not_quick)
+  {
+    auto detectorParams{cv::aruco::DetectorParameters::create()};
+
+#if (CV_VERSION_MAJOR == 4)
+    //     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
+    //     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
+    //     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
+    //     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
+    detectorParams->cornerRefinementMethod = precise_not_quick ?
+                                             cv::aruco::CORNER_REFINE_CONTOUR :
+                                             cv::aruco::CORNER_REFINE_NONE;
+#else
+    // 0 = false
+    // 1 = true
+    detectorParameters->doCornerRefinement = precise_not_quick;
+#endif
+
+    // detect markers
+    cv::aruco::detectMarkers(gray_,
+                             aruco_dictionary_,
+                             aruco_corners_,
+                             aruco_ids_,
+                             detectorParams);
+
+    // Calculate Homography and board corners
+    if (!aruco_ids_.empty()) {
+
+      std::vector<cv::Point2f> op{};
+      std::vector<cv::Point2f> ip{};
+
+      for (int i = 0; i < aruco_ids_.size(); i += 1) {
+        auto id = aruco_ids_[i];
+        auto object_points = cbm.to_aruco_corners_f_facade(id);
+        auto image_points = aruco_corners_[i];
+        for (int j = 0; j < 4; j += 1) {
+          op.emplace_back(cv::Point2f{float(object_points(0, j)), float(object_points(1, j))});
+          ip.emplace_back(cv::Point2f{float(image_points[j].x), float(image_points[j].y)});
+        }
+      }
+
+      auto homo = cv::findHomography(op, ip);
+
+      // Figure out the projection of the board corners in the image
+      std::vector<cv::Point2f> board_corners;
+      auto board_corners_f_board = cbm.board_corners_f_facade_point2_array<cv::Point2f>();
+      cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
+
+      board_projection_ = BoardProjection{board_corners};
+    }
+  }
+
+// ==============================================================================
 // CalibrateCameraProcessImageImpl class
 // ==============================================================================
 
@@ -376,7 +443,7 @@ namespace fiducial_vlam
         return Observations{};
       }
 
-      auto image_holder = new_image_holder(gray->image, time_stamp);
+      auto image_holder = make_image_holder(gray->image, time_stamp);
 
 //      if (!image_holder->aruco_ids_.empty()) {
 //        board_targets_->compare_to_targets(image_holder);
@@ -394,8 +461,8 @@ namespace fiducial_vlam
       if (color_marked.dims != 0) {
 
         // Annotate the image with info we have collected so far.
-        if (!image_holder->aruco_ids_.empty()) {
-          drawDetectedMarkers(color_marked, image_holder->aruco_corners_);
+        if (!image_holder->aruco_ids().empty()) {
+          drawDetectedMarkers(color_marked, image_holder->aruco_corners());
         }
 
 //        if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
@@ -404,7 +471,7 @@ namespace fiducial_vlam
 
         for (auto &captured_image : captured_images_()) {
           drawBoardCorners(color_marked,
-                           captured_image->board_projection_.ordered_board_corners_,
+                           captured_image->board_projection().ordered_board_corners(),
                            cv::Scalar(255, 0, 0));
         }
       }
@@ -445,12 +512,12 @@ namespace fiducial_vlam
       for (int i = 0; i < captured_images.size(); i += 1) {
 
         auto image_file_name{ros2_shared::string_print::f("%s_%03d.png", cal_cxt_.cal_images_file_name_.c_str(), i)};
-        auto res = cv::imwrite(image_file_name, captured_images[i]->gray_);
+        auto res = cv::imwrite(image_file_name, captured_images[i]->gray());
 
         fs_header << "{:"
                   << "name" << image_file_name
-                  << "stamp" << std::to_string(captured_images[i]->time_stamp_.nanoseconds())
-                  << "clock" << captured_images[i]->time_stamp_.get_clock_type()
+                  << "stamp" << std::to_string(captured_images[i]->time_stamp().nanoseconds())
+                  << "clock" << captured_images[i]->time_stamp().get_clock_type()
                   << "},";
       }
 
@@ -481,7 +548,7 @@ namespace fiducial_vlam
 
         cv::Mat gray{cv::imread(image_name, cv::IMREAD_ANYCOLOR)};
 
-        auto image_holder = pi->new_image_holder(gray, rclcpp::Time(std::stoul(time_str), clock));
+        auto image_holder = pi->make_image_holder(gray, rclcpp::Time(std::stoul(time_str), clock));
         pi->captured_images_.capture(image_holder);
       }
 
@@ -502,58 +569,9 @@ namespace fiducial_vlam
     }
 
   private:
-    std::shared_ptr<ImageHolder> new_image_holder(const cv::Mat &gray, const rclcpp::Time &time_stamp)
+    std::shared_ptr<ImageHolder> make_image_holder(const cv::Mat &gray, const rclcpp::Time &time_stamp)
     {
-      std::vector<std::vector<cv::Point2f>> rejected;
-
-      // detect markers
-      std::vector<int> aruco_ids;
-      std::vector<std::vector<cv::Point2f>> aruco_corners;
-      cv::aruco::detectMarkers(gray, dictionary_, aruco_corners, aruco_ids, detectorParams_, rejected);
-
-//      // refind strategy to detect more markers
-//      if (cxt_.refind_strategy_) {
-//        cv::aruco::refineDetectedMarkers(gray, board_, aruco_corners, aruco_ids, rejected);
-//      }
-//
-//      // interpolate charuco corners
-//      cv::Mat charuco_ids;
-//      cv::Mat charuco_corners;
-//      if (!aruco_ids.empty()) {
-//        cv::aruco::interpolateCornersCharuco(aruco_corners, aruco_ids,
-//                                             gray, charucoboard_,
-//                                             charuco_corners, charuco_ids);
-//      }
-//
-      // Calculate Homography
-      cv::Mat homo;
-      std::vector<cv::Point2f> board_corners;
-      if (!aruco_ids.empty()) {
-
-        std::vector<cv::Point2f> op{};
-        std::vector<cv::Point2f> ip{};
-
-        for (int i = 0; i < aruco_ids.size(); i += 1) {
-          auto id = aruco_ids[i];
-          auto object_points = cbm_.to_aruco_corners_f_facade(id);
-          auto image_points = aruco_corners[i];
-          for (int j = 0; j < 4; j += 1) {
-            op.emplace_back(cv::Point2f{float(object_points(0, j)), float(object_points(1, j))});
-            ip.emplace_back(cv::Point2f{float(image_points[j].x), float(image_points[j].y)});
-          }
-        }
-
-        homo = cv::findHomography(op, ip);
-
-        // Figure out the projection of the board corners in the image
-        auto board_corners_f_board = cbm_.board_corners_f_facade_point2_array<cv::Point2f>();
-        cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
-      }
-
-      return std::make_shared<ImageHolder>(
-        gray, time_stamp,
-        std::move(aruco_ids), std::move(aruco_corners),
-        std::move(homo), BoardProjection{std::move(board_corners)});
+      return ImageHolder::make(gray, time_stamp, dictionary_, cbm_);
     }
   };
 
@@ -608,8 +626,8 @@ namespace fiducial_vlam
     {
       CalibrateCameraResult res;
 
-      // Generate color images to draw on from the captured images.
-      prepare_captured_images_marked(res);
+      // Do some per captured image tasks to prepare for calibration.
+      prepare_captured_images(res);
 
       // Loop over the images finding the checkerboard junctions
       for (auto &captured_iamge : captured_images_) {
@@ -623,7 +641,7 @@ namespace fiducial_vlam
 
       res.reproject_error_ = calibrateCamera(
         res.junctions_f_board_, res.junctions_f_image_,
-        cv::Size{captured_images_[0]->gray_.cols, captured_images_[0]->gray_.rows},
+        cv::Size{captured_images_[0]->gray().cols, captured_images_[0]->gray().rows},
         res.camera_matrix_, res.dist_coeffs_,
         res.rvecs_, res.tvecs_,
         res.stdDeviationsIntrinsics_, res.stdDeviationsExtrinsics_, res.perViewErrors_,
@@ -698,7 +716,7 @@ namespace fiducial_vlam
 
             // Pick out the location of the corner of this marker that is closest to the
             // junction.
-            auto &aruco_corners = captured_image->aruco_corners_[std::get<1>(find_ptr->second)];
+            auto &aruco_corners = captured_image->aruco_corners()[std::get<1>(find_ptr->second)];
             closest_corners_f_image.emplace_back(aruco_corners[adjacent_aruco_closest_corner_idx[i]]);
           }
         }
@@ -721,7 +739,7 @@ namespace fiducial_vlam
 
         // Find the junction image location with sub pixel accuracy.
         local_junctions_f_image.resize(1);
-        cv::cornerSubPix(captured_image->gray_, local_junctions_f_image, win_size, cv::Size(),
+        cv::cornerSubPix(captured_image->gray(), local_junctions_f_image, win_size, cv::Size(),
                          cv::TermCriteria(cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS,
                                           30, DBL_EPSILON));
 
@@ -743,9 +761,9 @@ namespace fiducial_vlam
     {
       MarkersHomography markers_homography{};
 
-      for (std::size_t idx = 0; idx < captured_image->aruco_ids_.size(); idx += 1) {
-        ArucoId aruco_id(captured_image->aruco_ids_[idx]);
-        auto &aruco_corners_f_image(captured_image->aruco_corners_[idx]);
+      for (std::size_t idx = 0; idx < captured_image->aruco_ids().size(); idx += 1) {
+        ArucoId aruco_id(captured_image->aruco_ids()[idx]);
+        auto &aruco_corners_f_image(captured_image->aruco_corners()[idx]);
 
         std::vector<cv::Point2f> aruco_corners_f_facade{};
         auto const &acff(cbm_.to_aruco_corners_f_facade(aruco_id));
@@ -792,12 +810,19 @@ namespace fiducial_vlam
       return win_size;
     }
 
-    void prepare_captured_images_marked(CalibrateCameraResult &res)
+    void prepare_captured_images(CalibrateCameraResult &res)
     {
       for (auto &ci : captured_images_) {
+        // Redetect the aruco corners using precision
+        ci->detect_markers(cbm_, true);
+
+        // Create the color marked images for annotating
         cv::Mat cim{};
-        cv::cvtColor(ci->gray_, cim, cv::COLOR_GRAY2BGR);
+        cv::cvtColor(ci->gray(), cim, cv::COLOR_GRAY2BGR);
         res.captured_images_marked_.push_back(cim);
+
+        // Annotate the charuco markers.
+        drawDetectedMarkers(cim, ci->aruco_corners());
       }
     }
   };
@@ -960,7 +985,7 @@ namespace fiducial_vlam
 
       for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
         s.append(ros2_shared::string_print::f("Image %d, %s - Reprojection error %5.3f\n",
-                                              i, to_date_string(captured_images_[i]->time_stamp_).c_str(),
+                                              i, to_date_string(captured_images_[i]->time_stamp()).c_str(),
                                               res.perViewErrors_.at<double>(i, 0)));
         s.append(calc_junction_errors(res, i));
         s.append("\n");

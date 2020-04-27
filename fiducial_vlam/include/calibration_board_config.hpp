@@ -140,7 +140,7 @@ namespace fiducial_vlam
       return static_cast<double>(squares_x_) / squares_y_;
     }
 
-    CornerPointsFFacade board_corners_f_facade()
+    CornerPointsFFacade board_corners_f_facade() const
     {
       return (CornerPointsFFacade{} << PointFFacade{0.0, 0.0},
         PointFFacade{squares_x_ * square_length_, 0.0},
@@ -149,7 +149,7 @@ namespace fiducial_vlam
     }
 
     template<typename TPoint2>
-    std::vector<TPoint2> board_corners_f_facade_point2_array()
+    std::vector<TPoint2> board_corners_f_facade_point2_array() const
     {
       return std::vector<TPoint2>{
         TPoint2(0.0, 0.0),

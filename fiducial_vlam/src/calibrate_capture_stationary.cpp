@@ -54,13 +54,13 @@ namespace fiducial_vlam
   public:
     void reset(std::shared_ptr<ImageHolder> &image_holder)
     {
-      assert(image_holder->board_projection_.ordered_board_corners_.size() == 4);
-      last_board_corners_ = image_holder->board_projection_.ordered_board_corners_;
+      assert(image_holder->board_projection().ordered_board_corners().size() == 4);
+      last_board_corners_ = image_holder->board_projection().ordered_board_corners();
     }
 
     bool test_stationary(std::shared_ptr<ImageHolder> &image_holder)
     {
-      auto &board_corners = image_holder->board_projection_.ordered_board_corners_;
+      auto &board_corners = image_holder->board_projection().ordered_board_corners();
       assert(board_corners.size() == 4);
 
       // Calculate the number of pixels that each corner moved since the
@@ -123,17 +123,17 @@ namespace fiducial_vlam
       void test_capture(std::shared_ptr<ImageHolder> &image_holder,
                         cv::Mat &color_marked) override
       {
-        auto time_stamp{image_holder->time_stamp_};
+        auto time_stamp{image_holder->time_stamp()};
 
         // We can only leave ready state when a board has been viewed for a small
         // amount of time.
-        if (image_holder->board_projection_.ordered_board_corners_.empty()) {
+        if (image_holder->board_projection().ordered_board_corners().empty()) {
           last_empty_time_ = time_stamp;
           return;
         }
 
         // Provide some feed back in this state.
-        draw_board_boundary(color_marked, image_holder->board_projection_.ordered_board_corners_);
+        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners());
 
         // Enforce the minimum time.
         if (time_stamp - last_empty_time_ < min_time_before_leave_ready) {
@@ -163,13 +163,13 @@ namespace fiducial_vlam
       {
         // If we are tracking and the board disappears, then
         // go back to ready mode
-        if (image_holder->board_projection_.ordered_board_corners_.empty()) {
-          impl_.ready_state_.activate(image_holder->time_stamp_);
+        if (image_holder->board_projection().ordered_board_corners().empty()) {
+          impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
 
         // Provide some feed back in this state.
-        draw_board_boundary(color_marked, image_holder->board_projection_.ordered_board_corners_);
+        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners());
 
         // When the board becomes stationary, then transition to stationary mode.
         if (impl_.stationary_board_.test_stationary(image_holder)) {
@@ -202,15 +202,15 @@ namespace fiducial_vlam
       {
         // If we are stationary and the board disappears, then
         // go back to ready mode
-        if (image_holder->board_projection_.ordered_board_corners_.empty()) {
-          impl_.ready_state_.activate(image_holder->time_stamp_);
+        if (image_holder->board_projection().ordered_board_corners().empty()) {
+          impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
 
         // Mark the color_marked image with a coloration that indicates how long
         // this board has been stationary.
-        draw_board_boundary(color_marked, image_holder->board_projection_.ordered_board_corners_,
-                            (image_holder->time_stamp_ - start_stationary_time_).seconds() / min_time_stationary_secs);
+        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners(),
+                            (image_holder->time_stamp() - start_stationary_time_).seconds() / min_time_stationary_secs);
 
         // If the board starts moving then transition back to the
         // tracking state.
@@ -221,7 +221,7 @@ namespace fiducial_vlam
 
         // If the board stays stationary for the specified length of time
         // then transition to the captured state (and capture the image)
-        if ((image_holder->time_stamp_ - start_stationary_time_).seconds() > min_time_stationary_secs) {
+        if ((image_holder->time_stamp() - start_stationary_time_).seconds() > min_time_stationary_secs) {
           impl_.captured_state_.activate(image_holder);
           return;
         }
@@ -232,7 +232,7 @@ namespace fiducial_vlam
       void activate(std::shared_ptr<ImageHolder> &image_holder)
       {
         _activate();
-        start_stationary_time_ = image_holder->time_stamp_;
+        start_stationary_time_ = image_holder->time_stamp();
       }
     };
 
@@ -250,8 +250,8 @@ namespace fiducial_vlam
       {
         // Stay in the captured state until the board is removed from
         // the view.
-        if (image_holder->board_projection_.ordered_board_corners_.empty()) {
-          impl_.ready_state_.activate(image_holder->time_stamp_);
+        if (image_holder->board_projection().ordered_board_corners().empty()) {
+          impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
 
@@ -268,8 +268,8 @@ namespace fiducial_vlam
 
         // record the board boundary so we can give stationary feedback that the image
         // has been captured.
-        captured_board_corners_ = image_holder->board_projection_.ordered_board_corners_;
-       }
+        captured_board_corners_ = image_holder->board_projection().ordered_board_corners();
+      }
     };
 
     rclcpp::Logger &logger_;
