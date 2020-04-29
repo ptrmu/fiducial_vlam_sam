@@ -29,8 +29,6 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(cal_square_length, float, 0.030)           /* length of a square on the charuco board  */ \
   CXT_MACRO_MEMBER(cal_upper_left_white_not_black, int, 0)    /* upper_left_white_not_black  */ \
   CXT_MACRO_MEMBER(cal_marker_length, float, 0.0225)          /* length of a marker on the charuco board  */ \
-  CXT_MACRO_MEMBER(cal_cv3_do_corner_refinement, int, 1)      /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */ \
-  CXT_MACRO_MEMBER(cal_cv4_corner_refinement_method, int, 2)  /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */ \
  /* End of list */
 
   struct CalibrateContext

@@ -18,7 +18,7 @@ namespace fiducial_vlam
 // ==============================================================================
 
   static void draw_board_boundary(cv::InputOutputArray image,
-                                  const std::vector<cv::Point2f> &board_corners,
+                                  const std::array<cv::Point2f, 4> &board_corners,
                                   double border_fraction_colored_1 = 0.,
                                   cv::Scalar border_color_0 = feedback_border_color_0,
                                   cv::Scalar border_color_1 = feedback_border_color_1)
@@ -42,52 +42,6 @@ namespace fiducial_vlam
       }
     }
   }
-
-// ==============================================================================
-// StationaryBoard class
-// ==============================================================================
-
-  class StationaryBoard
-  {
-    std::vector<cv::Point2f> last_board_corners_{};
-
-  public:
-    void reset(std::shared_ptr<ImageHolder> &image_holder)
-    {
-      assert(image_holder->board_projection().ordered_board_corners().size() == 4);
-      last_board_corners_ = image_holder->board_projection().ordered_board_corners();
-    }
-
-    bool test_stationary(std::shared_ptr<ImageHolder> &image_holder)
-    {
-      auto &board_corners = image_holder->board_projection().ordered_board_corners();
-      assert(board_corners.size() == 4);
-
-      // Calculate the number of pixels that each corner moved since the
-      // last test. Calculate the average change in position of the four
-      // corners and then divide by the time to get the pixel velocity
-      // of the corners.
-      double delta{0.};
-      double longest_side{0.};
-      for (int i = 0; i < 4; i += 1) {
-        delta += cv::norm(board_corners[i] - last_board_corners_[i]);
-        last_board_corners_[i] = board_corners[i];
-        auto side = cv::norm(board_corners[i] - board_corners[(i + 1) % 4]);
-        longest_side = std::max(side, longest_side);
-      }
-
-      // A heuristic metric that seems to work OK for figuring out when
-      // the board is not moving. We may need some normalization based on
-      // the frame rate - but maybe not.
-      delta /= 4. * longest_side * 0.001;
-      return delta < delta_threshold;
-    }
-
-    std::vector<cv::Point2f> &last_board_corners()
-    {
-      return last_board_corners_;
-    }
-  };
 
 // ==============================================================================
 // CalibrateCaptureStationaryImpl class
@@ -127,13 +81,13 @@ namespace fiducial_vlam
 
         // We can only leave ready state when a board has been viewed for a small
         // amount of time.
-        if (image_holder->board_projection().ordered_board_corners().empty()) {
+        if (!image_holder->board_projection().valid()) {
           last_empty_time_ = time_stamp;
           return;
         }
 
         // Provide some feed back in this state.
-        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners());
+        draw_board_boundary(color_marked, image_holder->board_projection().board_corners());
 
         // Enforce the minimum time.
         if (time_stamp - last_empty_time_ < min_time_before_leave_ready) {
@@ -163,28 +117,29 @@ namespace fiducial_vlam
       {
         // If we are tracking and the board disappears, then
         // go back to ready mode
-        if (image_holder->board_projection().ordered_board_corners().empty()) {
+        if (!image_holder->board_projection().valid()) {
           impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
 
         // Provide some feed back in this state.
-        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners());
+        draw_board_boundary(color_marked, image_holder->board_projection().board_corners());
 
         // When the board becomes stationary, then transition to stationary mode.
-        if (impl_.stationary_board_.test_stationary(image_holder)) {
+        if (impl_.test_stationary(image_holder)) {
           impl_.stationary_state_.activate(image_holder);
           return;
         }
 
         // otherwise stay in the tracking state waiting for the
         // board to stop moving.
+        impl_.reset_stationary(image_holder);
       }
 
       void activate(std::shared_ptr<ImageHolder> &image_holder)
       {
         _activate();
-        impl_.stationary_board_.reset(image_holder);
+        impl_.reset_stationary(image_holder);
       }
     };
 
@@ -202,19 +157,19 @@ namespace fiducial_vlam
       {
         // If we are stationary and the board disappears, then
         // go back to ready mode
-        if (image_holder->board_projection().ordered_board_corners().empty()) {
+        if (!image_holder->board_projection().valid()) {
           impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
 
         // Mark the color_marked image with a coloration that indicates how long
         // this board has been stationary.
-        draw_board_boundary(color_marked, image_holder->board_projection().ordered_board_corners(),
+        draw_board_boundary(color_marked, image_holder->board_projection().board_corners(),
                             (image_holder->time_stamp() - start_stationary_time_).seconds() / min_time_stationary_secs);
 
         // If the board starts moving then transition back to the
         // tracking state.
-        if (!impl_.stationary_board_.test_stationary(image_holder)) {
+        if (!impl_.test_stationary(image_holder)) {
           impl_.tracking_state_.activate(image_holder);
           return;
         }
@@ -238,7 +193,7 @@ namespace fiducial_vlam
 
     class CapturedState : public State
     {
-      std::vector<cv::Point2f> captured_board_corners_;
+      std::array<cv::Point2f, 4> captured_board_corners_;
 
     public:
       CapturedState(CalibrateCaptureStationaryImpl &impl) :
@@ -250,7 +205,7 @@ namespace fiducial_vlam
       {
         // Stay in the captured state until the board is removed from
         // the view.
-        if (image_holder->board_projection().ordered_board_corners().empty()) {
+        if (!image_holder->board_projection().valid()) {
           impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
@@ -268,7 +223,7 @@ namespace fiducial_vlam
 
         // record the board boundary so we can give stationary feedback that the image
         // has been captured.
-        captured_board_corners_ = image_holder->board_projection().ordered_board_corners();
+        captured_board_corners_ = image_holder->board_projection().board_corners();
       }
     };
 
@@ -283,7 +238,19 @@ namespace fiducial_vlam
 
     CalibrateCaptureInterface *state_;
 
-    StationaryBoard stationary_board_{};
+    BoardProjection last_board_projection_{};
+
+    void reset_stationary(std::shared_ptr<ImageHolder> &image_holder)
+    {
+      last_board_projection_ = image_holder->board_projection();
+    }
+
+    bool test_stationary(std::shared_ptr<ImageHolder> &image_holder)
+    {
+      std::cout << last_board_projection_.corner_pixel_delta(image_holder->board_projection()) << std::endl;
+      return last_board_projection_.corner_pixel_delta(image_holder->board_projection()) < delta_threshold;
+    }
+
 
   public:
     CalibrateCaptureStationaryImpl(rclcpp::Logger &logger,

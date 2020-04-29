@@ -23,30 +23,21 @@ namespace fiducial_vlam
 
   class BoardProjection
   {
-    std::vector<cv::Point2f> ordered_board_corners_;
+    bool valid_{false};
+    double delta_scale_factor_{1.};
+    std::array<cv::Point2f, 4> board_corners_f_image_{};
 
   public:
-    BoardProjection() :
-      ordered_board_corners_{}
-    {}
+    BoardProjection() = default;
 
-    BoardProjection(std::vector<cv::Point2f> &ordered_board_corners) :
-      ordered_board_corners_{ordered_board_corners}
-    {}
+    explicit BoardProjection(std::vector<cv::Point2f> &board_corners, int max_image_dimension);
 
-    inline const auto &ordered_board_corners() const
-    { return ordered_board_corners_; }  //
+    inline const auto &valid() const
+    { return valid_; }  //
+    inline const auto &board_corners() const
+    { return board_corners_f_image_; }  //
 
-    float difference(const BoardProjection &other) const
-    {
-      auto diff = (
-                    cv::norm(ordered_board_corners_[0] - other.ordered_board_corners_[0]) +
-                    cv::norm(ordered_board_corners_[1] - other.ordered_board_corners_[1]) +
-                    cv::norm(ordered_board_corners_[2] - other.ordered_board_corners_[2]) +
-                    cv::norm(ordered_board_corners_[3] - other.ordered_board_corners_[3])
-                  ) / 4;
-      return diff;
-    }
+    double corner_pixel_delta(const BoardProjection &board_projection);
   };
 
 // ==============================================================================
@@ -97,7 +88,7 @@ namespace fiducial_vlam
 
   class CapturedImages
   {
-    const cv::Size image_size_;
+    cv::Size image_size_;
     std::vector<std::shared_ptr<ImageHolder>> captured_images_{};
 
   public:
@@ -105,20 +96,12 @@ namespace fiducial_vlam
       image_size_{image_size}
     {}
 
-    void capture(std::shared_ptr<ImageHolder> &image_holder)
-    {
-      captured_images_.emplace_back(image_holder);
-    }
-
     const cv::Size image_size()
-    {
-      return image_size_;
-    }
+    { return image_size_; } //
+    const auto &operator()()
+    { return captured_images_; } //
 
-    const std::vector<std::shared_ptr<ImageHolder>> &operator()()
-    {
-      return captured_images_;
-    }
+    void capture(std::shared_ptr<ImageHolder> &image_holder);
   };
 }
 #endif //_CALIBRATE_CLASSES_HPP

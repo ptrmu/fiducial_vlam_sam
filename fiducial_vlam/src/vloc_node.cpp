@@ -587,7 +587,7 @@ namespace fiducial_vlam
           header.stamp = time_now;
           header.frame_id = "captured_image_marked";
           cv_bridge::CvImage cv_image{header, "bgr8", captured_image_marked};
-          image_marked_pub_->publish(cv_image.toImageMsg());
+          image_marked_pub_->publish(*cv_image.toImageMsg());
         }
       }
     }

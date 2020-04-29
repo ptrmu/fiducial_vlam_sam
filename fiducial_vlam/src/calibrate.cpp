@@ -116,7 +116,7 @@ namespace fiducial_vlam
   }
 
   static void drawBoardCorners(cv::InputOutputArray image,
-                               const std::vector<cv::Point2f> &board_corners,
+                               const std::array<cv::Point2f, 4> &board_corners,
                                cv::Scalar borderColor = cv::Scalar(0, 0, 255))
   {
     for (int j = 0; j < 4; j++) {
@@ -152,174 +152,47 @@ namespace fiducial_vlam
 //    }
   }
 
-#if 0
+// ==============================================================================
+// BoardProjection class
+// ==============================================================================
 
-  struct CalibrationImage
+  static double calc_delta_scale_factor(std::vector<cv::Point2f> &board_corners,
+                                        int max_image_dimension)
   {
-    BoardProjection target_;
-    float difference_{};
-    std::shared_ptr<ImageHolder> image_{};
+    double longest_side{0.};
+    for (int i = 0; i < 4; i += 1) {
+      auto side = cv::norm(board_corners[i] - board_corners[(i + 1) % 4]);
+      longest_side = std::max(side, longest_side);
+    }
+    return max_image_dimension / 4. / longest_side;
+  }
 
-    CalibrationImage(BoardProjection &&target) :
-      target_{target}
-    {}
-  };
+  BoardProjection::BoardProjection(std::vector<cv::Point2f> &board_corners,
+                                   int max_image_dimension) :
+    valid_{true},
+    delta_scale_factor_{calc_delta_scale_factor(board_corners, max_image_dimension)},
+    board_corners_f_image_{board_corners[0], board_corners[1],
+                           board_corners[2], board_corners[3]}
+  {}
 
-  class BoardTargets
+  double BoardProjection::corner_pixel_delta(const BoardProjection &board_projection)
   {
-    cv::Size image_size_;
-    std::vector<CalibrationImage> best_images_;
+    auto &other_board_corners_f_image = board_projection.board_corners();
 
-    std::vector<std::shared_ptr<ImageHolder>> captured_images_{};
-
-    static BoardProjection new_target(double board_width_per_height, const cv::Size &image_size,
-                                      int x_alignment, float x_normalized, float width_normalized,
-                                      int y_alignment, float y_normalized)
-    {
-      double x_max = image_size.width - 1;
-      double y_max = image_size.height - 1;
-
-      double width = width_normalized * x_max;
-      double height = width / board_width_per_height;
-
-      double left = x_normalized * x_max;
-      switch (x_alignment) {
-        case 0:
-          left -= width / 2;
-          break;
-        case 1:
-          left -= width;
-          break;
-      }
-
-      double top = y_normalized * y_max;
-      switch (y_alignment) {
-        case 0:
-          top -= height / 2;
-          break;
-        case 1:
-          top -= height;
-          break;
-      }
-
-      return BoardProjection(std::vector<cv::Point2f>{
-        cv::Point2f(left, top),
-        cv::Point2f(left + width, top),
-        cv::Point2f(left + width, top + height),
-        cv::Point2f(left, top + height),
-      });
+    // Calculate the number of pixels that each corner moved from this
+    // location.
+    double delta{0.};
+    for (int i = 0; i < 4; i += 1) {
+      delta += cv::norm(other_board_corners_f_image[i] - board_corners_f_image_[i]);
     }
 
-    static std::vector<CalibrationImage> new_best_images(float width_per_height, const cv::Size &image_size)
-    {
-      return std::vector<CalibrationImage>{
-        CalibrationImage(new_target(width_per_height, image_size, -1, 0., 0.25, -1, 0.)),
-        CalibrationImage(new_target(width_per_height, image_size, +0, .5, 0.25, -1, 0.)),
-        CalibrationImage(new_target(width_per_height, image_size, +1, 1., 0.25, -1, 0.)),
-        CalibrationImage(new_target(width_per_height, image_size, -1, 0., 0.25, +1, 1.)),
-        CalibrationImage(new_target(width_per_height, image_size, +0, .5, 0.25, +1, 1.)),
-        CalibrationImage(new_target(width_per_height, image_size, +1, 1., 0.25, +1, 1.)),
-      };
-    }
+    // A heuristic metric that seems to work OK for figuring out when
+    // the board is not moving. We may need some normalization based on
+    // the frame rate - but maybe not.
+    delta *= delta_scale_factor_;
 
-  public:
-    explicit BoardTargets(rclcpp::Logger &logger, double board_width_per_height, const cv::Size &image_size) :
-      image_size_{image_size}, best_images_{new_best_images(board_width_per_height, image_size)}
-    {}
-
-    void reset()
-    {
-      image_size_.width = 0;
-    }
-
-    std::vector<CalibrationImage> &get_best_images()
-    {
-      return best_images_;
-    }
-
-    int width()
-    {
-      return image_size_.width;
-    }
-
-    int height()
-    {
-      return image_size_.height;
-    }
-
-    std::vector<std::shared_ptr<ImageHolder>> &get_captured_images()
-    {
-      return captured_images_;
-    }
-
-    void capture_image(std::shared_ptr<ImageHolder> &image_holder)
-    {
-      captured_images_.emplace_back(image_holder);
-    }
-
-    void compare_to_targets(std::shared_ptr<ImageHolder> &image_holder)
-    {
-      for (auto &best_image : best_images_) {
-        auto difference = best_image.target_.difference(image_holder->board_projection_);
-        if (difference < 300.) {
-          if (!best_image.image_ ||
-              difference < best_image.difference_) {
-            best_image.image_ = image_holder;
-            best_image.difference_ = difference;
-          }
-        }
-      }
-    }
-  };
-
-  struct FrameData
-  {
-    std::vector<int> ids_;
-    std::vector<std::vector<cv::Point2f> > corners_;
-    cv::Mat currentCharucoCorners_;
-    cv::Mat currentCharucoIds_;
-
-    explicit FrameData(CharucoMath::CvCharucoMath &cvcm, cv::Mat &image)
-    {
-      std::vector<std::vector<cv::Point2f> > rejected;
-
-      // detect markers
-      cv::aruco::detectMarkers(image, cvcm.dictionary_, corners_, ids_, cvcm.detectorParams_, rejected);
-
-      // refind strategy to detect more markers
-      if (cvcm.cxt_.refind_strategy_) {
-        cv::aruco::refineDetectedMarkers(image, cvcm.board_, corners_, ids_, rejected);
-      }
-
-      // interpolate charuco corners
-      if (!ids_.empty())
-        cv::aruco::interpolateCornersCharuco(corners_, ids_,
-                                             image, cvcm.charucoboard_,
-                                             currentCharucoCorners_, currentCharucoIds_);
-    }
-  };
-
-  struct AllFramesData
-  {
-    // collect data from each frame
-    std::vector<std::vector<std::vector<cv::Point2f>>> allCorners_;
-    std::vector<std::vector<int>> allIds_;
-    std::vector<cv::Mat> allImgs_;
-    cv::Size imgSize_;
-
-    explicit AllFramesData(CharucoMath::CvCharucoMath &cvcm,
-                           const std::vector<std::shared_ptr<cv_bridge::CvImage>> &captured_images)
-    {
-      for (auto &color : captured_images) {
-        FrameData fd{cvcm, color->image};
-        allCorners_.emplace_back(fd.corners_);
-        allIds_.emplace_back(fd.ids_);
-        allImgs_.emplace_back(color->image);
-        imgSize_ = color->image.size();
-      }
-    }
-  };
-#endif
+    return delta;
+  }
 
 // ==============================================================================
 // ImageHolder class
@@ -384,8 +257,14 @@ namespace fiducial_vlam
       auto board_corners_f_board = cbm.board_corners_f_facade_point2_array<cv::Point2f>();
       cv::perspectiveTransform(board_corners_f_board, board_corners, homo);
 
-      board_projection_ = BoardProjection{board_corners};
+      board_projection_ = BoardProjection{board_corners, std::max(gray_.cols, gray_.rows)};
     }
+  }
+
+
+  void CapturedImages::capture(std::shared_ptr<ImageHolder> &image_holder)
+  {
+    captured_images_.emplace_back(image_holder);
   }
 
 // ==============================================================================
@@ -396,8 +275,7 @@ namespace fiducial_vlam
   {
     rclcpp::Logger &logger_;
     const CalibrateContext &cal_cxt_;
-    cv::Ptr<cv::aruco::DetectorParameters> detectorParams_;
-    cv::Ptr<cv::aruco::Dictionary> dictionary_;
+    cv::Ptr<cv::aruco::Dictionary> aruco_dictionary_;
     CharucoboardConfig cbm_;
     CapturedImages captured_images_;
     std::unique_ptr<CalibrateCaptureInterface> test_capture_;
@@ -410,25 +288,13 @@ namespace fiducial_vlam
                                     const rclcpp::Time &time_stamp,
                                     const cv::Size &image_size) :
       logger_{logger}, cal_cxt_{cal_cxt},
-      detectorParams_{cv::aruco::DetectorParameters::create()},
-      dictionary_{cv::aruco::getPredefinedDictionary(
+      aruco_dictionary_{cv::aruco::getPredefinedDictionary(
         cv::aruco::PREDEFINED_DICTIONARY_NAME(cal_cxt.cal_aruco_dictionary_id_))},
       cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
            cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_),
       captured_images_(image_size),
       test_capture_(make_calibrate_capture_stationary(logger, cal_cxt, time_stamp, captured_images_))
     {
-#if (CV_VERSION_MAJOR == 4)
-//     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
-//     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
-//     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
-//     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
-      detectorParams_->cornerRefinementMethod = cal_cxt.cal_cv4_corner_refinement_method_;
-#else
-      // 0 = false
-      // 1 = true
-      detectorParameters->doCornerRefinement = cal_cxt.cal_cv3_do_corner_refinement_;
-#endif
       RCLCPP_INFO(logger, "CalibrateCameraProcessImage created for %dx%d (wxh) images",
                   image_size.width, image_size.height);
     }
@@ -444,10 +310,6 @@ namespace fiducial_vlam
       }
 
       auto image_holder = make_image_holder(gray->image, time_stamp);
-
-//      if (!image_holder->aruco_ids_.empty()) {
-//        board_targets_->compare_to_targets(image_holder);
-//      }
 
       // Check if a manual capture has been requested
       if (capture_next_image_) {
@@ -465,13 +327,9 @@ namespace fiducial_vlam
           drawDetectedMarkers(color_marked, image_holder->aruco_corners());
         }
 
-//        if (!image_holder->board_projection_.ordered_board_corners_.empty()) {
-//          drawBoardCorners(color_marked, image_holder->board_projection_.ordered_board_corners_);
-//        }
-
         for (auto &captured_image : captured_images_()) {
           drawBoardCorners(color_marked,
-                           captured_image->board_projection().ordered_board_corners(),
+                           captured_image->board_projection().board_corners(),
                            cv::Scalar(255, 0, 0));
         }
       }
@@ -571,7 +429,7 @@ namespace fiducial_vlam
   private:
     std::shared_ptr<ImageHolder> make_image_holder(const cv::Mat &gray, const rclcpp::Time &time_stamp)
     {
-      return ImageHolder::make(gray, time_stamp, dictionary_, cbm_);
+      return ImageHolder::make(gray, time_stamp, aruco_dictionary_, cbm_);
     }
   };
 
@@ -646,25 +504,6 @@ namespace fiducial_vlam
         res.rvecs_, res.tvecs_,
         res.stdDeviationsIntrinsics_, res.stdDeviationsExtrinsics_, res.perViewErrors_,
         res.flags_);
-
-//
-//      for (size_t i = 0; i < res.stdDeviationsIntrinsics_.rows; i += 1) {
-//        std::cout
-//          << "stdDeviationsIntrinsics_ " << i << " "
-//          << res.stdDeviationsIntrinsics_.at<float>(i, 0) << std::endl;
-//      }
-//
-//      for (size_t i = 0; i < res.stdDeviationsExtrinsics_.rows; i += 1) {
-//        std::cout
-//          << "stdDeviationsExtrinsics_ " << i << " "
-//          << res.stdDeviationsExtrinsics_.at<float>(i, 0) << std::endl;
-//      }
-//
-//      for (size_t i = 0; i < res.perViewErrors_.rows; i += 1) {
-//        std::cout
-//          << "perViewErrors_ " << i << " "
-//          << res.perViewErrors_.at<float>(i, 0) << std::endl;
-//      }
 
       res.valid_ = true;
       return res;
@@ -930,7 +769,8 @@ namespace fiducial_vlam
     std::string calc_junction_errors(const CalibrateCameraResult &res, std::size_t i)
     {
       std::string s{};
-      std::vector<cv::Vec2f> reproject_image_points;
+      std::vector<cv::Vec2f> reproject_image_points{};
+      int bad_reprojection_count{0};
 
       // Project the object points onto the image so we can calculate the individual junction
       // reprojection errors.
@@ -949,10 +789,18 @@ namespace fiducial_vlam
           auto index = p->second;
           auto error = cv::norm(reproject_image_points[index] - junctions_f_image[index]);
           s.append(ros2_shared::string_print::f("%5.3f ", error));
+          if (error > 1.) {
+            bad_reprojection_count += 1;
+          }
         }
         if (junction_id % cbm_.squares_x_m_1_ == cbm_.squares_x_m_1_ - 1) {
           s.append("\n");
         }
+      }
+
+      if (bad_reprojection_count > 0) {
+        s.append(ros2_shared::string_print::f("****** %d bad junction re-projection errors\n",
+                                              bad_reprojection_count));
       }
 
       return s;
@@ -966,19 +814,29 @@ namespace fiducial_vlam
       s.append(ros2_shared::string_print::f("Camera calibration done on %s\n",
                                             to_date_string(res.calibration_time_).c_str()));
 
-      s.append(ros2_shared::string_print::f("fx, fy: %f %f\n",
+      s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
                                             res.camera_matrix_(0, 0),
-                                            res.camera_matrix_(1, 1)));
-      s.append(ros2_shared::string_print::f("cx, cy: %f %f\n",
+                                            res.camera_matrix_(1, 1),
                                             res.camera_matrix_(0, 2),
                                             res.camera_matrix_(1, 2)));
+      s.append(ros2_shared::string_print::f("std dev fx, fy, cx, cy: %f %f %f %f\n",
+                                            res.stdDeviationsIntrinsics_.at<double>(0),
+                                            res.stdDeviationsIntrinsics_.at<double>(1),
+                                            res.stdDeviationsIntrinsics_.at<double>(2),
+                                            res.stdDeviationsIntrinsics_.at<double>(3)));
 
-      s.append(ros2_shared::string_print::f("%f %f %f %f %f\n",
+      s.append(ros2_shared::string_print::f("k1, k2, p1, p2, k3: %f %f %f %f %f\n",
                                             res.dist_coeffs_(0, 0),
                                             res.dist_coeffs_(1, 0),
                                             res.dist_coeffs_(2, 0),
                                             res.dist_coeffs_(3, 0),
                                             res.dist_coeffs_(4, 0)));
+      s.append(ros2_shared::string_print::f("std dev k1, k2, p1, p2, k3: %f %f %f %f %f\n",
+                                            res.stdDeviationsIntrinsics_.at<double>(4),
+                                            res.stdDeviationsIntrinsics_.at<double>(5),
+                                            res.stdDeviationsIntrinsics_.at<double>(6),
+                                            res.stdDeviationsIntrinsics_.at<double>(7),
+                                            res.stdDeviationsIntrinsics_.at<double>(8)));
 
       s.append(ros2_shared::string_print::f("Total reprojection error %5.3f\n",
                                             res.reproject_error_));

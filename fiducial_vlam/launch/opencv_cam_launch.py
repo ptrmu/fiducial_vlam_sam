@@ -30,7 +30,7 @@ def generate_launch_description():
         # ExecuteProcess(cmd=['rviz2'], output='screen'),
 
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
-             node_name='opencv_cam', parameters=opencv_zed_params),
+             node_name='opencv_cam', parameters=opencv_lifecam_params),
 
         # Node(package='charuco_ros2', node_executable='charuco_ros2', output='screen'),
     ])
