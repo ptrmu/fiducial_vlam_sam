@@ -10,19 +10,6 @@
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 
-//#include <gtsam/geometry/Cal3DS2.h>
-//#include <gtsam/geometry/PinholeCamera.h>
-//#include <gtsam/geometry/Point3.h>
-//#include <gtsam/geometry/Pose3.h>
-//#include "gtsam/inference/Symbol.h"
-//#include <gtsam/nonlinear/ISAM2.h>
-//#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-//#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-//#include <gtsam/nonlinear/Marginals.h>
-//#include <gtsam/slam/BetweenFactor.h>
-//#include <gtsam/slam/PriorFactor.h>
-//#include <gtsam/slam/ProjectionFactor.h>
-
 namespace fiducial_vlam
 {
 // ==============================================================================
@@ -180,6 +167,7 @@ namespace fiducial_vlam
   class CvFiducialMathImpl : public CvFiducialMathInterface
   {
     const FiducialMathContext &cxt_;
+    cv::Ptr<cv::aruco::Dictionary> localization_aruco_dictionary_;
 
     static void drawDetectedMarkers(cv::InputOutputArray image,
                                     cv::InputArrayOfArrays corners,
@@ -229,7 +217,9 @@ namespace fiducial_vlam
 
   public:
     explicit CvFiducialMathImpl(const FiducialMathContext &cxt) :
-      cxt_{cxt}
+      cxt_{cxt},
+      localization_aruco_dictionary_{cv::aruco::getPredefinedDictionary(
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(cxt.localization_aruco_dictionary_id_))}
     {}
 
     TransformWithCovariance solve_t_camera_marker(const Observation &observation,
@@ -255,8 +245,6 @@ namespace fiducial_vlam
     Observations detect_markers(cv_bridge::CvImage &gray,
                                 cv::Mat &color_marked) override
     {
-      // Todo: make the dictionary a parameter
-      auto dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
       auto detectorParameters = cv::aruco::DetectorParameters::create();
 #if (CV_VERSION_MAJOR == 4)
 //     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach
@@ -275,7 +263,7 @@ namespace fiducial_vlam
       // Detect markers
       std::vector<int> ids;
       std::vector<std::vector<cv::Point2f>> corners;
-      cv::aruco::detectMarkers(gray.image, dictionary, corners, ids, detectorParameters);
+      cv::aruco::detectMarkers(gray.image, localization_aruco_dictionary_, corners, ids, detectorParameters);
 
       // Annotate the markers
       if (color_marked.dims != 0) {
@@ -284,7 +272,6 @@ namespace fiducial_vlam
 
       // return the corners as a list of observations
       return CvUtil::to_observations(ids, corners);
-
     }
 
     void annotate_image_with_marker_axis(cv_bridge::CvImage &color_marked,

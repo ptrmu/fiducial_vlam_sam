@@ -3,6 +3,7 @@
 
 #include "calibrate_classes.hpp"
 #include "calibration_board_config.hpp"
+#include "camera_calibration_parsers/parse.h"
 #include "cv_bridge/cv_bridge.h"
 #include "fiducial_math.hpp"
 #include "observation.hpp"
@@ -673,6 +674,7 @@ namespace fiducial_vlam
   class CalibrateCameraTask
   {
     rclcpp::Logger &logger_;
+    const CalibrateContext &cal_cxt_;
     const CharucoboardConfig cbm_;
     const std::vector<std::shared_ptr<ImageHolder>> captured_images_;
     task_thread::TaskThread<CalibrateCameraWork> task_thread_;
@@ -683,7 +685,7 @@ namespace fiducial_vlam
     CalibrateCameraTask(rclcpp::Logger &logger,
                         const CalibrateContext &cal_cxt,
                         const std::vector<std::shared_ptr<ImageHolder>> &captured_images) :
-      logger_{logger},
+      logger_{logger}, cal_cxt_{cal_cxt},
       cbm_(cal_cxt.cal_squares_x_, cal_cxt.cal_squares_y_, cal_cxt.cal_square_length_,
            cal_cxt.cal_upper_left_white_not_black_, cal_cxt.cal_marker_length_),
       captured_images_{captured_images},
@@ -732,8 +734,38 @@ namespace fiducial_vlam
       return calibrate_camera_result_.valid_;
     }
 
-    std::string save_calibration()
+    std::string save_calibration(const rclcpp::Time &now)
     {
+      if (!calibration_complete()) {
+        return std::string{"Cannot save calibration because the calibration is not finished."};
+      }
+
+      // Build up a camera_info message with the calibration data.
+      sensor_msgs::msg::CameraInfo camera_info;
+      camera_info.header.stamp = now;
+      camera_info.width = captured_images_[0]->gray().cols;
+      camera_info.height = captured_images_[0]->gray().rows;
+      camera_info.distortion_model = "plumb_bob";
+
+      auto &cm = calibrate_camera_result_.camera_matrix_;
+      camera_info.k = std::array<double, 9>{cm(0, 0), cm(0, 1), cm(0, 2),
+                                            cm(1, 0), cm(1, 1), cm(1, 2),
+                                            cm(2, 0), cm(2, 1), cm(2, 2)};
+      auto &dm = calibrate_camera_result_.dist_coeffs_;
+      camera_info.d = std::vector<double>{dm(0), dm(1), dm(2), dm(3), dm(4)};
+
+      camera_info.r = std::array<double, 9>{1, 0, 0,
+                                            0, 1, 0,
+                                            0, 0, 1};
+
+      camera_info.p = std::array<double, 12>{cm(0, 0), cm(0, 1), cm(0, 2), 0.,
+                                             cm(1, 0), cm(1, 1), cm(1, 2), 0.,
+                                             cm(2, 0), cm(2, 1), cm(2, 2), 0.};
+
+      camera_calibration_parsers::writeCalibration(cal_cxt_.cal_save_camera_info_path_,
+                                                   cal_cxt_.cal_camera_name_,
+                                                   camera_info);
+
       return std::string{""};
     }
 
@@ -936,7 +968,7 @@ namespace fiducial_vlam
         }
 
       } else if (cmd.compare("save_calibration") == 0) {
-        ret_str = do_save_calibration();
+        ret_str = do_save_calibration(now);
 
       } else if (cmd.compare("reset") == 0) {
         pi_.reset(nullptr);
@@ -981,7 +1013,7 @@ namespace fiducial_vlam
 
   private:
 
-    std::string do_save_calibration()
+    std::string do_save_calibration(const rclcpp::Time &now)
     {
       if (!cct_) {
         return std::string("No calibration available");
@@ -991,7 +1023,7 @@ namespace fiducial_vlam
         return std::string("Calibration not complete");
       }
 
-      return cct_->save_calibration();
+      return cct_->save_calibration(now);
     }
   };
 
