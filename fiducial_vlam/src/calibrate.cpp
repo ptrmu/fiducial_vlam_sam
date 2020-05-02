@@ -438,16 +438,37 @@ namespace fiducial_vlam
 // CalibrateCameraResult class
 // ==============================================================================
 
-  enum class CalibrationStyles
+  struct CalibrationStyles
   {
-    minimum_freedom = 0,
-    principal_point_free,
-    k1_free,
-    k2_free,
-    unequal_focal_lengths,
-    tangent_distortion,
-    k3_free,
-    number_of_styles,
+#define CALIBRATION_STYLES \
+   CS(minimum_freedom) \
+   CS(principal_point_free) \
+   CS(k1_free) \
+   CS(k2_free) \
+   CS(unequal_focal_lengths) \
+   CS(tangent_distortion) \
+   CS(k3_free) \
+   CS(custom) \
+   CS(a_k1_free_b_fix_k2_free) \
+   /* end of list */
+
+    enum
+    {
+#define CS(n) n,
+      unknown = -1,
+      CALIBRATION_STYLES
+      number_of_styles,
+      range_twice_beg = a_k1_free_b_fix_k2_free,
+      range_twice_end = number_of_styles,
+    };
+
+    static std::string name(int style)
+    {
+#undef CS
+#define CS(n) if (style == n) return std::string(#n);
+      CALIBRATION_STYLES
+      return std::string("unknown style");
+    }
   };
 
   struct CalibrateCameraResult
@@ -456,7 +477,7 @@ namespace fiducial_vlam
 
     struct CalibrationResult
     {
-      CalibrationStyles calibration_style_{};
+      int calibration_style_{CalibrationStyles::unknown};
       int flags_{0};
       double reproject_error_{0.};
       cv::Matx33d camera_matrix_{};
@@ -510,8 +531,8 @@ namespace fiducial_vlam
         interpolate_junction_locations(captured_iamge, res);
       }
 
-      for (int calib_style = 0; calib_style < int(CalibrationStyles::number_of_styles); calib_style += 1) {
-        do_calibration(CalibrationStyles(calib_style), res);
+      for (int calib_style = 0; calib_style < CalibrationStyles::number_of_styles; calib_style += 1) {
+        do_calibration(calib_style, res);
       }
 
       res.valid_ = true;
@@ -519,7 +540,7 @@ namespace fiducial_vlam
     }
 
   private:
-    void do_calibration(CalibrationStyles calibration_style,
+    void do_calibration(int calibration_style,
                         CalibrateCameraResult &res)
     {
       CalibrateCameraResult::CalibrationResult cal{};
@@ -777,7 +798,7 @@ namespace fiducial_vlam
         calibrate_camera_result_ = calibrate_camera_future_.get();
         calibrate_camera_result_.calibration_time_ = now;
         auto &cal = calibrate_camera_result_.calibration_results_[
-          std::max(0, std::min(int(CalibrationStyles::number_of_styles) - 1, cal_cxt_.cal_calibration_style_to_save_))];
+          std::max(0, std::min(CalibrationStyles::number_of_styles - 1, cal_cxt_.cal_calibration_style_to_save_))];
         save_calibration(now, cal);
         return std::string("Calibrate camera task complete.\n")
           .append(create_calibration_report(cal));
@@ -912,8 +933,9 @@ namespace fiducial_vlam
     std::string create_one_calibration_report(CalibrateCameraResult::CalibrationResult &cal)
     {
       std::string s{};
-      s.append(ros2_shared::string_print::f("\nCamera calibration style %d\n",
-                                            int(cal.calibration_style_)));
+      s.append(ros2_shared::string_print::f("\nCamera calibration style %d, (%s)\n",
+                                            cal.calibration_style_,
+                                            CalibrationStyles::name(cal.calibration_style_).c_str()));
 
       s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
                                             cal.camera_matrix_(0, 0),
@@ -966,8 +988,9 @@ namespace fiducial_vlam
       }
 
       s.append(ros2_shared::string_print::f(
-        "\nIndividual junction re-projection errors for calibration style %d.\n",
-        int(cal.calibration_style_)));
+        "\nIndividual junction re-projection errors for calibration style %d (%s).\n",
+        cal.calibration_style_,
+        CalibrationStyles::name(cal.calibration_style_).c_str()));
 
       for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
         s.append(ros2_shared::string_print::f(
@@ -1064,9 +1087,6 @@ namespace fiducial_vlam
           ret_str = std::string("Cannot calibrate with zero images.");
         }
 
-      } else if (cmd.compare("save_calibration") == 0) {
-        ret_str = do_save_calibration(now);
-
       } else if (cmd.compare("reset") == 0) {
         pi_.reset(nullptr);
         cct_.reset(nullptr);
@@ -1106,21 +1126,6 @@ namespace fiducial_vlam
 
       marked_index_ = marked_index_ % cim.size();
       captured_image_marked = cim[marked_index_];
-    }
-
-  private:
-
-    std::string do_save_calibration(const rclcpp::Time &now)
-    {
-      if (!cct_) {
-        return std::string("No calibration available");
-      }
-
-      if (!cct_->calibration_complete()) {
-        return std::string("Calibration not complete");
-      }
-
-      return cct_->save_calibration(now);
     }
   };
 
