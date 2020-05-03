@@ -24,16 +24,19 @@ opencv_lifecam_params = [{
     'vcp_property3': 'CAP_PROP_FOCUS', 'vcp_value3': 1.0,
 }]
 
-def generate_launch_description():
-    return LaunchDescription([
-        # ExecuteProcess(cmd=['rviz2', '-d', 'src/fiducial_vlam/fiducial_vlam/cfg/default.rviz'], output='screen'),
-        # ExecuteProcess(cmd=['rviz2'], output='screen'),
+vloc_args = [{
+    'loc_calibrate_not_loocalize' : 1,
+}]
 
+def generate_launch_description():
+
+    entities = [
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
              node_name='opencv_cam', parameters=opencv_lifecam_params),
 
-        # Node(package='charuco_ros2', node_executable='charuco_ros2', output='screen'),
-    ])
+        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+             parameters=vloc_args),
+    ]
 
-# 'filename': '/home/peter/Videos/my_video-1.mkv',
-# 'filename': '/home/peter/Videos/VID_20190717_164536.mp4',
+    return LaunchDescription(entities)
+

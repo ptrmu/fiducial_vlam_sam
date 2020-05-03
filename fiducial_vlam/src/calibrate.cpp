@@ -442,14 +442,14 @@ namespace fiducial_vlam
   {
 #define CALIBRATION_STYLES \
    CS(minimum_freedom) \
-   CS(principal_point_free) \
    CS(k1_free) \
    CS(k2_free) \
+   CS(principal_point_free) \
    CS(unequal_focal_lengths) \
    CS(tangent_distortion) \
    CS(k3_free) \
    CS(custom) \
-   CS(a_k1_free_b_fix_k2_free) \
+   CS(a_k1_free_b_fix_principal_point_free) \
    /* end of list */
 
     enum
@@ -458,7 +458,7 @@ namespace fiducial_vlam
       unknown = -1,
       CALIBRATION_STYLES
       number_of_styles,
-      range_twice_beg = a_k1_free_b_fix_k2_free,
+      range_twice_beg = a_k1_free_b_fix_principal_point_free,
       range_twice_end = number_of_styles,
     };
 
@@ -546,37 +546,76 @@ namespace fiducial_vlam
       CalibrateCameraResult::CalibrationResult cal{};
 
       cal.calibration_style_ = calibration_style;
+      cv::Size image_size{captured_images_[0]->gray().cols, captured_images_[0]->gray().rows};
 
+      // For these styles, do two calibrations.
+      if (calibration_style >= CalibrationStyles::range_twice_beg &&
+          calibration_style < CalibrationStyles::range_twice_end) {
+        switch (calibration_style) {
+          default:
+          case CalibrationStyles::a_k1_free_b_fix_principal_point_free:
+            cal.flags_ = cv::CALIB_FIX_PRINCIPAL_POINT |
+                         cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
+                         cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
+            cal.camera_matrix_(0, 0) = 1.0;
+            cal.camera_matrix_(1, 1) = 1.0;
+            cal.camera_matrix_(0, 2) = image_size.width / 2;
+            cal.camera_matrix_(1, 2) = image_size.height / 2;
+            cal.camera_matrix_(2, 2) = 1.0;
+            break;
+        }
+
+        cal.reproject_error_ = calibrateCamera(
+          res.junctions_f_board_, res.junctions_f_image_,
+          image_size,
+          cal.camera_matrix_, cal.dist_coeffs_,
+          cv::noArray(), cv::noArray(),
+          cv::noArray(), cv::noArray(), cv::noArray(),
+          cal.flags_);
+      }
+
+      // Set up the flags and calibration values for each style of calibration
       switch (calibration_style) {
+        default:
         case CalibrationStyles::minimum_freedom:
-          cal.flags_ = cv::CALIB_FIX_PRINCIPAL_POINT | cv::CALIB_USE_INTRINSIC_GUESS |
+          cal.flags_ = cv::CALIB_FIX_PRINCIPAL_POINT |
                        cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
                        cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
           cal.camera_matrix_(0, 0) = 1.0;
           cal.camera_matrix_(1, 1) = 1.0;
-          cal.camera_matrix_(0, 2) = captured_images_[0]->gray().cols / 2.;
-          cal.camera_matrix_(1, 2) = captured_images_[0]->gray().rows / 2;
-        case CalibrationStyles::principal_point_free:
-          cal.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
-                       cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
-          cal.camera_matrix_(0, 0) = 1.0;
-          cal.camera_matrix_(1, 1) = 1.0;
+          cal.camera_matrix_(0, 2) = image_size.width / 2;
+          cal.camera_matrix_(1, 2) = image_size.height / 2;
+          cal.camera_matrix_(2, 2) = 1.0;
           break;
         case CalibrationStyles::k1_free:
-          cal.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST
-                       | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
+          cal.flags_ = cv::CALIB_FIX_PRINCIPAL_POINT |
+                       cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
           cal.camera_matrix_(0, 0) = 1.0;
           cal.camera_matrix_(1, 1) = 1.0;
+          cal.camera_matrix_(0, 2) = image_size.width / 2;
+          cal.camera_matrix_(1, 2) = image_size.height / 2;
+          cal.camera_matrix_(2, 2) = 1.0;
           break;
         case CalibrationStyles::k2_free:
-          cal.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST
-                       | cv::CALIB_FIX_K3;
+          cal.flags_ = cv::CALIB_FIX_PRINCIPAL_POINT |
+                       cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K3;
+          cal.camera_matrix_(0, 0) = 1.0;
+          cal.camera_matrix_(1, 1) = 1.0;
+          cal.camera_matrix_(0, 2) = image_size.width / 2;
+          cal.camera_matrix_(1, 2) = image_size.height / 2;
+          cal.camera_matrix_(2, 2) = 1.0;
+          break;
+        case CalibrationStyles::principal_point_free:
+          cal.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K3;
           cal.camera_matrix_(0, 0) = 1.0;
           cal.camera_matrix_(1, 1) = 1.0;
           break;
         case CalibrationStyles::unequal_focal_lengths:
-          cal.flags_ = cv::CALIB_ZERO_TANGENT_DIST
-                       | cv::CALIB_FIX_K3;
+          cal.flags_ = cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K3;
           break;
         case CalibrationStyles::tangent_distortion:
           cal.flags_ = cv::CALIB_FIX_K3;
@@ -584,11 +623,42 @@ namespace fiducial_vlam
         case CalibrationStyles::k3_free:
           cal.flags_ = 0;
           break;
+        case CalibrationStyles::custom:
+          cal.flags_ = cv::CALIB_USE_INTRINSIC_GUESS |
+                       cv::CALIB_FIX_PRINCIPAL_POINT |
+                       cv::CALIB_FIX_FOCAL_LENGTH | cv::CALIB_FIX_ASPECT_RATIO |
+                       cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
+#if 1
+          cal.camera_matrix_(0, 0) = 699.3550;
+          cal.camera_matrix_(1, 1) = 699.3550;
+          cal.camera_matrix_(0, 2) = 650.0850;
+          cal.camera_matrix_(1, 2) = 354.6600;
+          cal.camera_matrix_(2, 2) = 1.0;
+          cal.dist_coeffs_(0, 0) = -0.1716;
+          cal.dist_coeffs_(1, 0) = 0.0246;
+#else
+          cal.camera_matrix_(0, 0) = 700.9050;
+          cal.camera_matrix_(1, 1) = 700.9050;
+          cal.camera_matrix_(0, 2) = 655.5400;
+          cal.camera_matrix_(1, 2) = 358.5940;
+          cal.camera_matrix_(2, 2) = 1.0;
+          cal.dist_coeffs_(0, 0) = -0.1681;
+          cal.dist_coeffs_(1, 0) = 0.0205;
+#endif
+          break;
+        case CalibrationStyles::a_k1_free_b_fix_principal_point_free:
+          cal.flags_ = cv::CALIB_USE_INTRINSIC_GUESS |
+                       cv::CALIB_FIX_FOCAL_LENGTH |
+                       cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K3;;
+          break;
       }
 
+      // Do the calibration.
       cal.reproject_error_ = calibrateCamera(
         res.junctions_f_board_, res.junctions_f_image_,
-        cv::Size{captured_images_[0]->gray().cols, captured_images_[0]->gray().rows},
+        image_size,
         cal.camera_matrix_, cal.dist_coeffs_,
         cal.rvecs_, cal.tvecs_,
         cal.stdDeviationsIntrinsics_, cal.stdDeviationsExtrinsics_, cal.perViewErrors_,
@@ -799,8 +869,8 @@ namespace fiducial_vlam
         calibrate_camera_result_.calibration_time_ = now;
         auto &cal = calibrate_camera_result_.calibration_results_[
           std::max(0, std::min(CalibrationStyles::number_of_styles - 1, cal_cxt_.cal_calibration_style_to_save_))];
-        save_calibration(now, cal);
-        return std::string("Calibrate camera task complete.\n")
+        auto save_str{save_calibration(now, cal)};
+        return save_str
           .append(create_calibration_report(cal));
       }
 
@@ -856,7 +926,9 @@ namespace fiducial_vlam
                                                    cal_cxt_.cal_camera_name_,
                                                    camera_info);
 
-      return std::string{""};
+      return std::string{ros2_shared::string_print::f("Calibration for camera '%s' saved to file: %s\n",
+                                                      cal_cxt_.cal_camera_name_.c_str(),
+                                                      cal_cxt_.cal_save_camera_info_path_.c_str())};
     }
 
     std::string status()
@@ -895,6 +967,8 @@ namespace fiducial_vlam
       std::string s{};
       std::vector<cv::Vec2f> reproject_image_points{};
       int bad_reprojection_count{0};
+      int junction_count{0};
+      double total_error_squared{0.0};
 
       // Project the object points onto the image so we can calculate the individual junction
       // reprojection errors.
@@ -912,6 +986,8 @@ namespace fiducial_vlam
         } else {
           auto index = p->second;
           auto error = cv::norm(reproject_image_points[index] - junctions_f_image[index]);
+          total_error_squared += error * error;
+          junction_count += 1;
           s.append(ros2_shared::string_print::f("%5.3f ", error));
           if (error > 1.) {
             bad_reprojection_count += 1;
@@ -921,6 +997,9 @@ namespace fiducial_vlam
           s.append("\n");
         }
       }
+
+      s.append(ros2_shared::string_print::f("Recalculated reprojection error: %5.3f (rms pixels)\n",
+                                            std::sqrt(total_error_squared / junction_count)));
 
       if (bad_reprojection_count > 0) {
         s.append(ros2_shared::string_print::f("****** %d bad junction re-projection errors\n",

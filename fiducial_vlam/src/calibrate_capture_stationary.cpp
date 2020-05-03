@@ -247,7 +247,6 @@ namespace fiducial_vlam
 
     bool test_stationary(std::shared_ptr<ImageHolder> &image_holder)
     {
-      std::cout << last_board_projection_.corner_pixel_delta(image_holder->board_projection()) << std::endl;
       return last_board_projection_.corner_pixel_delta(image_holder->board_projection()) < delta_threshold;
     }
 
