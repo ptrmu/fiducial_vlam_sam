@@ -21,11 +21,6 @@ namespace fiducial_vlam
     double x2_, y2_;
     double x3_, y3_;
 
-    // The 2D pixel coordinates of the corners in the image.
-    // The corners need to be in the same order as is returned
-    // from cv::aruco::detectMarkers().
-//    std::vector<cv::Point2f> corners_f_image_;
-
   public:
     Observation(int id,
                 double x0, double y0,
@@ -48,31 +43,23 @@ namespace fiducial_vlam
     {}
 
     auto id() const
-    { return id_; }
-
+    { return id_; } //
     auto x0() const
-    { return x0_; }
-
+    { return x0_; } //
     auto x1() const
-    { return x1_; }
-
+    { return x1_; } //
     auto x2() const
-    { return x2_; }
-
+    { return x2_; } //
     auto x3() const
-    { return x3_; }
-
+    { return x3_; } //
     auto y0() const
-    { return y0_; }
-
+    { return y0_; } //
     auto y1() const
-    { return y1_; }
-
+    { return y1_; } //
     auto y2() const
-    { return y2_; }
-
+    { return y2_; } //
     auto y3() const
-    { return y3_; }
+    { return y3_; } //
 
     template<class TPoint>
     auto to_point_vector() const
@@ -103,7 +90,7 @@ namespace fiducial_vlam
   class Observations
   {
     // The list of observations
-    std::vector<Observation> observations_;
+    std::vector<Observation> observations_{};
 
   public:
     Observations() = default;
@@ -111,15 +98,13 @@ namespace fiducial_vlam
     explicit Observations(const fiducial_vlam_msgs::msg::Observations &msg);
 
     const auto &observations() const
-    { return observations_; }
-
+    { return observations_; } //
     auto size() const
-    { return observations_.size(); }
+    { return observations_.size(); } //
 
-    void add(const Observation observation)
-    {
-      observations_.emplace_back(observation);
-    }
+    void add(const Observation &observation); //
+    void remove(std::size_t index); //
+    void set(std::size_t index, const Observation &observation); //
 
     fiducial_vlam_msgs::msg::Observations to_msg(std_msgs::msg::Header::_stamp_type stamp,
                                                  const std_msgs::msg::Header::_frame_id_type &frame_id,

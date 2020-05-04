@@ -343,7 +343,7 @@ namespace fiducial_vlam
         // When mat_with_msg_data is destroyed, it does not release the image data because it does not own the data.
         // When const_color_marked is destroyed, it does not release the image data because it does not own the data.
         // tracked_object does not really track anything.
-        // When color_marked is destoryed at the end of this method, it will not release the image data because
+        // When color_marked is destroyed at the end of this method, it will not release the image data because
         //  it does not own the data.
         // The image data will finally get released when the image_msg variable is destroyed because it owns the
         //  image data. image_msg gets destroyed last thing in this method because it is passed by value. But that

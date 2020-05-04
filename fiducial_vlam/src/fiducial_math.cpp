@@ -9,6 +9,7 @@
 #include "cv_bridge/cv_bridge.h"
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
+#include "opencv2/opencv.hpp"
 
 namespace fiducial_vlam
 {
@@ -127,7 +128,7 @@ namespace fiducial_vlam
     cv::Mat dist_coeffs_;
 
   public:
-    CameraInfoImpl(const sensor_msgs::msg::CameraInfo &msg) :
+    explicit CameraInfoImpl(const sensor_msgs::msg::CameraInfo &msg) :
       camera_matrix_{3, 3, CV_64F, 0.}, dist_coeffs_{5, 1, CV_64F, 0.}
     {
       camera_matrix_.at<double>(0, 0) = msg.k[0];
@@ -163,6 +164,16 @@ namespace fiducial_vlam
 // ==============================================================================
 // CvFiducialMathImpl class
 // ==============================================================================
+
+  class CornerFilter
+  {
+    cv::KalmanFilter kalman;
+    cv::Matx<float, 4, 1> x_k;
+    cv::Matx<float, 4, 1> w_k;
+    cv::Matx<float, 2, 1> z_k;
+
+
+  };
 
   class CvFiducialMathImpl : public CvFiducialMathInterface
   {
@@ -284,6 +295,13 @@ namespace fiducial_vlam
       cv::aruco::drawAxis(color_marked.image,
                           camera_info.camera_matrix(), camera_info.dist_coeffs(),
                           rvec, tvec, 0.1);
+    }
+
+
+    void filter_observations(Observations &observations,
+                             double dt)
+    {
+
     }
   };
 
