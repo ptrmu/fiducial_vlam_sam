@@ -3,6 +3,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "cv_utils.hpp"
 #include "fiducial_math.hpp"
 #include "map.hpp"
 #include "observation.hpp"
@@ -283,8 +284,6 @@ namespace fiducial_vlam
   {
     VmapContext cxt_{};
     FiducialMathContext fm_cxt_{};
-
-    std::unique_ptr<CvFiducialMathInterface> cvfm_;
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
@@ -366,7 +365,7 @@ namespace fiducial_vlam
       }
 
       // Find t_camera_marker
-      auto t_camera_marker = cvfm_->solve_t_camera_marker(*min_obs, ci, cxt_.marker_length_);
+      auto t_camera_marker = CvUtils::solve_t_camera_marker(*min_obs, ci, cxt_.marker_length_);
 
       // And t_map_camera
       auto t_map_camera = cxt_.map_init_transform_;
@@ -379,7 +378,6 @@ namespace fiducial_vlam
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
       Node{"vmap_node", options},
-      cvfm_{make_cv_fiducial_math(fm_cxt_)},
       exit_build_map_time_{now()}
     {
       // Get parameters from the command line
@@ -518,7 +516,7 @@ namespace fiducial_vlam
         map_ = initialize_map("", Map::MapStyles::pose);
 
         // Create a builder object. Now any observation messages will get passed to it.
-        build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *cvfm_, *map_);
+        build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *map_);
 
         // Pass the "start" command to the builder incase it wants to do anything (like report status)
         return build_marker_map_->build_marker_map_cmd(cmd);

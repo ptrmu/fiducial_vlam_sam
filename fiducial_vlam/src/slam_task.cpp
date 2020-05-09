@@ -3,6 +3,7 @@
 
 //#define ENABLE_TIMING
 
+#include "cv_utils.hpp"
 #include <gtsam/base/timing.h>
 #include <gtsam/geometry/Cal3DS2.h>
 #include <gtsam/geometry/PinholeCamera.h>
@@ -20,44 +21,10 @@
 #include "opencv2/core.hpp"
 #include "ros2_shared/string_printf.hpp"
 #include "task_thread.hpp"
+#include "tf_utils.hpp"
 
 namespace fiducial_vlam
 {
-// ==============================================================================
-// Convert class
-// ==============================================================================
-
-  struct Convert
-  {
-    template<class TPoint>
-    static std::vector<TPoint> corners_f_marker(double marker_length)
-    {
-      return std::vector<TPoint>{
-        TPoint{-marker_length / 2.f, marker_length / 2.f, 0.f},
-        TPoint{marker_length / 2.f, marker_length / 2.f, 0.f},
-        TPoint{marker_length / 2.f, -marker_length / 2.f, 0.f},
-        TPoint{-marker_length / 2.f, -marker_length / 2.f, 0.f}};
-    }
-
-    template<class TPoint>
-    static TPoint to_point(const Vector3WithCovariance &v3wc)
-    {
-      return TPoint{v3wc.vector3().x(),
-                    v3wc.vector3().y(),
-                    v3wc.vector3().z()};
-    }
-
-    template<class TPoint>
-    static std::vector<TPoint> to_corner_points(const std::vector<Vector3WithCovariance> &corners)
-    {
-      std::vector<TPoint> corner_points;
-      for (auto &corner : corners) {
-        corner_points.emplace_back(to_point<TPoint>(corner));
-      }
-      return corner_points;
-    }
-  };
-
 // ==============================================================================
 // GtsamUtil class
 // ==============================================================================
@@ -245,7 +212,6 @@ namespace fiducial_vlam
 
   class SamBuildMarkerMapTask
   {
-    CvFiducialMathInterface &fm_;
     const FiducialMathContext &cxt_;
     const Map &empty_map_;
     const gtsam::SharedNoiseModel corner_noise_;
@@ -312,7 +278,7 @@ namespace fiducial_vlam
       const Observation &observation,
       const CameraInfoInterface &camera_info)
     {
-      auto cv_t_camera_marker = fm_.solve_t_camera_marker(observation, camera_info, empty_map_.marker_length());
+      auto cv_t_camera_marker = CvUtils::solve_t_camera_marker(observation, camera_info, empty_map_.marker_length());
       return GtsamUtil::to_pose3(cv_t_camera_marker.transform().inverse());
     }
 
@@ -334,7 +300,7 @@ namespace fiducial_vlam
 
           // The marker corners as seen in the image.
           auto corners_f_image = observation.to_point_vector<gtsam::Point2>();
-          auto corners_f_marker = Convert::corners_f_marker<gtsam::Point3>(empty_map_.marker_length());
+          auto corners_f_marker = TFConvert::corners_f_marker<gtsam::Point3>(empty_map_.marker_length());
 
           // Add factors to the graph
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
@@ -357,8 +323,8 @@ namespace fiducial_vlam
     }
 
   public:
-    SamBuildMarkerMapTask(CvFiducialMathInterface &fm, const FiducialMathContext &cxt, const Map &empty_map) :
-      fm_{fm}, cxt_{cxt}, empty_map_{empty_map},
+    SamBuildMarkerMapTask(const FiducialMathContext &cxt, const Map &empty_map) :
+      cxt_{cxt}, empty_map_{empty_map},
       corner_noise_{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.corner_measurement_sigma_)}
     {
       // Initialize the isam with the fixed prior
@@ -568,7 +534,6 @@ namespace fiducial_vlam
     // These parameters are captured when the class is constructed. This allows
     // the map creation to proceed in one mode.
     const FiducialMathContext cxt_;
-    CvFiducialMathInterface &fm_;
     std::unique_ptr<Map> empty_map_;
 
     std::unique_ptr<SamBuildMarkerMapTask> stw_; // This will ultimately get owned by the thread
@@ -580,11 +545,10 @@ namespace fiducial_vlam
 
   public:
     SamBuildMarkerMapImpl(const FiducialMathContext &cxt,
-                          CvFiducialMathInterface &fm,
                           const Map &empty_map) :
-      cxt_{cxt}, fm_{fm},
+      cxt_{cxt},
       empty_map_{std::make_unique<Map>(empty_map)},
-      stw_{std::make_unique<SamBuildMarkerMapTask>(fm, cxt_, *empty_map_)}
+      stw_{std::make_unique<SamBuildMarkerMapTask>(cxt_, *empty_map_)}
     {
       // If we are using a thread, create it and pass the work object to it.
       if (cxt.compute_on_thread_) {
@@ -664,10 +628,9 @@ namespace fiducial_vlam
   };
 
   std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
-                                                                     CvFiducialMathInterface &fm,
                                                                      const Map &empty_map)
   {
-    return std::make_unique<SamBuildMarkerMapImpl>(cxt, fm, empty_map);
+    return std::make_unique<SamBuildMarkerMapImpl>(cxt, empty_map);
   }
 
 // ==============================================================================
@@ -708,7 +671,7 @@ namespace fiducial_vlam
 
           // The marker corners as seen in the image.
           auto corners_f_image = observation.to_point_vector<gtsam::Point2>();
-          auto corners_f_marker = Convert::corners_f_marker<gtsam::Point3>(map.marker_length());
+          auto corners_f_marker = TFConvert::corners_f_marker<gtsam::Point3>(map.marker_length());
 
           // Add factors to the graph.
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {

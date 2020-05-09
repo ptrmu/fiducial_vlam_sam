@@ -5,6 +5,7 @@
 #include "calibration_board_config.hpp"
 #include "camera_calibration_parsers/parse.h"
 #include "cv_bridge/cv_bridge.h"
+#include "cv_utils.hpp"
 #include "fiducial_math.hpp"
 #include "observation.hpp"
 #include "opencv2/aruco.hpp"
@@ -23,135 +24,6 @@ namespace fiducial_vlam
 {
 
   constexpr auto time_display_captured_image_marked = std::chrono::milliseconds(1500);
-
-// ==============================================================================
-// Drawing functions copied from opencv
-// ==============================================================================
-
-  static void drawDetectedMarkers(cv::InputOutputArray _image, cv::InputArrayOfArrays _corners,
-                                  cv::InputArray _ids = cv::noArray(),
-                                  cv::Scalar borderColor = cv::Scalar(0, 255, 0))
-  {
-    CV_Assert(_image.getMat().total() != 0 &&
-              (_image.getMat().channels() == 1 || _image.getMat().channels() == 3));
-    CV_Assert((_corners.total() == _ids.total()) || _ids.total() == 0);
-
-    // calculate colors
-    cv::Scalar textColor, cornerColor;
-    textColor = cornerColor = borderColor;
-    cv::swap(textColor.val[0], textColor.val[1]);     // text color just sawp G and R
-    cv::swap(cornerColor.val[1], cornerColor.val[2]); // corner color just sawp G and B
-
-    int nMarkers = (int) _corners.total();
-    for (int i = 0; i < nMarkers; i++) {
-      cv::Mat currentMarker = _corners.getMat(i);
-      CV_Assert(currentMarker.total() == 4 && currentMarker.type() == CV_32FC2);
-
-      // draw marker sides
-      for (int j = 0; j < 4; j++) {
-        cv::Point2f p0, p1;
-        p0 = currentMarker.ptr<cv::Point2f>(0)[j];
-        p1 = currentMarker.ptr<cv::Point2f>(0)[(j + 1) % 4];
-        cv::line(_image, p0, p1, borderColor, 1);
-      }
-//      // draw first corner mark
-//      cv::rectangle(_image, currentMarker.ptr<cv::Point2f>(0)[0] - cv::Point2f(3, 3),
-//                    currentMarker.ptr<cv::Point2f>(0)[0] + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
-
-      // draw ID
-//      if (_ids.total() != 0) {
-//        cv::Point2f cent(0, 0);
-//        for (int p = 0; p < 4; p++)
-//          cent += currentMarker.ptr<cv::Point2f>(0)[p];
-//        cent = cent / 4.;
-//        std::stringstream s;
-//        s << "id=" << _ids.getMat().ptr<int>(0)[i];
-//        putText(_image, s.str(), cent, cv::FONT_HERSHEY_SIMPLEX, 0.5, textColor, 2);
-//      }
-    }
-  }
-
-  static void drawDetectedCornersCharuco(cv::InputOutputArray _image, cv::InputArray _charucoCorners,
-                                         cv::InputArray _charucoIds = cv::noArray(),
-                                         cv::Scalar cornerColor = cv::Scalar(255, 0, 0))
-  {
-    CV_Assert(_image.getMat().total() != 0 &&
-              (_image.getMat().channels() == 1 || _image.getMat().channels() == 3));
-    CV_Assert((_charucoCorners.getMat().total() == _charucoIds.getMat().total()) ||
-              _charucoIds.getMat().total() == 0);
-
-    unsigned int nCorners = (unsigned int) _charucoCorners.getMat().total();
-    for (unsigned int i = 0; i < nCorners; i++) {
-      cv::Point2f corner = _charucoCorners.getMat().at<cv::Point2f>(i);
-
-      // draw first corner mark
-      cv::rectangle(_image, corner - cv::Point2f(3, 3), corner + cv::Point2f(3, 3), cornerColor, 1, cv::LINE_AA);
-
-      // draw ID
-//      if (_charucoIds.total() != 0) {
-//        int id = _charucoIds.getMat().at<int>(i);
-//        std::stringstream s;
-//        s << "id=" << id;
-//        putText(_image, s.str(), corner + cv::Point2f(5, -5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
-//                cornerColor, 2);
-//      }
-    }
-  }
-
-
-  static void draw_detected_junction(cv::InputOutputArray captured_image_marked,
-                                     const cv::Point2f &junction_f_image,
-                                     const cv::Size &win_size,
-                                     cv::Scalar junction_color = cv::Scalar(255, 0, 0))
-  {
-    auto j_f_image = cv::Point2f{std::round(junction_f_image.x), std::round(junction_f_image.y)};
-    cv::rectangle(captured_image_marked,
-                  j_f_image - cv::Point2f(3, 3),
-                  j_f_image + cv::Point2f(3, 3),
-                  junction_color, 1, cv::LINE_4);
-
-    cv::rectangle(captured_image_marked,
-                  j_f_image - cv::Point2f(win_size.width, win_size.height),
-                  j_f_image + cv::Point2f(win_size.width, win_size.height),
-                  junction_color / 2, 1, cv::LINE_4);
-  }
-
-  static void drawBoardCorners(cv::InputOutputArray image,
-                               const std::array<cv::Point2f, 4> &board_corners,
-                               cv::Scalar borderColor = cv::Scalar(0, 0, 255))
-  {
-    for (int j = 0; j < 4; j++) {
-      auto p0 = board_corners[j];
-      auto p1 = board_corners[(j + 1) % 4];
-      cv::line(image, p0, p1, borderColor, 1);
-    }
-  }
-
-  static void drawPolygonAtCenter(cv::Mat &color,
-                                  std::vector<cv::Point2f> &board_corners,
-                                  cv::Scalar borderColor = cv::Scalar(0, 0, 255))
-  {
-    cv::Point2f avg;
-    for (int i = 0; i < board_corners.size(); i += 1) {
-      avg = avg + board_corners[i];
-    }
-    avg = avg / double(board_corners.size());
-    avg.x -= color.cols / 2;
-    avg.y -= color.rows / 2;
-    std::vector<cv::Point> bc = {
-      cv::Point{int(round(board_corners[0].x - avg.x)), int(round(board_corners[0].y - avg.y))},
-      cv::Point{int(round(board_corners[1].x - avg.x)), int(round(board_corners[1].y - avg.y))},
-      cv::Point{int(round(board_corners[2].x - avg.x)), int(round(board_corners[2].y - avg.y))},
-      cv::Point{int(round(board_corners[3].x - avg.x)), int(round(board_corners[3].y - avg.y))},
-    };
-    cv::fillConvexPoly(color, bc, borderColor);
-//    for (int j = 0; j < 4; j++) {
-//      cv::Point2f p0, p1;
-//      p0 = board_corners[j];
-//      p1 = board_corners[(j + 1) % 4];
-//      line(image, p0, p1, borderColor, 1);
-//    }
-  }
 
 // ==============================================================================
 // BoardProjection class
@@ -325,13 +197,15 @@ namespace fiducial_vlam
 
         // Annotate the image with info we have collected so far.
         if (!image_holder->aruco_ids().empty()) {
-          drawDetectedMarkers(color_marked, image_holder->aruco_corners());
+          AnnotateImages::with_detected_markers(color_marked,
+                                                image_holder->aruco_corners(),
+                                                image_holder->aruco_ids());
         }
 
         for (auto &captured_image : captured_images_()) {
-          drawBoardCorners(color_marked,
-                           captured_image->board_projection().board_corners(),
-                           cv::Scalar(255, 0, 0));
+          AnnotateImages::with_board_corners(color_marked,
+                                             captured_image->board_projection().board_corners(),
+                                             cv::Scalar(255, 0, 0));
         }
       }
 
@@ -745,7 +619,7 @@ namespace fiducial_vlam
         js_f_image.emplace_back(local_junctions_f_image[0]);
         j_id_index_map.emplace(junction_id, index);
 
-        draw_detected_junction(captured_image_marked, local_junctions_f_image[0], win_size);
+        AnnotateImages::with_detected_junction(captured_image_marked, local_junctions_f_image[0], win_size);
       }
 
       res.junctions_f_board_.emplace_back(std::move(js_f_board));
@@ -818,7 +692,7 @@ namespace fiducial_vlam
         res.captured_images_marked_.push_back(cim);
 
         // Annotate the charuco markers.
-        drawDetectedMarkers(cim, ci->aruco_corners());
+        AnnotateImages::with_detected_markers(cim, ci->aruco_corners(), ci->aruco_ids());
       }
     }
   };

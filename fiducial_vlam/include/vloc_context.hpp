@@ -102,7 +102,7 @@ namespace fiducial_vlam
   int, 1) \
   \
   CXT_MACRO_MEMBER(loc_localize_camera_sam_not_cv, int, 0)      /* use gtsam not opencv for localizing the camera */\
-  CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 1)         /* calibrate camera instead of localize camera */ \
+  CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 0)         /* calibrate camera instead of localize camera */ \
   CXT_MACRO_MEMBER(loc_aruco_dictionary_id, int, 10)            /* aruco dictionary id for localization markers  */ \
   /* End of list */
 

@@ -74,16 +74,8 @@ namespace fiducial_vlam
   public:
     virtual ~CvFiducialMathInterface() = default;
 
-    virtual TransformWithCovariance solve_t_camera_marker(const Observation &observation,
-                                                          const CameraInfoInterface &camera_info,
-                                                          double marker_length) = 0;
-
     virtual Observations detect_markers(cv_bridge::CvImage &gray,
                                         cv::Mat &color_marked) = 0;
-
-    virtual void annotate_image_with_marker_axis(cv_bridge::CvImage &color_marked,
-                                                 const TransformWithCovariance &t_camera_marker,
-                                                 const CameraInfoInterface &camera_info) = 0;
   };
 
   std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt);
@@ -125,7 +117,6 @@ namespace fiducial_vlam
   };
 
   std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
-                                                                     CvFiducialMathInterface &fm,
                                                                      const Map &empty_map);
 
 // ==============================================================================
@@ -146,6 +137,19 @@ namespace fiducial_vlam
                                                        const Map &map) = 0;
   };
 
+// ==============================================================================
+// SmoothObservationsInterface class
+// ==============================================================================
+
+  class SmoothObservationsInterface
+  {
+  public:
+    virtual ~SmoothObservationsInterface() = default;
+
+    virtual void smooth_observations(Observations &observations) = 0;
+  };
+
+  std::unique_ptr<SmoothObservationsInterface> make_smooth_observations(const FiducialMathContext &cxt);
 }
 
 #endif //FIDUCIAL_VLAM_FIDUCIAL_MATH_HPP

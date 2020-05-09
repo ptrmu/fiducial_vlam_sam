@@ -4,6 +4,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "calibrate.hpp"
+#include "cv_utils.hpp"
 #include "fiducial_math.hpp"
 #include "map.hpp"
 #include "observation.hpp"
@@ -39,7 +40,7 @@ namespace fiducial_vlam
       if (t_map_marker.is_valid()) {
         // Calculalte t_camera_marker and draw the axis.
         auto t_camera_marker = TransformWithCovariance(tf_t_camera_map * t_map_marker.transform());
-        fm.annotate_image_with_marker_axis(color_marked, t_camera_marker, camera_info);
+        AnnotateImages::with_marker_axis(color_marked.image, t_camera_marker, camera_info);
       }
     }
   }

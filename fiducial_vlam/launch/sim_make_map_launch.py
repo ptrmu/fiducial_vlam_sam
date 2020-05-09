@@ -61,13 +61,13 @@ def generate_launch_description():
         ], output='screen'),
 
         # Joystick driver, generates /namespace/joy messages
-        Node(package='joy', node_executable='joy_node', output='screen'),
+        # Node(package='joy', node_executable='joy_node', output='screen'),
 
         # Add forward-facing camera to the simulation
-        # Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
-        #      arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
         Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
-             arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
+             arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
+        # Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
+        #      arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args, node_namespace='forward_camera'),
