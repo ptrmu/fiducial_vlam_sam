@@ -4,6 +4,7 @@
 
 #include <array>
 
+#include "opencv2/core/types.hpp"
 #include "ros2_shared/context_macros.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 
@@ -29,6 +30,8 @@ namespace fiducial_vlam
   class Observations; //
   class TransformWithCovariance; //
   class Map; //
+  class VlocContext; //
+  class SmoothObservationsInterface; //
 
 // ==============================================================================
 // CameraInfoInterface class
@@ -75,10 +78,12 @@ namespace fiducial_vlam
     virtual ~CvFiducialMathInterface() = default;
 
     virtual Observations detect_markers(cv_bridge::CvImage &gray,
+                                        const rclcpp::Time &time_stamp,
                                         cv::Mat &color_marked) = 0;
   };
 
-  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt);
+  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt,
+                                                                 SmoothObservationsInterface &so);
 
 // ==============================================================================
 // LocalizeCameraInterface class
@@ -146,10 +151,12 @@ namespace fiducial_vlam
   public:
     virtual ~SmoothObservationsInterface() = default;
 
-    virtual void smooth_observations(Observations &observations) = 0;
+    virtual void smooth_observations(std::vector<std::vector<cv::Point2f>> &aruco_corners,
+                                     std::vector<int> &aruco_ids,
+                                     const rclcpp::Time &time_stamp) = 0;
   };
 
-  std::unique_ptr<SmoothObservationsInterface> make_smooth_observations(const FiducialMathContext &cxt);
+  std::unique_ptr<SmoothObservationsInterface> make_smooth_observations(const VlocContext &cxt);
 }
 
 #endif //FIDUCIAL_VLAM_FIDUCIAL_MATH_HPP

@@ -27,18 +27,6 @@ namespace fiducial_vlam
     observations_.emplace_back(observation);
   }
 
-  void Observations::remove(std::size_t index)
-  {
-    assert(index < observations_.size());
-    observations_.erase(observations_.begin() + index);
-  }
-
-  void Observations::set(std::size_t index, const Observation &observation)
-  {
-    assert(index < observations_.size());
-    observations_[index] = observation;
-  }
-
   fiducial_vlam_msgs::msg::Observations Observations::to_msg(std_msgs::msg::Header::_stamp_type stamp,
                                                              const std_msgs::msg::Header::_frame_id_type &frame_id,
                                                              const sensor_msgs::msg::CameraInfo &camera_info_msg)

@@ -65,17 +65,20 @@ namespace fiducial_vlam
 
   class CvFiducialMathImpl : public CvFiducialMathInterface
   {
-    const FiducialMathContext &cxt_;
+    const FiducialMathContext &fm_cxt_;
+    SmoothObservationsInterface &so_;
     cv::Ptr<cv::aruco::Dictionary> localization_aruco_dictionary_;
 
   public:
-    explicit CvFiducialMathImpl(const FiducialMathContext &cxt) :
-      cxt_{cxt},
+    explicit CvFiducialMathImpl(const FiducialMathContext &fm_cxt,
+                                SmoothObservationsInterface &so) :
+      fm_cxt_{fm_cxt}, so_{so},
       localization_aruco_dictionary_{cv::aruco::getPredefinedDictionary(
-        cv::aruco::PREDEFINED_DICTIONARY_NAME(cxt.localization_aruco_dictionary_id_))}
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(fm_cxt.localization_aruco_dictionary_id_))}
     {}
 
     Observations detect_markers(cv_bridge::CvImage &gray,
+                                const rclcpp::Time &time_stamp,
                                 cv::Mat &color_marked) override
     {
       auto detectorParameters = cv::aruco::DetectorParameters::create();
@@ -86,7 +89,7 @@ namespace fiducial_vlam
 //     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
 
       // Use the new AprilTag 2 corner algorithm, much better but much slower
-      detectorParameters->cornerRefinementMethod = cxt_.cv4_corner_refinement_method_;
+      detectorParameters->cornerRefinementMethod = fm_cxt_.cv4_corner_refinement_method_;
 #else
       // 0 = false
       // 1 = true
@@ -98,6 +101,8 @@ namespace fiducial_vlam
       std::vector<std::vector<cv::Point2f>> corners;
       cv::aruco::detectMarkers(gray.image, localization_aruco_dictionary_, corners, ids, detectorParameters);
 
+      so_.smooth_observations(corners, ids, time_stamp);
+
       // Annotate the markers
       if (color_marked.dims != 0) {
         AnnotateImages::with_detected_markers(color_marked, corners, ids);
@@ -108,9 +113,10 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt)
+  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt,
+                                                                 SmoothObservationsInterface &so)
   {
-    return std::make_unique<CvFiducialMathImpl>(cxt);
+    return std::make_unique<CvFiducialMathImpl>(cxt, so);
   }
 
 // ==============================================================================

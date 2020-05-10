@@ -104,6 +104,9 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(loc_localize_camera_sam_not_cv, int, 0)      /* use gtsam not opencv for localizing the camera */\
   CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 0)         /* calibrate camera instead of localize camera */ \
   CXT_MACRO_MEMBER(loc_aruco_dictionary_id, int, 10)            /* aruco dictionary id for localization markers  */ \
+  CXT_MACRO_MEMBER(loc_corner_filter_process_std, float, 0.)    /* Process Noise Std Dev for Kalman filtering corners */\
+  CXT_MACRO_MEMBER(loc_corner_filter_measure_std, float, 0.)    /* Measurement Noise Std Dev for Kalman filtering corners */\
+  CXT_MACRO_MEMBER(loc_corner_filter_max_skipped, int, 3)       /* Max number of frames that to predict_only corner locations */\
   /* End of list */
 
   struct VlocContext

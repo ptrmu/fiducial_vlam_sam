@@ -34,6 +34,14 @@ namespace fiducial_vlam
         x3_(x3), y3_(y3)
     {}
 
+    explicit Observation(int id)
+      : id_(id),
+        x0_(0.), y0_(0.),
+        x1_(0.), y1_(0.),
+        x2_(0.), y2_(0.),
+        x3_(0.), y3_(0.)
+    {}
+
     explicit Observation(const fiducial_vlam_msgs::msg::Observation &msg)
       : id_(msg.id),
         x0_(msg.x0), y0_(msg.y0),
@@ -44,21 +52,38 @@ namespace fiducial_vlam
 
     auto id() const
     { return id_; } //
-    auto x0() const
+    auto &x0() const
     { return x0_; } //
-    auto x1() const
+    auto &x1() const
     { return x1_; } //
-    auto x2() const
+    auto &x2() const
     { return x2_; } //
-    auto x3() const
+    auto &x3() const
     { return x3_; } //
-    auto y0() const
+    auto &y0() const
     { return y0_; } //
-    auto y1() const
+    auto &y1() const
     { return y1_; } //
-    auto y2() const
+    auto &y2() const
     { return y2_; } //
-    auto y3() const
+    auto &y3() const
+    { return y3_; } //
+
+    auto &x0()
+    { return x0_; } //
+    auto &x1()
+    { return x1_; } //
+    auto &x2()
+    { return x2_; } //
+    auto &x3()
+    { return x3_; } //
+    auto &y0()
+    { return y0_; } //
+    auto &y1()
+    { return y1_; } //
+    auto &y2()
+    { return y2_; } //
+    auto &y3()
     { return y3_; } //
 
     template<class TPoint>
@@ -97,14 +122,14 @@ namespace fiducial_vlam
 
     explicit Observations(const fiducial_vlam_msgs::msg::Observations &msg);
 
-    const auto &observations() const
+    auto &observations() const
+    { return observations_; } //
+    auto &observations()
     { return observations_; } //
     auto size() const
     { return observations_.size(); } //
 
     void add(const Observation &observation); //
-    void remove(std::size_t index); //
-    void set(std::size_t index, const Observation &observation); //
 
     fiducial_vlam_msgs::msg::Observations to_msg(std_msgs::msg::Header::_stamp_type stamp,
                                                  const std_msgs::msg::Header::_frame_id_type &frame_id,

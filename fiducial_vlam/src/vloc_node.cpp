@@ -80,7 +80,7 @@ namespace fiducial_vlam
     {
       // Detect the markers in this image and create a list of
       // observations.
-      return fm_.detect_markers(*gray, color_marked);
+      return fm_.detect_markers(*gray, time_stamp, color_marked);
     }
 
     TransformWithCovariance solve_t_map_camera(const Observations &observations,
@@ -101,6 +101,7 @@ namespace fiducial_vlam
     VlocContext cxt_{};
     FiducialMathContext fm_cxt_{};
     CalibrateContext cal_cxt_{};
+    std::unique_ptr<SmoothObservationsInterface> so_;
     std::unique_ptr<CvFiducialMathInterface> fm_;
     std::unique_ptr<ProcessImageInterface> lc_pi_{};
     std::unique_ptr<CalibrateCameraInterface> cc_pi_{};
@@ -198,7 +199,8 @@ namespace fiducial_vlam
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
       ros_logger_inst_{get_logger()},
-      fm_{make_cv_fiducial_math(fm_cxt_)},
+      so_{make_smooth_observations(cxt_)},
+      fm_{make_cv_fiducial_math(fm_cxt_, *so_)},
       lc_pi_{std::make_unique<LocalizeCameraProcessImageImpl>(cxt_, fm_cxt_, *fm_)},
       cc_pi_{make_calibrate_camera(ros_logger_inst_, cal_cxt_)}
     {
@@ -357,7 +359,7 @@ namespace fiducial_vlam
       auto observations = pi().process_image(gray, time_stamp, color_marked.image);
 
       // Publish the observations.
-      if (observations.size()) {
+      if (!observations.observations().empty()) {
         auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg);
         observations_pub_->publish(observations_msg);
       }

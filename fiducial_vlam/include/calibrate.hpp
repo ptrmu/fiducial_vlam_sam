@@ -32,6 +32,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(cal_square_length, float, 0.030)               /* length of a square on the charuco board  */ \
   CXT_MACRO_MEMBER(cal_upper_left_white_not_black, int, 0)        /* upper_left_white_not_black  */ \
   CXT_MACRO_MEMBER(cal_marker_length, float, 0.0225)              /* length of a marker on the charuco board  */ \
+  CXT_MACRO_MEMBER(cal_stationary_capture_ms, int, 2000)          /* Time that calibration target needs to be stationary.  */ \
  /* End of list */
 
   struct CalibrateContext
