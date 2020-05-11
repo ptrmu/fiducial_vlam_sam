@@ -8,7 +8,6 @@ namespace fiducial_vlam
 {
 
   constexpr auto min_time_before_leave_ready = std::chrono::milliseconds(500);
-  constexpr double min_time_stationary_secs = 4.0;
   constexpr double delta_threshold = 5.0;
   const cv::Scalar feedback_border_color_0(0, 0, 255);
   const cv::Scalar feedback_border_color_1(0, 255, 0);
@@ -125,8 +124,11 @@ namespace fiducial_vlam
         // Provide some feed back in this state.
         draw_board_boundary(color_marked, image_holder->board_projection().board_corners());
 
-        // When the board becomes stationary, then transition to stationary mode.
-        if (impl_.test_stationary(image_holder)) {
+        // When the board becomes stationary, then transition to stationary mode. If the
+        // capture time is zero, then we never transition. This allows images to be captured
+        // manually with the "cal_cmd capture"
+        if (impl_.test_stationary(image_holder) &&
+            impl_.cxt_.cal_stationary_capture_ms_ != 0) {
           impl_.stationary_state_.activate(image_holder);
           return;
         }
@@ -161,6 +163,10 @@ namespace fiducial_vlam
           impl_.ready_state_.activate(image_holder->time_stamp());
           return;
         }
+
+        // Figure out how many seconds the calibration board needs to be stationary.
+        // This should not be executed if cal_stationary_capture_ms_ == 0.
+        double min_time_stationary_secs = 0.001 * impl_.cxt_.cal_stationary_capture_ms_;
 
         // Mark the color_marked image with a coloration that indicates how long
         // this board has been stationary.

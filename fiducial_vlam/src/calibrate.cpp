@@ -352,6 +352,7 @@ namespace fiducial_vlam
     struct CalibrationResult
     {
       int calibration_style_{CalibrationStyles::unknown};
+      std::vector<std::size_t> images_for_calibration_{};
       int flags_{0};
       double reproject_error_{0.};
       cv::Matx33d camera_matrix_{};
@@ -406,8 +407,10 @@ namespace fiducial_vlam
       }
 
       for (int calib_style = 0; calib_style < CalibrationStyles::number_of_styles; calib_style += 1) {
-        do_calibration(calib_style, res);
+        do_calibration(calib_style, std::vector<size_t>{}, res);
       }
+
+      do_calibration(CalibrationStyles::principal_point_free, std::vector<size_t>{0, 1, 2, 3, 4}, res);
 
       res.valid_ = true;
       return res;
@@ -415,11 +418,33 @@ namespace fiducial_vlam
 
   private:
     void do_calibration(int calibration_style,
+                        const std::vector<size_t> &images_for_calibration,
                         CalibrateCameraResult &res)
     {
       CalibrateCameraResult::CalibrationResult cal{};
 
       cal.calibration_style_ = calibration_style;
+      cal.images_for_calibration_ = images_for_calibration;
+
+      // Pick out the images to use for calibration. Here we copy points
+      // from boards of interest to a separate vector.
+      std::vector<std::vector<cv::Vec3f>> junctions_f_board_tmp{};
+      std::vector<std::vector<cv::Vec2f>> junctions_f_image_tmp{};
+      if (!images_for_calibration.empty()) {
+        for (auto ifc : images_for_calibration) {
+          junctions_f_board_tmp.insert(junctions_f_board_tmp.end(), res.junctions_f_board_[ifc]);
+          junctions_f_image_tmp.insert(junctions_f_image_tmp.end(), res.junctions_f_image_[ifc]);
+        }
+      }
+
+      // Create references to the vectors to use for calibration.
+      std::vector<std::vector<cv::Vec3f>> &junctions_f_board{!images_for_calibration.empty() ?
+                                                             junctions_f_board_tmp :
+                                                             res.junctions_f_board_};
+      std::vector<std::vector<cv::Vec2f>> &junctions_f_image{!images_for_calibration.empty() ?
+                                                             junctions_f_image_tmp :
+                                                             res.junctions_f_image_};
+
       cv::Size image_size{captured_images_[0]->gray().cols, captured_images_[0]->gray().rows};
 
       // For these styles, do two calibrations.
@@ -440,7 +465,7 @@ namespace fiducial_vlam
         }
 
         cal.reproject_error_ = calibrateCamera(
-          res.junctions_f_board_, res.junctions_f_image_,
+          junctions_f_board, junctions_f_image,
           image_size,
           cal.camera_matrix_, cal.dist_coeffs_,
           cv::noArray(), cv::noArray(),
@@ -523,15 +548,14 @@ namespace fiducial_vlam
           break;
         case CalibrationStyles::a_k1_free_b_fix_principal_point_free:
           cal.flags_ = cv::CALIB_USE_INTRINSIC_GUESS |
-                       cv::CALIB_FIX_FOCAL_LENGTH |
-                       cv::CALIB_ZERO_TANGENT_DIST |
-                       cv::CALIB_FIX_K3;;
+                       cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST |
+                       cv::CALIB_FIX_K3;
           break;
       }
 
       // Do the calibration.
       cal.reproject_error_ = calibrateCamera(
-        res.junctions_f_board_, res.junctions_f_image_,
+        junctions_f_board, junctions_f_image,
         image_size,
         cal.camera_matrix_, cal.dist_coeffs_,
         cal.rvecs_, cal.tvecs_,
@@ -889,6 +913,19 @@ namespace fiducial_vlam
       s.append(ros2_shared::string_print::f("\nCamera calibration style %d, (%s)\n",
                                             cal.calibration_style_,
                                             CalibrationStyles::name(cal.calibration_style_).c_str()));
+
+      if (cal.images_for_calibration_.empty()) {
+        s.append("Using all captured images\n");
+      } else {
+        s.append("Using  captured images: ");
+        for (auto ifc : cal.images_for_calibration_) {
+          if (ifc != cal.images_for_calibration_[0]) {
+            s.append(", ");
+          }
+          s.append(ros2_shared::string_print::f("%d", ifc));
+        }
+        s.append("\n");
+      }
 
       s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
                                             cal.camera_matrix_(0, 0),

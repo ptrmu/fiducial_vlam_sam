@@ -310,5 +310,4 @@ namespace fiducial_vlam
   {
     return std::make_unique<SmoothObservationsImpl>(cxt);
   }
-
 }

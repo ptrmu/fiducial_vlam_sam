@@ -9,7 +9,7 @@ from launch.actions import ExecuteProcess
 opencv_zed_params = [{
     'file': False,
     'index': 0,
-    'half_image': 2,
+    'half_image': 2, # 1 - left sensor, 2 - right sensor (when looking in the same direction as the ZED)
     'vcp_property0': 'CAP_PROP_FRAME_WIDTH', 'vcp_value0': 2560.,
     'vcp_property1': 'CAP_PROP_FRAME_HEIGHT', 'vcp_value1': 720.,
 }]
@@ -32,10 +32,10 @@ def generate_launch_description():
 
     entities = [
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
-             node_name='opencv_cam', parameters=opencv_lifecam_params),
+             node_name='opencv_cam', parameters=opencv_zed_params),
 
-        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
-             parameters=vloc_args),
+        # Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+        #      parameters=vloc_args),
     ]
 
     return LaunchDescription(entities)
