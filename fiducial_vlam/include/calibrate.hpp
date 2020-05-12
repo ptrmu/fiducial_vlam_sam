@@ -14,6 +14,7 @@ namespace fiducial_vlam
 {
   class CapturedImages; //
   class ImageHolder; //
+  class CalibrateContext; //
 
 // ==============================================================================
 // CalibrateContext class
@@ -78,5 +79,26 @@ namespace fiducial_vlam
                                                                                const rclcpp::Time &now,
                                                                                CapturedImages &captured_images);
 
+// ==============================================================================
+// CalibrateCameraTaskInterface class
+// ==============================================================================
+
+  struct CalibrateCameraTaskResult
+  {
+    std::string calibration_report_{};
+    std::vector<cv::Mat> captured_images_marked_{};
+  };
+
+  class CalibrateCameraTaskInterface
+  {
+  public:
+    virtual ~CalibrateCameraTaskInterface() = default; //
+    virtual CalibrateCameraTaskResult calculate_calibration() = 0; //
+  };
+
+  std::unique_ptr<CalibrateCameraTaskInterface> make_calibrate_camera_task(
+    const CalibrateContext &cal_cxt,
+    const rclcpp::Time &now,
+    std::unique_ptr<const CapturedImages> captured_images);
 }
 #endif //VLAM_CALIBRATE_HPP

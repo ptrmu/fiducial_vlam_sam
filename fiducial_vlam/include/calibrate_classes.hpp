@@ -96,9 +96,17 @@ namespace fiducial_vlam
       image_size_{image_size}
     {}
 
-    const cv::Size image_size()
+    // Make a shallow copy of the vector. This is how we pass images to another thread. The vector is not
+    // thread safe and we have to make the other thread use a clone of the vector. The content of the vector
+    // gets copied in this operation. But the content is a list of shared_ptrs. The items these shared pointers
+    // point to are NOT copied. According to the stl docs, the control block of the shared_ptr is thread safe
+    // and the object will be deleted correctly across multiple threads. The ImageHolders that are referenced
+    // from this vector are not modified and therefor can be accessed by multiple threads.
+    std::unique_ptr<const CapturedImages> shallow_clone() const;
+
+    auto &image_size() const
     { return image_size_; } //
-    const auto &operator()()
+    auto &captured_images() const
     { return captured_images_; } //
 
     void capture(std::shared_ptr<ImageHolder> &image_holder);

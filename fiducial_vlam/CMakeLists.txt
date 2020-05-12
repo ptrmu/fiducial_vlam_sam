@@ -105,6 +105,7 @@ set(VLOC_NODE_SOURCES
   src/calibrate_capture_stationary.cpp
   src/smooth_observations.cpp
   src/cv_utils.cpp
+  src/calibrate_task.cpp
   )
 
 set(VLOC_NODE_DEPS
