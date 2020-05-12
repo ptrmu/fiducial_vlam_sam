@@ -142,6 +142,7 @@ namespace task_thread
     ConcurrentQueue<std::packaged_task<void(TWork &)>> q_{};
     std::unique_ptr<TWork> work_;
     std::thread thread_;
+    bool run_on_start_thread_; // for debugging - execute task on the starting thread.
     volatile int abort_{0};
 
     static void run(TaskThread *tt)
@@ -157,8 +158,8 @@ namespace task_thread
     }
 
   public:
-    TaskThread(std::unique_ptr<TWork> work) :
-      work_{std::move(work)}, thread_{run, this}
+    TaskThread(std::unique_ptr<TWork> work, bool run_on_start_thread = false) :
+      work_{std::move(work)}, thread_{run, this}, run_on_start_thread_{run_on_start_thread}
     {}
 
     ~TaskThread()
@@ -177,7 +178,11 @@ namespace task_thread
     template <class TTask>
     void push(TTask task)
     {
-      q_.push(std::packaged_task<void(TWork &)>{std::move(task)});
+      if (run_on_start_thread_) {
+        task(*work_);
+      } else {
+        q_.push(std::packaged_task<void(TWork &)>{std::move(task)});
+      }
     }
 
     bool empty()

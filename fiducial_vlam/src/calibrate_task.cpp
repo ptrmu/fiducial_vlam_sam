@@ -28,14 +28,10 @@ namespace fiducial_vlam
     Type selection_size_;
     std::vector<Type> selection_{};
 
+  public:
     GenerateCombinations(Type set_size, Type selection_size) :
-      set_size_{set_size}, selection_size_{std::max(selection_size, set_size)}
-    {
-      Type offset = set_size - selection_size;
-      for (Type i = 0; i < selection_size; i += 1) {
-        selection_.emplace_back(i + offset);
-      }
-    }
+      set_size_{set_size}, selection_size_{std::min(selection_size, set_size)}
+    {}
 
     const auto &selection() const
     { return selection_; }
@@ -180,9 +176,39 @@ namespace fiducial_vlam
       return s;
     }
 
-    std::string calc_junction_errors(const CalibrateCameraResult &res,
-                                     const CalibrateCameraResult::CalibrationResult &cal,
-                                     std::size_t i)
+    double calc_reprojection_error(const CalibrateCameraResult &res,
+                                   const CalibrateCameraResult::CalibrationResult &cal,
+                                   std::size_t image_index)
+    {
+      auto &junctions_f_board = res.junctions_f_board_[image_index];
+      auto &junctions_f_image = res.junctions_f_image_[image_index];
+
+      // Figure out the location of the board relative to the camera.
+      cv::Vec3d rvec, tvec;
+      cv::solvePnP(junctions_f_board, junctions_f_image,
+                   cal.camera_matrix_, cal.dist_coeffs_,
+                   rvec, tvec);
+
+      // Project the object points onto the image so we can calculate the individual junction
+      // reprojection errors.
+      std::vector<cv::Vec2f> junctions_f_image_reproject{};
+      cv::projectPoints(junctions_f_board,
+                        rvec, tvec,
+                        cal.camera_matrix_, cal.dist_coeffs_,
+                        junctions_f_image_reproject);
+
+      double total_error_squared{0.0};
+      for (size_t i = 0; i < junctions_f_image.size(); i += 1) {
+        auto error = cv::norm(junctions_f_image_reproject[i] - junctions_f_image[i]);
+        total_error_squared += error * error;
+      }
+
+      return std::sqrt(total_error_squared / junctions_f_image.size());
+    }
+
+    std::string report_junction_errors(const CalibrateCameraResult &res,
+                                       const CalibrateCameraResult::CalibrationResult &cal,
+                                       std::size_t image_index)
     {
       std::string s{};
       std::vector<cv::Vec2f> reproject_image_points{};
@@ -192,13 +218,13 @@ namespace fiducial_vlam
 
       // Project the object points onto the image so we can calculate the individual junction
       // reprojection errors.
-      cv::projectPoints(res.junctions_f_board_[i],
-                        cal.rvecs_.at<cv::Vec3d>(i, 0), cal.tvecs_.at<cv::Vec3d>(i, 0),
+      cv::projectPoints(res.junctions_f_board_[image_index],
+                        cal.rvecs_.at<cv::Vec3d>(image_index, 0), cal.tvecs_.at<cv::Vec3d>(image_index, 0),
                         cal.camera_matrix_, cal.dist_coeffs_,
                         reproject_image_points);
 
-      auto &junction_id_index_map_ = res.junction_id_index_maps_[i];
-      auto &junctions_f_image = res.junctions_f_image_[i];
+      auto &junction_id_index_map_ = res.junction_id_index_maps_[image_index];
+      auto &junctions_f_image = res.junctions_f_image_[image_index];
       for (JunctionId junction_id = 0; junction_id < cbm_.max_junction_id_; junction_id += 1) {
         auto p = junction_id_index_map_.find(junction_id);
         if (p == junction_id_index_map_.end()) {
@@ -229,7 +255,8 @@ namespace fiducial_vlam
       return s;
     }
 
-    std::string create_one_calibration_report(const CalibrateCameraResult::CalibrationResult &cal)
+    std::string create_one_calibration_report(const CalibrateCameraResult &res,
+                                              const CalibrateCameraResult::CalibrationResult &cal)
     {
       std::string s{};
       s.append(ros2_shared::string_print::f("\nCamera calibration style %d, (%s)\n",
@@ -273,17 +300,35 @@ namespace fiducial_vlam
                                             cal.stdDeviationsIntrinsics_.at<double>(7),
                                             cal.stdDeviationsIntrinsics_.at<double>(8)));
 
-      s.append(ros2_shared::string_print::f("Total reprojection error %5.3f\n",
-                                            cal.reproject_error_));
-
+      double image_error_acc{0.};
       for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
+        auto image_index = cal.images_for_calibration_.empty() ? i : cal.images_for_calibration_[i];
+        auto image_error = calc_reprojection_error(res, cal, image_index);
+        image_error_acc += image_error * image_error;
         s.append(ros2_shared::string_print::f(
-          "Image %d, %s - Reprojection error %5.3f\n",
-          i,
-          to_date_string(captured_images_->captured_images()[i]->time_stamp()).c_str(),
-          cal.perViewErrors_.at<double>(i, 0)));
+          "Image %d, %s - Reprojection error %6.4f, internal %6.4f\n",
+          image_index,
+          to_date_string(captured_images_->captured_images()[image_index]->time_stamp()).c_str(),
+          cal.perViewErrors_.at<double>(i, 0),
+          image_error));
       }
 
+      double internal_image_error = std::sqrt(image_error_acc / cal.perViewErrors_.rows);
+      s.append(ros2_shared::string_print::f("Total reprojection error %6.4f, internal %6.4f",
+                                            cal.reproject_error_, internal_image_error));
+
+      if (!cal.images_for_calibration_.empty()) {
+        image_error_acc = 0;
+        for (size_t image_index = 0; image_index < res.junctions_f_image_.size(); image_index += 1) {
+          auto image_error = calc_reprojection_error(res, cal, image_index);
+          image_error_acc += image_error * image_error;
+        }
+        double complete_image_error = std::sqrt(image_error_acc / res.junctions_f_image_.size());
+        s.append(ros2_shared::string_print::f(", complete %6.4f",
+                                              complete_image_error));
+      }
+
+      s.append("\n");
       return s;
     }
 
@@ -296,8 +341,8 @@ namespace fiducial_vlam
                                             captured_images_->image_size().width,
                                             captured_images_->image_size().height));
 
-      for (auto &calibration_result : res.calibration_results_) {
-        s.append(create_one_calibration_report(calibration_result));
+      for (auto &one_cal : res.calibration_results_) {
+        s.append(create_one_calibration_report(res, one_cal));
       }
 
       s.append(ros2_shared::string_print::f(
@@ -310,7 +355,7 @@ namespace fiducial_vlam
           "Image %d, %s - Reprojection error %5.3f\n",
           i, to_date_string(captured_images_->captured_images()[i]->time_stamp()).c_str(),
           cal.perViewErrors_.at<double>(i, 0)));
-        s.append(calc_junction_errors(res, cal, i));
+        s.append(report_junction_errors(res, cal, i));
         s.append("\n");
       }
 
@@ -360,14 +405,17 @@ namespace fiducial_vlam
       }
 
       // find the desired calibration style.
-      auto cal_style = std::max(0, std::min(CalibrationStyles::number_of_styles - 1,
-                                            cal_cxt_.cal_calibration_style_to_save_));
+      auto calibration_style = std::max(0, std::min(CalibrationStyles::number_of_styles - 1,
+                                                    cal_cxt_.cal_calibration_style_to_save_));
 
       // Try all combinations of captured images.
-      do_calibration(cal_style, std::vector<size_t>{0, 1, 2, 3, 4}, res);
+      if (cal_cxt_.cal_bootstrap_reserve_fraction_ > 0.0 &&
+          cal_cxt_.cal_bootstrap_reserve_fraction_ < 1.0) {
+        calibrate_with_image_sets(calibration_style, res);
+      }
 
       // Save the calibration file.
-      auto &cal = res.calibration_results_[cal_style];
+      auto &cal = res.calibration_results_[calibration_style];
       auto save_str{save_calibration(now_, cal)};
 
       // Return a report and the marked images.
@@ -376,6 +424,19 @@ namespace fiducial_vlam
         CalibrateCameraReport(cal_cxt_, cbm_, now_, captured_images_).create(res, cal));
       task_res.captured_images_marked_ = std::move(res.captured_images_marked_);
       return task_res;
+    }
+
+    void calibrate_with_image_sets(int calibration_style,
+                                   CalibrateCameraResult &res)
+    {
+      std::size_t set_size = res.junctions_f_image_.size();
+      std::size_t reserve_size = static_cast<size_t>(std::round(set_size * cal_cxt_.cal_bootstrap_reserve_fraction_));
+      std::size_t selection_size = std::max(4UL, std::min(set_size, set_size - reserve_size));
+
+      GenerateCombinations<std::size_t> combinations(set_size, selection_size);
+      while (combinations.next()) {
+        do_calibration(calibration_style, combinations.selection(), res);
+      }
     }
 
     void do_calibration(int calibration_style,
@@ -714,160 +775,6 @@ namespace fiducial_vlam
                                                       cal_cxt_.cal_camera_name_.c_str(),
                                                       cal_cxt_.cal_save_camera_info_path_.c_str())};
     }
-
-#if 0
-    std::string to_date_string(const rclcpp::Time time)
-    {
-      auto nano = time.nanoseconds();
-      auto secs = nano / 1000000000L;
-      auto milli = (nano - secs * 1000000000L) / 1000000L;
-      char time_buf[64];
-      std::time_t t = secs;
-      if (0 == strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S.", localtime(&t))) {
-        time_buf[0] = 0;
-      }
-      std::string s(time_buf);
-      auto milli_str{std::to_string(milli)};
-      s.append(3 - milli_str.size(), '0').append(milli_str);
-      return s;
-    }
-
-    std::string calc_junction_errors(const CalibrateCameraResult &res,
-                                     const CalibrateCameraResult::CalibrationResult &cal,
-                                     std::size_t i)
-    {
-      std::string s{};
-      std::vector<cv::Vec2f> reproject_image_points{};
-      int bad_reprojection_count{0};
-      int junction_count{0};
-      double total_error_squared{0.0};
-
-      // Project the object points onto the image so we can calculate the individual junction
-      // reprojection errors.
-      cv::projectPoints(res.junctions_f_board_[i],
-                        cal.rvecs_.at<cv::Vec3d>(i, 0), cal.tvecs_.at<cv::Vec3d>(i, 0),
-                        cal.camera_matrix_, cal.dist_coeffs_,
-                        reproject_image_points);
-
-      auto &junction_id_index_map_ = res.junction_id_index_maps_[i];
-      auto &junctions_f_image = res.junctions_f_image_[i];
-      for (JunctionId junction_id = 0; junction_id < cbm_.max_junction_id_; junction_id += 1) {
-        auto p = junction_id_index_map_.find(junction_id);
-        if (p == junction_id_index_map_.end()) {
-          s.append("0.000 ");
-        } else {
-          auto index = p->second;
-          auto error = cv::norm(reproject_image_points[index] - junctions_f_image[index]);
-          total_error_squared += error * error;
-          junction_count += 1;
-          s.append(ros2_shared::string_print::f("%5.3f ", error));
-          if (error > 1.) {
-            bad_reprojection_count += 1;
-          }
-        }
-        if (junction_id % cbm_.squares_x_m_1_ == cbm_.squares_x_m_1_ - 1) {
-          s.append("\n");
-        }
-      }
-
-      s.append(ros2_shared::string_print::f("Recalculated reprojection error: %5.3f (rms pixels)\n",
-                                            std::sqrt(total_error_squared / junction_count)));
-
-      if (bad_reprojection_count > 0) {
-        s.append(ros2_shared::string_print::f("****** %d bad junction re-projection errors\n",
-                                              bad_reprojection_count));
-      }
-
-      return s;
-    }
-
-    std::string create_one_calibration_report(CalibrateCameraResult::CalibrationResult &cal)
-    {
-      std::string s{};
-      s.append(ros2_shared::string_print::f("\nCamera calibration style %d, (%s)\n",
-                                            cal.calibration_style_,
-                                            CalibrationStyles::name(cal.calibration_style_).c_str()));
-
-      if (cal.images_for_calibration_.empty()) {
-        s.append("Using all captured images\n");
-      } else {
-        s.append("Using  captured images: ");
-        for (auto ifc : cal.images_for_calibration_) {
-          if (ifc != cal.images_for_calibration_[0]) {
-            s.append(", ");
-          }
-          s.append(ros2_shared::string_print::f("%d", ifc));
-        }
-        s.append("\n");
-      }
-
-      s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
-                                            cal.camera_matrix_(0, 0),
-                                            cal.camera_matrix_(1, 1),
-                                            cal.camera_matrix_(0, 2),
-                                            cal.camera_matrix_(1, 2)));
-      s.append(ros2_shared::string_print::f("std dev fx, fy, cx, cy: %f %f %f %f\n",
-                                            cal.stdDeviationsIntrinsics_.at<double>(0),
-                                            cal.stdDeviationsIntrinsics_.at<double>(1),
-                                            cal.stdDeviationsIntrinsics_.at<double>(2),
-                                            cal.stdDeviationsIntrinsics_.at<double>(3)));
-
-      s.append(ros2_shared::string_print::f("k1, k2, p1, p2, k3: %f %f %f %f %f\n",
-                                            cal.dist_coeffs_(0, 0),
-                                            cal.dist_coeffs_(1, 0),
-                                            cal.dist_coeffs_(2, 0),
-                                            cal.dist_coeffs_(3, 0),
-                                            cal.dist_coeffs_(4, 0)));
-      s.append(ros2_shared::string_print::f("std dev k1, k2, p1, p2, k3: %f %f %f %f %f\n",
-                                            cal.stdDeviationsIntrinsics_.at<double>(4),
-                                            cal.stdDeviationsIntrinsics_.at<double>(5),
-                                            cal.stdDeviationsIntrinsics_.at<double>(6),
-                                            cal.stdDeviationsIntrinsics_.at<double>(7),
-                                            cal.stdDeviationsIntrinsics_.at<double>(8)));
-
-      s.append(ros2_shared::string_print::f("Total reprojection error %5.3f\n",
-                                            cal.reproject_error_));
-
-      for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
-        s.append(ros2_shared::string_print::f("Image %d, %s - Reprojection error %5.3f\n",
-                                              i, to_date_string(captured_images_[i]->time_stamp()).c_str(),
-                                              cal.perViewErrors_.at<double>(i, 0)));
-      }
-
-      return s;
-    }
-
-    std::string create_calibration_report(CalibrateCameraResult::CalibrationResult &cal)
-    {
-//      auto &res = calibrate_camera_result_;
-//
-//      std::string s{};
-//      s.append(ros2_shared::string_print::f("Camera calibration done on %s.\nWith %dx%d images.\n",
-//                                            to_date_string(res.calibration_time_).c_str(),
-//                                            captured_images_[0]->gray().cols,
-//                                            captured_images_[0]->gray().rows));
-//
-//      for (auto &calibration_result : res.calibration_results_) {
-//        s.append(create_one_calibration_report(calibration_result));
-//      }
-//
-//      s.append(ros2_shared::string_print::f(
-//        "\nIndividual junction re-projection errors for calibration style %d (%s).\n",
-//        cal.calibration_style_,
-//        CalibrationStyles::name(cal.calibration_style_).c_str()));
-//
-//      for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
-//        s.append(ros2_shared::string_print::f(
-//          "Image %d, %s - Reprojection error %5.3f\n",
-//          i, to_date_string(captured_images_[i]->time_stamp()).c_str(),
-//          cal.perViewErrors_.at<double>(i, 0)));
-//        s.append(calc_junction_errors(res, cal, i));
-//        s.append("\n");
-//      }
-//
-//      return s;
-    }
-#endif
   };
 
 

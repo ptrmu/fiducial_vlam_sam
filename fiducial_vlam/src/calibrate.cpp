@@ -330,7 +330,8 @@ namespace fiducial_vlam
     CalibrateCameraThread(const CalibrateContext &cal_cxt,
                           const rclcpp::Time &now,
                           std::unique_ptr<const CapturedImages> captured_images) :
-      task_thread_{make_calibrate_camera_task(cal_cxt, now, std::move(captured_images))}
+      task_thread_{make_calibrate_camera_task(cal_cxt, now, std::move(captured_images)),
+                   !cal_cxt.cal_compute_on_thread_}
     {}
 
     std::string check_completion(const rclcpp::Time &now)

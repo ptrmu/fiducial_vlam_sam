@@ -34,7 +34,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(cal_upper_left_white_not_black, int, 0)        /* upper_left_white_not_black  */ \
   CXT_MACRO_MEMBER(cal_marker_length, float, 0.0450)              /* length of a marker on the charuco board  */ \
   CXT_MACRO_MEMBER(cal_stationary_capture_ms, int, 0)             /* Duration that calibration target needs to be stationary. 0 => infinite */ \
-  CXT_MACRO_MEMBER(cal_bootstrap_reserve_percent, double, 0.5)    /* % of calibration images to reserve for bootstrap validation */ \
+  CXT_MACRO_MEMBER(cal_bootstrap_reserve_fraction, double, 0.2)   /* % of calibration images to reserve for bootstrap validation */ \
  /* End of list */
 
   struct CalibrateContext
