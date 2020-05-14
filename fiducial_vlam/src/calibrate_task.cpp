@@ -150,6 +150,16 @@ namespace fiducial_vlam
     const CharucoboardConfig &cbm_;
     const rclcpp::Time &now_;
     std::unique_ptr<const CapturedImages> &captured_images_;
+    uint32_t report_flags_;
+
+    enum
+    {
+      REPORT_JUNCTION_ERRORS = 1U,
+      REPORT_IMAGE_ERRORS = 2U,
+      REPORT_CAL_ALL_IMAGES = 4U,
+      REPORT_CAL_SUBSET_IMAGES = 8U,
+      REPORT_CAL_SUBSET_STATS = 16U
+    };
 
   public:
     CalibrateCameraReport(const CalibrateContext &cal_cxt,
@@ -157,7 +167,8 @@ namespace fiducial_vlam
                           const rclcpp::Time &now,
                           std::unique_ptr<const CapturedImages> &captured_images) :
       cal_cxt_{cal_cxt}, cbm_{cbm}, now_{now},
-      captured_images_{captured_images}
+      captured_images_{captured_images},
+      report_flags_{REPORT_CAL_ALL_IMAGES}
     {}
 
     std::string to_date_string(const rclcpp::Time time)
@@ -305,12 +316,14 @@ namespace fiducial_vlam
         auto image_index = cal.images_for_calibration_.empty() ? i : cal.images_for_calibration_[i];
         auto image_error = calc_reprojection_error(res, cal, image_index);
         image_error_acc += image_error * image_error;
-        s.append(ros2_shared::string_print::f(
-          "Image %d, %s - Reprojection error %6.4f, internal %6.4f\n",
-          image_index,
-          to_date_string(captured_images_->captured_images()[image_index]->time_stamp()).c_str(),
-          cal.perViewErrors_.at<double>(i, 0),
-          image_error));
+        if (report_flags_ & REPORT_IMAGE_ERRORS) {
+          s.append(ros2_shared::string_print::f(
+            "Image %d, %s - Reprojection error %6.4f, internal %6.4f\n",
+            image_index,
+            to_date_string(captured_images_->captured_images()[image_index]->time_stamp()).c_str(),
+            cal.perViewErrors_.at<double>(i, 0),
+            image_error));
+        }
       }
 
       double internal_image_error = std::sqrt(image_error_acc / cal.perViewErrors_.rows);
@@ -342,21 +355,30 @@ namespace fiducial_vlam
                                             captured_images_->image_size().height));
 
       for (auto &one_cal : res.calibration_results_) {
-        s.append(create_one_calibration_report(res, one_cal));
+        if (((report_flags_ & REPORT_CAL_ALL_IMAGES) && one_cal.images_for_calibration_.empty()) ||
+            ((report_flags_ & REPORT_CAL_SUBSET_IMAGES) && !one_cal.images_for_calibration_.empty())) {
+          s.append(create_one_calibration_report(res, one_cal));
+        }
       }
 
-      s.append(ros2_shared::string_print::f(
-        "\nIndividual junction re-projection errors for calibration style %d (%s).\n",
-        cal.calibration_style_,
-        CalibrationStyles::name(cal.calibration_style_).c_str()));
+      if (report_flags_ & REPORT_CAL_SUBSET_STATS) {
 
-      for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
+      }
+
+      if (report_flags_ & REPORT_JUNCTION_ERRORS) {
         s.append(ros2_shared::string_print::f(
-          "Image %d, %s - Reprojection error %5.3f\n",
-          i, to_date_string(captured_images_->captured_images()[i]->time_stamp()).c_str(),
-          cal.perViewErrors_.at<double>(i, 0)));
-        s.append(report_junction_errors(res, cal, i));
-        s.append("\n");
+          "\nIndividual junction re-projection errors for calibration style %d (%s).\n",
+          cal.calibration_style_,
+          CalibrationStyles::name(cal.calibration_style_).c_str()));
+
+        for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
+          s.append(ros2_shared::string_print::f(
+            "Image %d, %s - Reprojection error %5.3f\n",
+            i, to_date_string(captured_images_->captured_images()[i]->time_stamp()).c_str(),
+            cal.perViewErrors_.at<double>(i, 0)));
+          s.append(report_junction_errors(res, cal, i));
+          s.append("\n");
+        }
       }
 
       return s;
@@ -548,9 +570,19 @@ namespace fiducial_vlam
           cal.flags_ = cv::CALIB_USE_INTRINSIC_GUESS |
                        cv::CALIB_FIX_PRINCIPAL_POINT |
                        cv::CALIB_FIX_FOCAL_LENGTH | cv::CALIB_FIX_ASPECT_RATIO |
-                       cv::CALIB_ZERO_TANGENT_DIST |
                        cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
 #if 1
+          cal.camera_matrix_(0, 0) = 921.170702;
+          cal.camera_matrix_(1, 1) = 919.018377;
+          cal.camera_matrix_(0, 2) = 459.904354;
+          cal.camera_matrix_(1, 2) = 351.238301;
+          cal.camera_matrix_(2, 2) = 1.0;
+          cal.dist_coeffs_(0, 0) = -0.033458;
+          cal.dist_coeffs_(1, 0) = 0.105152;
+          cal.dist_coeffs_(2, 0) = 0.001256;
+          cal.dist_coeffs_(3, 0) = -0.006647;
+          cal.dist_coeffs_(4, 0) = 0.000000;
+#else
           cal.camera_matrix_(0, 0) = 699.3550;
           cal.camera_matrix_(1, 1) = 699.3550;
           cal.camera_matrix_(0, 2) = 650.0850;
@@ -558,7 +590,7 @@ namespace fiducial_vlam
           cal.camera_matrix_(2, 2) = 1.0;
           cal.dist_coeffs_(0, 0) = -0.1716;
           cal.dist_coeffs_(1, 0) = 0.0246;
-#else
+
           cal.camera_matrix_(0, 0) = 700.9050;
           cal.camera_matrix_(1, 1) = 700.9050;
           cal.camera_matrix_(0, 2) = 655.5400;
