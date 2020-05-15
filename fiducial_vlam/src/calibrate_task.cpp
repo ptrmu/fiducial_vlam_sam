@@ -111,20 +111,25 @@ namespace fiducial_vlam
 
   struct CalibrateCameraResult
   {
+    using ValueType = double;
     using JunctionIdIndexMap = std::map<JunctionId, std::size_t>;
     using CameraMatrixType = cv::Matx33d;
-    using DistCoeffsType = cv::Vec<double, 5>;
+    using DistCoeffsType = cv::Vec<ValueType, 5>;
+    using CameraVectorType = cv::Vec<ValueType, 4>;
+
     struct CalibrationResult
     {
       int calibration_style_{CalibrationStyles::unknown};
       std::vector<std::size_t> images_for_calibration_{};
       int flags_{0};
-      double reproject_error_{0.};
+      ValueType reproject_error_{0.};
+      ValueType internal_reproject_error_{0.};
+      ValueType complete_reproject_error_{0.};
       CameraMatrixType camera_matrix_{};
       DistCoeffsType dist_coeffs_{};
       cv::Mat rvecs_{};
       cv::Mat tvecs_{};
-      cv::Mat stdDeviationsIntrinsics_{};
+      cv::Mat stdDeviationsIntrinsics_{}; // These cannot be Matx in opencv 4.1
       cv::Mat stdDeviationsExtrinsics_{};
       cv::Mat perViewErrors_{};
     };
@@ -139,6 +144,57 @@ namespace fiducial_vlam
     rclcpp::Time calibration_time_{0, 0};
 
     std::vector<CalibrationResult> calibration_results_{};
+  };
+
+// ==============================================================================
+// CalcStats class
+// ==============================================================================
+
+  template<typename TValue, int Tn>
+  class CalcStats
+  {
+  public:
+    using ValueType = TValue;
+    using VectorType = cv::Vec<TValue, Tn>;
+
+  private:
+    int count_{0};
+    VectorType mean_curr_{};
+    VectorType mean_prev_{};
+    VectorType s_curr_{};
+    VectorType s_prev_{};
+
+  public:
+    void append(const VectorType &v)
+    {
+      count_++;
+
+      if (count_ == 1) {
+        // Set the very first values.
+        mean_curr_ = v;
+        s_curr_ = 0.;
+      } else {
+        // Save the previous values.
+        mean_prev_ = mean_curr_;
+        s_prev_ = s_curr_;
+
+        // Update the current values.
+        mean_curr_ = mean_prev_ + (v - mean_prev_) / count_;
+        s_curr_ = s_prev_ + (v - mean_prev_).mul(v - mean_curr_);
+      }
+    }
+
+    VectorType mean()
+    {
+      return mean_curr_;
+    }
+
+    VectorType std_dev()
+    {
+      VectorType std_dev{};
+      cv::sqrt(s_curr_ / std::max(1, (count_ - 1)), std_dev);
+      return std_dev;
+    }
   };
 
 // ==============================================================================
@@ -169,7 +225,7 @@ namespace fiducial_vlam
                           std::unique_ptr<const CapturedImages> &captured_images) :
       cal_cxt_{cal_cxt}, cbm_{cbm}, now_{now},
       captured_images_{captured_images},
-      report_flags_{REPORT_CAL_ALL_IMAGES}
+      report_flags_{REPORT_CAL_ALL_IMAGES | REPORT_CAL_SUBSET_STATS}
     {}
 
     std::string to_date_string(const rclcpp::Time time)
@@ -186,36 +242,6 @@ namespace fiducial_vlam
       auto milli_str{std::to_string(milli)};
       s.append(3 - milli_str.size(), '0').append(milli_str);
       return s;
-    }
-
-    double calc_reprojection_error(const CalibrateCameraResult &res,
-                                   const CalibrateCameraResult::CalibrationResult &cal,
-                                   std::size_t image_index)
-    {
-      auto &junctions_f_board = res.junctions_f_board_[image_index];
-      auto &junctions_f_image = res.junctions_f_image_[image_index];
-
-      // Figure out the location of the board relative to the camera.
-      cv::Vec3d rvec, tvec;
-      cv::solvePnP(junctions_f_board, junctions_f_image,
-                   cal.camera_matrix_, cal.dist_coeffs_,
-                   rvec, tvec);
-
-      // Project the object points onto the image so we can calculate the individual junction
-      // reprojection errors.
-      std::vector<cv::Vec2f> junctions_f_image_reproject{};
-      cv::projectPoints(junctions_f_board,
-                        rvec, tvec,
-                        cal.camera_matrix_, cal.dist_coeffs_,
-                        junctions_f_image_reproject);
-
-      double total_error_squared{0.0};
-      for (size_t i = 0; i < junctions_f_image.size(); i += 1) {
-        auto error = cv::norm(junctions_f_image_reproject[i] - junctions_f_image[i]);
-        total_error_squared += error * error;
-      }
-
-      return std::sqrt(total_error_squared / junctions_f_image.size());
     }
 
     std::string report_junction_errors(const CalibrateCameraResult &res,
@@ -267,6 +293,39 @@ namespace fiducial_vlam
       return s;
     }
 
+    std::string camera_matrix_report(const CalibrateCameraResult::CameraMatrixType &camera_matrix,
+                                     const CalibrateCameraResult::DistCoeffsType &dist_coeffs,
+                                     const cv::Mat &stdDeviationsIntrinsics)
+    {
+      std::string s;
+
+      s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
+                                            camera_matrix(0, 0),
+                                            camera_matrix(1, 1),
+                                            camera_matrix(0, 2),
+                                            camera_matrix(1, 2)));
+      s.append(ros2_shared::string_print::f("std dev fx, fy, cx, cy: %f %f %f %f\n",
+                                            stdDeviationsIntrinsics.at<double>(0),
+                                            stdDeviationsIntrinsics.at<double>(1),
+                                            stdDeviationsIntrinsics.at<double>(2),
+                                            stdDeviationsIntrinsics.at<double>(3)));
+
+      s.append(ros2_shared::string_print::f("k1, k2, p1, p2, k3: %f %f %f %f %f\n",
+                                            dist_coeffs(0),
+                                            dist_coeffs(1),
+                                            dist_coeffs(2),
+                                            dist_coeffs(3),
+                                            dist_coeffs(4)));
+      s.append(ros2_shared::string_print::f("std dev k1, k2, p1, p2, k3: %f %f %f %f %f\n",
+                                            stdDeviationsIntrinsics.at<double>(4),
+                                            stdDeviationsIntrinsics.at<double>(5),
+                                            stdDeviationsIntrinsics.at<double>(6),
+                                            stdDeviationsIntrinsics.at<double>(7),
+                                            stdDeviationsIntrinsics.at<double>(8)));
+
+      return s;
+    }
+
     std::string create_one_calibration_report(const CalibrateCameraResult &res,
                                               const CalibrateCameraResult::CalibrationResult &cal)
     {
@@ -288,58 +347,27 @@ namespace fiducial_vlam
         s.append("\n");
       }
 
-      s.append(ros2_shared::string_print::f("fx, fy, cx, cy: %f %f %f %f\n",
-                                            cal.camera_matrix_(0, 0),
-                                            cal.camera_matrix_(1, 1),
-                                            cal.camera_matrix_(0, 2),
-                                            cal.camera_matrix_(1, 2)));
-      s.append(ros2_shared::string_print::f("std dev fx, fy, cx, cy: %f %f %f %f\n",
-                                            cal.stdDeviationsIntrinsics_.at<double>(0),
-                                            cal.stdDeviationsIntrinsics_.at<double>(1),
-                                            cal.stdDeviationsIntrinsics_.at<double>(2),
-                                            cal.stdDeviationsIntrinsics_.at<double>(3)));
+      s.append(camera_matrix_report(cal.camera_matrix_,
+                                    cal.dist_coeffs_,
+                                    cal.stdDeviationsIntrinsics_));
 
-      s.append(ros2_shared::string_print::f("k1, k2, p1, p2, k3: %f %f %f %f %f\n",
-                                            cal.dist_coeffs_(0),
-                                            cal.dist_coeffs_(1),
-                                            cal.dist_coeffs_(2),
-                                            cal.dist_coeffs_(3),
-                                            cal.dist_coeffs_(4)));
-      s.append(ros2_shared::string_print::f("std dev k1, k2, p1, p2, k3: %f %f %f %f %f\n",
-                                            cal.stdDeviationsIntrinsics_.at<double>(4),
-                                            cal.stdDeviationsIntrinsics_.at<double>(5),
-                                            cal.stdDeviationsIntrinsics_.at<double>(6),
-                                            cal.stdDeviationsIntrinsics_.at<double>(7),
-                                            cal.stdDeviationsIntrinsics_.at<double>(8)));
-
-      double image_error_acc{0.};
       for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
         auto image_index = cal.images_for_calibration_.empty() ? i : cal.images_for_calibration_[i];
-        auto image_error = calc_reprojection_error(res, cal, image_index);
-        image_error_acc += image_error * image_error;
         if (report_flags_ & REPORT_IMAGE_ERRORS) {
           s.append(ros2_shared::string_print::f(
-            "Image %d, %s - Reprojection error %6.4f, internal %6.4f\n",
+            "Image %d, %s - Reprojection error %6.4f\n",
             image_index,
             to_date_string(captured_images_->captured_images()[image_index]->time_stamp()).c_str(),
-            cal.perViewErrors_.at<double>(i, 0),
-            image_error));
+            cal.perViewErrors_.at<double>(i, 0)));
         }
       }
 
-      double internal_image_error = std::sqrt(image_error_acc / cal.perViewErrors_.rows);
       s.append(ros2_shared::string_print::f("Total reprojection error %6.4f, internal %6.4f",
-                                            cal.reproject_error_, internal_image_error));
+                                            cal.reproject_error_, cal.internal_reproject_error_));
 
       if (!cal.images_for_calibration_.empty()) {
-        image_error_acc = 0;
-        for (size_t image_index = 0; image_index < res.junctions_f_image_.size(); image_index += 1) {
-          auto image_error = calc_reprojection_error(res, cal, image_index);
-          image_error_acc += image_error * image_error;
-        }
-        double complete_image_error = std::sqrt(image_error_acc / res.junctions_f_image_.size());
         s.append(ros2_shared::string_print::f(", complete %6.4f",
-                                              complete_image_error));
+                                              cal.complete_reproject_error_));
       }
 
       s.append("\n");
@@ -348,43 +376,72 @@ namespace fiducial_vlam
 
     std::string create_averaged_calibration_report(const CalibrateCameraResult &res)
     {
-      // calculate the mean and std dev of all cals that use a subset of the calibrated images.
+      std::string s;
+
+      // Calculate the mean and std dev of all cals that use a subset of the calibrated images.
       CalibrateCameraResult::CalibrationResult average_cal;
 
-      uint32_t count{0};
-      CalibrateCameraResult::CameraMatrixType cm_mean_curr{};
-      CalibrateCameraResult::CameraMatrixType cm_mean_prev{};
-      CalibrateCameraResult::CameraMatrixType cm_s_curr{};
-      CalibrateCameraResult::CameraMatrixType cm_s_prev{};
-      CalibrateCameraResult::DistCoeffsType dc_mean_curr{};
-      CalibrateCameraResult::DistCoeffsType dc_mean_prev{};
-      CalibrateCameraResult::DistCoeffsType dc_s_curr{};
-      CalibrateCameraResult::DistCoeffsType dc_s_prev{};
+      CalcStats<CalibrateCameraResult::ValueType, 4> cv_stats{};
+      CalcStats<CalibrateCameraResult::ValueType, 5> dc_stats{};
+      CalcStats<CalibrateCameraResult::ValueType, 1> re_stats{};
+
+      int calibration_style{CalibrationStyles::unknown};
+      int flags{0};
+
 
       for (auto &cal : res.calibration_results_) {
         if (!cal.images_for_calibration_.empty()) {
-          count += 1;
 
-          if (count == 1) {
-            cm_mean_curr = cal.camera_matrix_;
-            cm_s_curr = cm_s_curr.zeros();
-            dc_mean_curr = cal.dist_coeffs_;
-            dc_s_curr = 0;
-
-            average_cal.calibration_style_ = cal.calibration_style_;
-            average_cal.flags_ = cal.flags_;
-
-          } else {
-            cm_mean_prev = cm_mean_curr;
-            cm_s_prev = cm_s_curr;
-            dc_mean_prev = dc_mean_curr;
-            dc_s_prev = dc_s_curr;
-
-//            cm_mean_curr = cm_mean_prev + (cal.camera_matrix_ - cm_mean_prev) / 2.0;
+          if (calibration_style == CalibrationStyles::unknown) {
+            calibration_style = cal.calibration_style_;
+            flags = cal.flags_;
           }
+
+          CalibrateCameraResult::CameraVectorType cal_cv{cal.camera_matrix_(0, 0),
+                                                         cal.camera_matrix_(1, 1),
+                                                         cal.camera_matrix_(0, 2),
+                                                         cal.camera_matrix_(1, 2)};
+
+
+          cv_stats.append(cal_cv);
+          dc_stats.append(cal.dist_coeffs_);
+          re_stats.append(cal.complete_reproject_error_);
         }
       }
 
+      auto cv_mean = cv_stats.mean();
+      auto dc_mean = dc_stats.mean();
+      auto re_mean = re_stats.mean();
+      auto cv_std_dev = cv_stats.std_dev();
+      auto dc_std_dev = dc_stats.std_dev();
+      auto re_std_dev = re_stats.std_dev();
+
+      CalibrateCameraResult::CameraMatrixType camera_matrix{};
+      camera_matrix(0, 0) = cv_mean(0);
+      camera_matrix(1, 1) = cv_mean(1);
+      camera_matrix(0, 2) = cv_mean(2);
+      camera_matrix(1, 2) = cv_mean(3);
+      camera_matrix(2, 2) = 1.;
+
+      auto stdDeviationsIntrinsics = cv::Mat(9, 1, CV_64F);
+      stdDeviationsIntrinsics.at<double>(0) = cv_std_dev(0);
+      stdDeviationsIntrinsics.at<double>(1) = cv_std_dev(1);
+      stdDeviationsIntrinsics.at<double>(2) = cv_std_dev(2);
+      stdDeviationsIntrinsics.at<double>(3) = cv_std_dev(3);
+      stdDeviationsIntrinsics.at<double>(4) = dc_std_dev(0);
+      stdDeviationsIntrinsics.at<double>(5) = dc_std_dev(1);
+      stdDeviationsIntrinsics.at<double>(6) = dc_std_dev(2);
+      stdDeviationsIntrinsics.at<double>(7) = dc_std_dev(3);
+      stdDeviationsIntrinsics.at<double>(8) = dc_std_dev(4);
+
+      s.append(ros2_shared::string_print::f("\nSummary of combinations of captured images style %d, (%s)\n",
+                                            calibration_style,
+                                            CalibrationStyles::name(calibration_style).c_str()));
+      s.append(camera_matrix_report(camera_matrix, dc_mean, stdDeviationsIntrinsics));
+      s.append(ros2_shared::string_print::f("Average complete reprojection error %6.4f, std dev %6.4f",
+                                            re_mean(0), re_std_dev(0)));
+
+      return s;
     }
 
     std::string create(const CalibrateCameraResult &res,
@@ -404,7 +461,7 @@ namespace fiducial_vlam
       }
 
       if (report_flags_ & REPORT_CAL_SUBSET_STATS) {
-        create_averaged_calibration_report(res);
+        s.append(create_averaged_calibration_report(res));
       }
 
       if (report_flags_ & REPORT_JUNCTION_ERRORS) {
@@ -658,6 +715,9 @@ namespace fiducial_vlam
         cal.stdDeviationsIntrinsics_, cal.stdDeviationsExtrinsics_, cal.perViewErrors_,
         cal.flags_);
 
+      // Do our own calculation of the re-projection error.
+      calculate_reprojection_errors(junctions_f_board, junctions_f_image, cal);
+
       res.calibration_results_.emplace_back(std::move(cal));
     }
 
@@ -798,6 +858,65 @@ namespace fiducial_vlam
       win_size = cv::Size{std::min(10, std::max(2, win_size.width)),  // min: 2, max: 10
                           std::min(10, std::max(2, win_size.height))};
       return win_size;
+    }
+
+
+    void calculate_reprojection_errors(const std::vector<std::vector<cv::Vec3f>> &junctions_f_board,
+                                       const std::vector<std::vector<cv::Vec2f>> &junctions_f_image,
+                                       CalibrateCameraResult::CalibrationResult &cal)
+    {
+      std::vector<bool> included(cal.images_for_calibration_.size(), false);
+      for (auto image_index : cal.images_for_calibration_) {
+        included[image_index] = true;
+      }
+
+      decltype(cal.reproject_error_) internal_error_acc(0.);
+      decltype(cal.reproject_error_) complete_error_acc(0.);
+      uint32_t internal_count{0};
+      uint32_t complete_count{0};
+      for (size_t image_index = 0; image_index < junctions_f_board.size(); image_index += 1) {
+        auto error = calc_single_image_reprojection_error(junctions_f_board[image_index],
+                                                          junctions_f_image[image_index],
+                                                          cal);
+
+        auto error_sq = error * error;
+        complete_error_acc += error_sq;
+        complete_count += 1;
+        if (cal.images_for_calibration_.empty() || included[image_index]) {
+          internal_error_acc += error_sq;
+          internal_count += 1;
+        }
+      }
+
+      cal.internal_reproject_error_ = std::sqrt(internal_error_acc / internal_count);
+      cal.complete_reproject_error_ = std::sqrt(complete_error_acc / complete_count);
+    }
+
+    double calc_single_image_reprojection_error(const std::vector<cv::Vec3f> &junctions_f_board,
+                                                const std::vector<cv::Vec2f> &junctions_f_image,
+                                                const CalibrateCameraResult::CalibrationResult &cal)
+    {
+      // Figure out the location of the board relative to the camera.
+      cv::Vec3d rvec, tvec;
+      cv::solvePnP(junctions_f_board, junctions_f_image,
+                   cal.camera_matrix_, cal.dist_coeffs_,
+                   rvec, tvec);
+
+      // Project the object points onto the image so we can calculate the individual junction
+      // reprojection errors.
+      std::vector<cv::Vec2f> junctions_f_image_reproject{};
+      cv::projectPoints(junctions_f_board,
+                        rvec, tvec,
+                        cal.camera_matrix_, cal.dist_coeffs_,
+                        junctions_f_image_reproject);
+
+      double total_error_squared{0.0};
+      for (size_t i = 0; i < junctions_f_image.size(); i += 1) {
+        auto error = cv::norm(junctions_f_image_reproject[i] - junctions_f_image[i]);
+        total_error_squared += error * error;
+      }
+
+      return std::sqrt(total_error_squared / junctions_f_image.size());
     }
 
     void prepare_captured_images(CalibrateCameraResult &res)
