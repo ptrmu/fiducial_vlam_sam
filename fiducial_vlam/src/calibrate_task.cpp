@@ -112,15 +112,16 @@ namespace fiducial_vlam
   struct CalibrateCameraResult
   {
     using JunctionIdIndexMap = std::map<JunctionId, std::size_t>;
-
+    using CameraMatrixType = cv::Matx33d;
+    using DistCoeffsType = cv::Vec<double, 5>;
     struct CalibrationResult
     {
       int calibration_style_{CalibrationStyles::unknown};
       std::vector<std::size_t> images_for_calibration_{};
       int flags_{0};
       double reproject_error_{0.};
-      cv::Matx33d camera_matrix_{};
-      cv::Matx<double, 5, 1> dist_coeffs_{};
+      CameraMatrixType camera_matrix_{};
+      DistCoeffsType dist_coeffs_{};
       cv::Mat rvecs_{};
       cv::Mat tvecs_{};
       cv::Mat stdDeviationsIntrinsics_{};
@@ -299,11 +300,11 @@ namespace fiducial_vlam
                                             cal.stdDeviationsIntrinsics_.at<double>(3)));
 
       s.append(ros2_shared::string_print::f("k1, k2, p1, p2, k3: %f %f %f %f %f\n",
-                                            cal.dist_coeffs_(0, 0),
-                                            cal.dist_coeffs_(1, 0),
-                                            cal.dist_coeffs_(2, 0),
-                                            cal.dist_coeffs_(3, 0),
-                                            cal.dist_coeffs_(4, 0)));
+                                            cal.dist_coeffs_(0),
+                                            cal.dist_coeffs_(1),
+                                            cal.dist_coeffs_(2),
+                                            cal.dist_coeffs_(3),
+                                            cal.dist_coeffs_(4)));
       s.append(ros2_shared::string_print::f("std dev k1, k2, p1, p2, k3: %f %f %f %f %f\n",
                                             cal.stdDeviationsIntrinsics_.at<double>(4),
                                             cal.stdDeviationsIntrinsics_.at<double>(5),
@@ -345,6 +346,47 @@ namespace fiducial_vlam
       return s;
     }
 
+    std::string create_averaged_calibration_report(const CalibrateCameraResult &res)
+    {
+      // calculate the mean and std dev of all cals that use a subset of the calibrated images.
+      CalibrateCameraResult::CalibrationResult average_cal;
+
+      uint32_t count{0};
+      CalibrateCameraResult::CameraMatrixType cm_mean_curr{};
+      CalibrateCameraResult::CameraMatrixType cm_mean_prev{};
+      CalibrateCameraResult::CameraMatrixType cm_s_curr{};
+      CalibrateCameraResult::CameraMatrixType cm_s_prev{};
+      CalibrateCameraResult::DistCoeffsType dc_mean_curr{};
+      CalibrateCameraResult::DistCoeffsType dc_mean_prev{};
+      CalibrateCameraResult::DistCoeffsType dc_s_curr{};
+      CalibrateCameraResult::DistCoeffsType dc_s_prev{};
+
+      for (auto &cal : res.calibration_results_) {
+        if (!cal.images_for_calibration_.empty()) {
+          count += 1;
+
+          if (count == 1) {
+            cm_mean_curr = cal.camera_matrix_;
+            cm_s_curr = cm_s_curr.zeros();
+            dc_mean_curr = cal.dist_coeffs_;
+            dc_s_curr = 0;
+
+            average_cal.calibration_style_ = cal.calibration_style_;
+            average_cal.flags_ = cal.flags_;
+
+          } else {
+            cm_mean_prev = cm_mean_curr;
+            cm_s_prev = cm_s_curr;
+            dc_mean_prev = dc_mean_curr;
+            dc_s_prev = dc_s_curr;
+
+//            cm_mean_curr = cm_mean_prev + (cal.camera_matrix_ - cm_mean_prev) / 2.0;
+          }
+        }
+      }
+
+    }
+
     std::string create(const CalibrateCameraResult &res,
                        const CalibrateCameraResult::CalibrationResult &cal)
     {
@@ -362,7 +404,7 @@ namespace fiducial_vlam
       }
 
       if (report_flags_ & REPORT_CAL_SUBSET_STATS) {
-
+        create_averaged_calibration_report(res);
       }
 
       if (report_flags_ & REPORT_JUNCTION_ERRORS) {
@@ -577,27 +619,27 @@ namespace fiducial_vlam
           cal.camera_matrix_(0, 2) = 459.904354;
           cal.camera_matrix_(1, 2) = 351.238301;
           cal.camera_matrix_(2, 2) = 1.0;
-          cal.dist_coeffs_(0, 0) = -0.033458;
-          cal.dist_coeffs_(1, 0) = 0.105152;
-          cal.dist_coeffs_(2, 0) = 0.001256;
-          cal.dist_coeffs_(3, 0) = -0.006647;
-          cal.dist_coeffs_(4, 0) = 0.000000;
+          cal.dist_coeffs_(0) = -0.033458;
+          cal.dist_coeffs_(1) = 0.105152;
+          cal.dist_coeffs_(2) = 0.001256;
+          cal.dist_coeffs_(3) = -0.006647;
+          cal.dist_coeffs_(4) = 0.000000;
 #else
           cal.camera_matrix_(0, 0) = 699.3550;
           cal.camera_matrix_(1, 1) = 699.3550;
           cal.camera_matrix_(0, 2) = 650.0850;
           cal.camera_matrix_(1, 2) = 354.6600;
           cal.camera_matrix_(2, 2) = 1.0;
-          cal.dist_coeffs_(0, 0) = -0.1716;
-          cal.dist_coeffs_(1, 0) = 0.0246;
+          cal.dist_coeffs_(0) = -0.1716;
+          cal.dist_coeffs_(1) = 0.0246;
 
           cal.camera_matrix_(0, 0) = 700.9050;
           cal.camera_matrix_(1, 1) = 700.9050;
           cal.camera_matrix_(0, 2) = 655.5400;
           cal.camera_matrix_(1, 2) = 358.5940;
           cal.camera_matrix_(2, 2) = 1.0;
-          cal.dist_coeffs_(0, 0) = -0.1681;
-          cal.dist_coeffs_(1, 0) = 0.0205;
+          cal.dist_coeffs_(0) = -0.1681;
+          cal.dist_coeffs_(1) = 0.0205;
 #endif
           break;
         case CalibrationStyles::a_k1_free_b_fix_principal_point_free:
