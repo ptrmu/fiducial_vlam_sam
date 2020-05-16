@@ -8,11 +8,14 @@
 #include "opencv2/calib3d.hpp"
 #include "opencv2/core/types.hpp"
 #include "opencv2/core/mat.hpp"
+#include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_shared/string_printf.hpp"
 
+#include <fstream>
 #include <map>
+#include <string_view>
 
 namespace fiducial_vlam
 {
@@ -537,13 +540,20 @@ namespace fiducial_vlam
 
       // Save the calibration file.
       auto &cal = res.calibration_results_[calibration_style];
-      auto save_str{save_calibration(now_, cal)};
+      auto s{save_calibration(now_, cal)};
 
-      // Return a report and the marked images.
+      // Save the captured images
+      s.append(save_captured_and_marked_images(res));
+
+      // Create and save the report
+      s.append(CalibrateCameraReport(cal_cxt_, cbm_, now_, captured_images_).create(res, cal));
+      save_report(s);
+
+      // Return the report and the marked images.
       CalibrateCameraTaskResult task_res{};
-      task_res.calibration_report_ = save_str.append(
-        CalibrateCameraReport(cal_cxt_, cbm_, now_, captured_images_).create(res, cal));
+      task_res.calibration_report_ = std::move(s);
       task_res.captured_images_marked_ = std::move(res.captured_images_marked_);
+
       return task_res;
     }
 
@@ -960,13 +970,51 @@ namespace fiducial_vlam
                                              cm(1, 0), cm(1, 1), cm(1, 2), 0.,
                                              cm(2, 0), cm(2, 1), cm(2, 2), 0.};
 
-      camera_calibration_parsers::writeCalibration(cal_cxt_.cal_save_camera_info_path_,
+      auto filename{get_camera_info_file_name(cal_cxt_)};
+      camera_calibration_parsers::writeCalibration(filename,
                                                    cal_cxt_.cal_camera_name_,
                                                    camera_info);
 
       return std::string{ros2_shared::string_print::f("Calibration for camera '%s' saved to file: %s\n",
                                                       cal_cxt_.cal_camera_name_.c_str(),
-                                                      cal_cxt_.cal_save_camera_info_path_.c_str())};
+                                                      filename.c_str())};
+    }
+
+    std::string save_captured_and_marked_images(const CalibrateCameraResult &res)
+    {
+      cv::FileStorage fs_header(get_captured_image_file_name(cal_cxt_),
+                                cv::FileStorage::WRITE);
+
+      fs_header << "width" << captured_images_->image_size().width
+                << "height" << captured_images_->image_size().height
+                << "imageNames" << "[";
+
+      auto captured_images = captured_images_->captured_images();
+      for (int i = 0; i < captured_images.size(); i += 1) {
+
+        auto image_file_name{get_captured_image_file_name(cal_cxt_, i)};
+        auto marked_image_file_name{get_marked_image_file_name(cal_cxt_, i)};
+        cv::imwrite(image_file_name, captured_images[i]->gray());
+        cv::imwrite(marked_image_file_name, res.captured_images_marked_[i]);
+
+        fs_header << "{:"
+                  << "name" << image_file_name
+                  << "stamp" << std::to_string(captured_images[i]->time_stamp().nanoseconds())
+                  << "clock" << captured_images[i]->time_stamp().get_clock_type()
+                  << "},";
+      }
+
+      fs_header << "]";
+      fs_header.release();
+      return std::string{};
+    }
+
+    void save_report(const std::string s)
+    {
+      std::ofstream file;
+      file.open(get_calibration_report_file_name(cal_cxt_));
+      file << s;
+      file.close();
     }
   };
 

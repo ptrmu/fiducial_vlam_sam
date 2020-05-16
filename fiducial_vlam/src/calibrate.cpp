@@ -19,7 +19,56 @@
 namespace fiducial_vlam
 {
 
-  constexpr auto time_display_captured_image_marked = std::chrono::milliseconds(1500);
+  constexpr static auto time_display_captured_image_marked = std::chrono::milliseconds(1500);
+
+  constexpr static auto camera_info_file_name = "camera_info.yaml";
+  constexpr static auto captured_image_file_name = "captured_image";
+  constexpr static auto marked_image_file_name = "marked_image";
+  constexpr static auto calibration_report_file_name = "calibration_report.txt";
+
+  std::string get_camera_info_file_name(const CalibrateContext &cal_cxt)
+  {
+    return ros2_shared::string_print::f("%s/%s",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        camera_info_file_name);
+  }
+
+  std::string get_captured_image_file_name(const CalibrateContext &cal_cxt)
+  {
+    return ros2_shared::string_print::f("%s/%s.yaml",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        captured_image_file_name);
+  }
+
+  std::string get_captured_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index)
+  {
+    return ros2_shared::string_print::f("%s/%s_%03d.png",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        captured_image_file_name,
+                                        index);
+  }
+
+  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt)
+  {
+    return ros2_shared::string_print::f("%s/%s.yaml",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        marked_image_file_name);
+  }
+
+  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index)
+  {
+    return ros2_shared::string_print::f("%s/%s_%03d.png",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        marked_image_file_name,
+                                        index);
+  }
+
+  std::string get_calibration_report_file_name(const CalibrateContext &cal_cxt)
+  {
+    return ros2_shared::string_print::f("%s/%s",
+                                        cal_cxt.cal_save_files_path_.c_str(),
+                                        calibration_report_file_name);
+  }
 
 // ==============================================================================
 // BoardProjection class
@@ -234,44 +283,12 @@ namespace fiducial_vlam
       return std::string("An image will be captured.");
     }
 
-    std::string load_images()
-    {
-      return std::string{};
-    }
-
-    std::string save_images()
-    {
-      cv::FileStorage fs_header(std::string(cal_cxt_.cal_images_file_name_).append(".yml"),
-                                cv::FileStorage::WRITE);
-
-      fs_header << "width" << captured_images_.image_size().width
-                << "height" << captured_images_.image_size().height
-                << "imageNames" << "[";
-
-      auto captured_images = captured_images_.captured_images();
-      for (int i = 0; i < captured_images.size(); i += 1) {
-
-        auto image_file_name{ros2_shared::string_print::f("%s_%03d.png", cal_cxt_.cal_images_file_name_.c_str(), i)};
-        auto res = cv::imwrite(image_file_name, captured_images[i]->gray());
-
-        fs_header << "{:"
-                  << "name" << image_file_name
-                  << "stamp" << std::to_string(captured_images[i]->time_stamp().nanoseconds())
-                  << "clock" << captured_images[i]->time_stamp().get_clock_type()
-                  << "},";
-      }
-
-      fs_header << "]";
-      fs_header.release();
-      return std::string{};
-    }
-
     static std::unique_ptr<CalibrateCameraProcessImageImpl> load_images(rclcpp::Logger &logger,
                                                                         const CalibrateContext &cal_cxt,
                                                                         const rclcpp::Time &now)
     {
-      cv::FileStorage fs_header(std::string(cal_cxt.cal_images_file_name_).append(".yml"),
-                                cv::FileStorage::READ);
+      auto filename{get_captured_image_file_name(cal_cxt)};
+      cv::FileStorage fs_header(filename, cv::FileStorage::READ);
 
       auto pi{std::make_unique<CalibrateCameraProcessImageImpl>(logger, cal_cxt, now,
                                                                 cv::Size{static_cast<int>( fs_header["width"]),
@@ -438,11 +455,6 @@ namespace fiducial_vlam
       if (cmd.compare("capture") == 0) {
         if (pi_) {
           ret_str = pi_->prep_image_capture();
-        }
-
-      } else if (cmd.compare("save_images") == 0) {
-        if (pi_) {
-          ret_str = pi_->save_images();
         }
 
       } else if (cmd.compare("status") == 0) {

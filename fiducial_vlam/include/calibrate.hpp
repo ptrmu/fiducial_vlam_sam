@@ -23,8 +23,7 @@ namespace fiducial_vlam
 #define CAL_ALL_PARAMS \
   CXT_MACRO_MEMBER(cal_compute_on_thread, int, 1)                 /* Do heavy-duty computation on a thread. */\
   CXT_MACRO_MEMBER(cal_calibration_style_to_save, int, 3)         /* The calibration style to save. */\
-  CXT_MACRO_MEMBER(cal_images_file_name, std::string, "cal_img")  /* Calibrate command. */\
-  CXT_MACRO_MEMBER(cal_save_camera_info_path, std::string, "camera_info.yaml") /* Name of file to store calibration in. */\
+  CXT_MACRO_MEMBER(cal_save_files_path, std::string, ".")         /* path to file to store calibration in. */\
   CXT_MACRO_MEMBER(cal_camera_name, std::string, "Calibrated Camera") /* Name of the calibrated camera. */\
   CXT_MACRO_MEMBER(cal_cmd, std::string, "")                      /* Calibrate command. */\
   CXT_MACRO_MEMBER(cal_aruco_dictionary_id, int, 5)               /* dictionary id  */ \
@@ -44,7 +43,14 @@ namespace fiducial_vlam
     CAL_ALL_PARAMS
   };
 
-// ==============================================================================
+  std::string get_camera_info_file_name(const CalibrateContext &cal_cxt); //
+  std::string get_captured_image_file_name(const CalibrateContext &cal_cxt); //
+  std::string get_captured_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index); //
+  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt); //
+  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index); //
+  std::string get_calibration_report_file_name(const CalibrateContext &cal_cxt); //
+
+  // ==============================================================================
 // CalibrateCameraInterface class
 // ==============================================================================
 
