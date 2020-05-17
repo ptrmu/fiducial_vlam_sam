@@ -34,10 +34,10 @@ namespace fiducial_vlam
                 (p0 * (1. - 4. * (border_fraction_colored_1 - beg_fraction)) +
                  p1 * (0. + 4. * (border_fraction_colored_1 - beg_fraction)));
       if (beg_fraction < border_fraction_colored_1) {
-        cv::line(image, p0, pm, border_color_1, 3);
+        cv::line(image, p0, pm, border_color_1, 3, cv::LINE_4);
       }
       if (end_fraction > border_fraction_colored_1) {
-        cv::line(image, pm, p1, border_color_0, 3);
+        cv::line(image, pm, p1, border_color_0, 3, cv::LINE_4);
       }
     }
   }

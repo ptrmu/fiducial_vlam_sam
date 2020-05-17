@@ -86,9 +86,9 @@ namespace fiducial_vlam
    CS(k1_free) \
    CS(k2_free) \
    CS(principal_point_free) \
+   CS(k3_free) \
    CS(unequal_focal_lengths) \
    CS(tangent_distortion) \
-   CS(k3_free) \
    CS(custom) \
    CS(a_k1_free_b_fix_principal_point_free) \
    /* end of list */
@@ -390,14 +390,20 @@ namespace fiducial_vlam
 
       int calibration_style{CalibrationStyles::unknown};
       int flags{0};
+      uint32_t set_size{0};
+      uint32_t selection_size{0};
+      uint32_t combinations_size{0};
 
 
       for (auto &cal : res.calibration_results_) {
         if (!cal.images_for_calibration_.empty()) {
+          combinations_size += 1;
 
           if (calibration_style == CalibrationStyles::unknown) {
             calibration_style = cal.calibration_style_;
             flags = cal.flags_;
+            selection_size = cal.images_for_calibration_.size();
+            set_size = res.junctions_f_board_.size();
           }
 
           CalibrateCameraResult::CameraVectorType cal_cv{cal.camera_matrix_(0, 0),
@@ -437,7 +443,8 @@ namespace fiducial_vlam
       stdDeviationsIntrinsics.at<double>(7) = dc_std_dev(3);
       stdDeviationsIntrinsics.at<double>(8) = dc_std_dev(4);
 
-      s.append(ros2_shared::string_print::f("\nSummary of combinations of captured images style %d, (%s)\n",
+      s.append(ros2_shared::string_print::f("\nSummary of %d combinations of %d out of %d captured images. calibration style %d, (%s)\n",
+                                            combinations_size, selection_size, set_size,
                                             calibration_style,
                                             CalibrationStyles::name(calibration_style).c_str()));
       s.append(camera_matrix_report(camera_matrix, dc_mean, stdDeviationsIntrinsics));
@@ -665,14 +672,15 @@ namespace fiducial_vlam
           cal.camera_matrix_(0, 0) = 1.0;
           cal.camera_matrix_(1, 1) = 1.0;
           break;
+        case CalibrationStyles::k3_free:
+          cal.flags_ = cv::CALIB_FIX_ASPECT_RATIO | cv::CALIB_ZERO_TANGENT_DIST;
+          cal.camera_matrix_(0, 0) = 1.0;
+          cal.camera_matrix_(1, 1) = 1.0;
+          break;
         case CalibrationStyles::unequal_focal_lengths:
-          cal.flags_ = cv::CALIB_ZERO_TANGENT_DIST |
-                       cv::CALIB_FIX_K3;
+          cal.flags_ = cv::CALIB_ZERO_TANGENT_DIST;
           break;
         case CalibrationStyles::tangent_distortion:
-          cal.flags_ = cv::CALIB_FIX_K3;
-          break;
-        case CalibrationStyles::k3_free:
           cal.flags_ = 0;
           break;
         case CalibrationStyles::custom:

@@ -121,14 +121,14 @@ namespace fiducial_vlam
       for (int j = 0; j < 4; j++) {
         auto p0 = currentMarker[j];
         auto p1 = currentMarker[(j + 1) % 4];
-        cv::line(color_image, p0, p1, borderColor, 1);
+        cv::line(color_image, p0, p1, borderColor, 1, cv::LINE_4);
       }
 
       // draw first corner mark
       cv::rectangle(color_image,
                     currentMarker[0] - cv::Point2f(3, 3),
                     currentMarker[0] + cv::Point2f(3, 3),
-                    cornerColor, 1, cv::LINE_AA);
+                    cornerColor, 1, cv::LINE_4);
 
       // draw ID
 //      if (ids.total() != 0) {
@@ -169,7 +169,7 @@ namespace fiducial_vlam
     for (int j = 0; j < 4; j++) {
       auto p0 = board_corners[j];
       auto p1 = board_corners[(j + 1) % 4];
-      cv::line(color_image, p0, p1, borderColor, 1);
+      cv::line(color_image, p0, p1, borderColor, 1, cv::LINE_4);
     }
   }
 }
