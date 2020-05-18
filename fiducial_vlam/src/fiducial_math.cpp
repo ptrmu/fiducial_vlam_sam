@@ -1,17 +1,17 @@
 
 #include "fiducial_math.hpp"
 
+#include "cv_bridge/cv_bridge.h"
 #include "cv_utils.hpp"
 #include "map.hpp"
 #include "observation.hpp"
-#include "ros2_shared/string_printf.hpp"
-#include "tf_utils.hpp"
-#include "transform_with_covariance.hpp"
-
-#include "cv_bridge/cv_bridge.h"
 #include "opencv2/aruco.hpp"
 #include "opencv2/calib3d/calib3d.hpp"
 #include "opencv2/opencv.hpp"
+#include "ros2_shared/string_printf.hpp"
+#include "tf_utils.hpp"
+#include "transform_with_covariance.hpp"
+#include "vloc_context.hpp"
 
 namespace fiducial_vlam
 {
@@ -65,16 +65,16 @@ namespace fiducial_vlam
 
   class CvFiducialMathImpl : public CvFiducialMathInterface
   {
-    const FiducialMathContext &fm_cxt_;
+    const VlocContext &cxt_;
     SmoothObservationsInterface &so_;
     cv::Ptr<cv::aruco::Dictionary> localization_aruco_dictionary_;
 
   public:
-    explicit CvFiducialMathImpl(const FiducialMathContext &fm_cxt,
+    explicit CvFiducialMathImpl(const VlocContext &cxt,
                                 SmoothObservationsInterface &so) :
-      fm_cxt_{fm_cxt}, so_{so},
+      cxt_{cxt}, so_{so},
       localization_aruco_dictionary_{cv::aruco::getPredefinedDictionary(
-        cv::aruco::PREDEFINED_DICTIONARY_NAME(fm_cxt.localization_aruco_dictionary_id_))}
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(cxt.loc_aruco_dictionary_id_))}
     {}
 
     Observations detect_markers(cv_bridge::CvImage &gray,
@@ -89,7 +89,7 @@ namespace fiducial_vlam
 //     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
 
       // Use the new AprilTag 2 corner algorithm, much better but much slower
-      detectorParameters->cornerRefinementMethod = fm_cxt_.cv4_corner_refinement_method_;
+      detectorParameters->cornerRefinementMethod = cxt_.loc_cv4_corner_refinement_method_;
 #else
       // 0 = false
       // 1 = true
@@ -113,7 +113,7 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt,
+  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const VlocContext &cxt,
                                                                  SmoothObservationsInterface &so)
   {
     return std::make_unique<CvFiducialMathImpl>(cxt, so);
@@ -125,10 +125,10 @@ namespace fiducial_vlam
 
   class CvLocalizeCameraImpl : public LocalizeCameraInterface
   {
-    const FiducialMathContext &cxt_;
+    const VlocContext &cxt_;
 
   public:
-    explicit CvLocalizeCameraImpl(const FiducialMathContext &cxt) :
+    explicit CvLocalizeCameraImpl(const VlocContext &cxt) :
       cxt_{cxt}
     {}
 
@@ -197,7 +197,7 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<LocalizeCameraInterface> make_cv_localize_camera(const FiducialMathContext &cxt)
+  std::unique_ptr<LocalizeCameraInterface> make_cv_localize_camera(const VlocContext &cxt)
   {
     return std::make_unique<CvLocalizeCameraImpl>(cxt);
   }

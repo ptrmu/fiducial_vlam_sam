@@ -26,7 +26,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(cal_save_files_path, std::string, "cal_files") /* path to file to store calibration in. */\
   CXT_MACRO_MEMBER(cal_camera_name, std::string, "Calibrated Camera") /* Name of the calibrated camera. */\
   CXT_MACRO_MEMBER(cal_cmd, std::string, "")                      /* Calibrate command. */\
-  CXT_MACRO_MEMBER(cal_aruco_dictionary_id, int, 5)               /* dictionary id  */ \
+  CXT_MACRO_MEMBER(cal_aruco_dictionary_id, int, 5)               /* dictionary id of aruco markers on the charuco calibration target  */ \
   CXT_MACRO_MEMBER(cal_squares_x, int, 12)                        /* number of squares in the x direction on the charuco board  */ \
   CXT_MACRO_MEMBER(cal_squares_y, int, 9)                         /* number of squares in the y direction on the charuco board  */ \
   CXT_MACRO_MEMBER(cal_square_length, float, 0.060)               /* length of a square on the charuco board  */ \
@@ -46,7 +46,6 @@ namespace fiducial_vlam
   std::string get_camera_info_file_name(const CalibrateContext &cal_cxt); //
   std::string get_captured_image_file_name(const CalibrateContext &cal_cxt); //
   std::string get_captured_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index); //
-  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt); //
   std::string get_marked_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index); //
   std::string get_calibration_report_file_name(const CalibrateContext &cal_cxt); //
 

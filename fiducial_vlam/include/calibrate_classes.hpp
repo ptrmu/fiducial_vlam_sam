@@ -55,11 +55,11 @@ namespace fiducial_vlam
     BoardProjection board_projection_{};
 
   public:
-    ImageHolder(const cv::Mat &gray,
+    ImageHolder(cv::Mat gray,
                 const rclcpp::Time &time_stamp,
-                const cv::Ptr<cv::aruco::Dictionary> &aruco_dictionary) :
-      gray_{gray}, time_stamp_{time_stamp},
-      aruco_dictionary_{aruco_dictionary}
+                cv::Ptr<cv::aruco::Dictionary> aruco_dictionary) :
+      gray_{std::move(gray)}, time_stamp_{time_stamp},
+      aruco_dictionary_{std::move(aruco_dictionary)}
     {}
 
     static std::shared_ptr<ImageHolder> make(const cv::Mat &gray,
@@ -92,8 +92,8 @@ namespace fiducial_vlam
     std::vector<std::shared_ptr<ImageHolder>> captured_images_{};
 
   public:
-    explicit CapturedImages(const cv::Size &image_size) :
-      image_size_{image_size}
+    explicit CapturedImages(cv::Size image_size) :
+      image_size_{std::move(image_size)}
     {}
 
     // Make a shallow copy of the vector. This is how we pass images to another thread. The vector is not

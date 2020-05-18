@@ -22,6 +22,7 @@
 #include "ros2_shared/string_printf.hpp"
 #include "task_thread.hpp"
 #include "tf_utils.hpp"
+#include "vloc_context.hpp"
 
 namespace fiducial_vlam
 {
@@ -639,13 +640,13 @@ namespace fiducial_vlam
 
   class SamLocalizeCameraImpl : public LocalizeCameraInterface
   {
-    const FiducialMathContext &cxt_;
+    const VlocContext &cxt_;
     LocalizeCameraInterface &cv_lc_;
 
     gtsam::Key camera_key_{GtsamUtil::camera_key(0)};
 
   public:
-    explicit SamLocalizeCameraImpl(const FiducialMathContext &cxt, LocalizeCameraInterface &cv_lc) :
+    explicit SamLocalizeCameraImpl(const VlocContext &cxt, LocalizeCameraInterface &cv_lc) :
       cxt_{cxt}, cv_lc_{cv_lc}
     {}
 
@@ -654,7 +655,7 @@ namespace fiducial_vlam
                                      gtsam::NonlinearFactorGraph &graph, gtsam::Values &initial)
     {
       auto cal3ds2{GtsamUtil::make_cal3ds2(camera_info)};
-      auto corner_noise{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.corner_measurement_sigma_)};
+      auto corner_noise{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.loc_corner_measurement_sigma_)};
 
       // Add the camera initial value.
       initial.insert(camera_key_, GtsamUtil::to_pose3(t_map_camera_initial.transform()));
@@ -744,7 +745,7 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<LocalizeCameraInterface> make_sam_localize_camera(const FiducialMathContext &cxt,
+  std::unique_ptr<LocalizeCameraInterface> make_sam_localize_camera(const VlocContext &cxt,
                                                                     LocalizeCameraInterface &cv_lc)
   {
     return std::make_unique<SamLocalizeCameraImpl>(cxt, cv_lc);

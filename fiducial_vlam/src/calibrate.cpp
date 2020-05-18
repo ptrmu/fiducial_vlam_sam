@@ -48,13 +48,6 @@ namespace fiducial_vlam
                                         index);
   }
 
-  std::string get_marked_image_file_name(const CalibrateContext &cal_cxt)
-  {
-    return ros2_shared::string_print::f("%s/%s.yaml",
-                                        cal_cxt.cal_save_files_path_.c_str(),
-                                        marked_image_file_name);
-  }
-
   std::string get_marked_image_file_name(const CalibrateContext &cal_cxt, std::uint32_t index)
   {
     return ros2_shared::string_print::f("%s/%s_%03d.png",
@@ -314,7 +307,7 @@ namespace fiducial_vlam
 
     std::string status()
     {
-      return ros2_shared::string_print::f("# captured images:%d, w:%d, h:%d",
+      return ros2_shared::string_print::f("%d captured images, w:%d, h:%d",
                                           captured_images_.captured_images().size(),
                                           captured_images_.image_size().width,
                                           captured_images_.image_size().height);

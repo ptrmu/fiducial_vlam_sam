@@ -53,7 +53,6 @@ namespace fiducial_vlam
   class LocalizeCameraProcessImageImpl : public ProcessImageInterface
   {
     const VlocContext &cxt_;
-    const FiducialMathContext &fm_cxt_;
     CvFiducialMathInterface &fm_;
     std::unique_ptr<LocalizeCameraInterface> cv_lc_{};
     std::unique_ptr<LocalizeCameraInterface> sam_lc_{};
@@ -61,17 +60,16 @@ namespace fiducial_vlam
     LocalizeCameraInterface &lc()
     {
       // Select which type of localize camera functionality to use.
-      return (cxt_.loc_localize_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
+      return (cxt_.loc_camera_sam_not_cv_ && sam_lc_) ? *sam_lc_ : *cv_lc_;
     }
 
 
   public:
     explicit LocalizeCameraProcessImageImpl(const VlocContext &cxt,
-                                            const FiducialMathContext &fm_cxt,
                                             CvFiducialMathInterface &fm) :
-      cxt_{cxt}, fm_cxt_{fm_cxt}, fm_{fm},
-      cv_lc_{make_cv_localize_camera(fm_cxt_)},
-      sam_lc_{make_sam_localize_camera(fm_cxt_, *cv_lc_)}
+      cxt_{cxt}, fm_{fm},
+      cv_lc_{make_cv_localize_camera(cxt_)},
+      sam_lc_{make_sam_localize_camera(cxt_, *cv_lc_)}
     {}
 
     Observations process_image(std::shared_ptr<cv_bridge::CvImage> &gray,
@@ -99,7 +97,6 @@ namespace fiducial_vlam
   {
     rclcpp::Logger ros_logger_inst_;
     VlocContext cxt_{};
-    FiducialMathContext fm_cxt_{};
     CalibrateContext cal_cxt_{};
     std::unique_ptr<SmoothObservationsInterface> so_;
     std::unique_ptr<CvFiducialMathInterface> fm_;
@@ -147,15 +144,6 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
 
-      // Do the fiducial_math parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
-
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
-
       // Do the calibrate  parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cal_cxt_, n, t, d)
@@ -171,17 +159,13 @@ namespace fiducial_vlam
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VlocNode Parameters", VLOC_ALL_PARAMS)
 
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(fm_cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "FiducialMath Parameters", FM_ALL_PARAMS)
-
-#undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cal_cxt_, n, t, d)
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "Calibrate Parameters", CAL_ALL_PARAMS)
 
       // Check that all command line parameters are registered
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS FM_ALL_PARAMS CAL_ALL_PARAMS)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS CAL_ALL_PARAMS)
     }
 
     ProcessImageInterface &pi()
@@ -200,8 +184,8 @@ namespace fiducial_vlam
       Node("vloc_node", options),
       ros_logger_inst_{get_logger()},
       so_{make_smooth_observations(cxt_)},
-      fm_{make_cv_fiducial_math(fm_cxt_, *so_)},
-      lc_pi_{std::make_unique<LocalizeCameraProcessImageImpl>(cxt_, fm_cxt_, *fm_)},
+      fm_{make_cv_fiducial_math(cxt_, *so_)},
+      lc_pi_{std::make_unique<LocalizeCameraProcessImageImpl>(cxt_, *fm_)},
       cc_pi_{make_calibrate_camera(ros_logger_inst_, cal_cxt_)}
     {
       // Get parameters from the command line

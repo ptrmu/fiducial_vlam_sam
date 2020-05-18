@@ -44,11 +44,7 @@ namespace fiducial_vlam
 // ==============================================================================
 
 #define FM_ALL_PARAMS \
-  CXT_MACRO_MEMBER(cv3_do_corner_refinement, int, 1)          /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */\
-  CXT_MACRO_MEMBER(cv4_corner_refinement_method, int, 2)      /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
-  CXT_MACRO_MEMBER(localization_aruco_dictionary_id, int, 10) /* aruco dictionary id for localization markers  */ \
-  CXT_MACRO_MEMBER(corner_measurement_sigma, double, 2.0)     /* noise in detection of marker corners in the image (sigma in pixels) */\
-  CXT_MACRO_MEMBER(localize_camera_sam_not_cv, int, 1)        /* use gtsam not opencv for localizing the camera */\
+  CXT_MACRO_MEMBER(corner_measurement_sigma, double, 2.0)     /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
   CXT_MACRO_MEMBER(build_marker_map_sam_not_cv, int, 1)       /* use gtsam not opencv for building the marker map */\
   CXT_MACRO_MEMBER(compute_on_thread, int, 1)                 /* Do heavy-duty computation on a thread. */\
   /* End of list */
@@ -74,7 +70,7 @@ namespace fiducial_vlam
                                         cv::Mat &color_marked) = 0;
   };
 
-  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const FiducialMathContext &cxt,
+  std::unique_ptr<CvFiducialMathInterface> make_cv_fiducial_math(const VlocContext &cxt,
                                                                  SmoothObservationsInterface &so);
 
 // ==============================================================================
@@ -91,9 +87,9 @@ namespace fiducial_vlam
                                                        const Map &map) = 0;
   };
 
-  std::unique_ptr<LocalizeCameraInterface> make_cv_localize_camera(const FiducialMathContext &cxt);
+  std::unique_ptr<LocalizeCameraInterface> make_cv_localize_camera(const VlocContext &cxt);
 
-  std::unique_ptr<LocalizeCameraInterface> make_sam_localize_camera(const FiducialMathContext &cxt,
+  std::unique_ptr<LocalizeCameraInterface> make_sam_localize_camera(const VlocContext &cxt,
                                                                     LocalizeCameraInterface &cv_lc);
 
 // ==============================================================================

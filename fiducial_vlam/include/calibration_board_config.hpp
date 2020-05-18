@@ -4,7 +4,6 @@
 
 #include <array>
 
-//#include <gtsam/3rdparty/Eigen/Eigen/src/Core/Matrix.h>
 #include <gtsam/geometry/Pose3.h>
 
 namespace fiducial_vlam
@@ -57,8 +56,6 @@ namespace fiducial_vlam
 
     CheckerboardConfig(const CheckerboardConfig &) = default;               // Copy constructor
     CheckerboardConfig(CheckerboardConfig &&) = default;                    // Move constructor
-//    CheckerboardConfig &operator=(const CheckerboardConfig &) = default;    // Copy assignment operator
-//    CheckerboardConfig &operator=(CheckerboardConfig &&) = default;         // Move assignment operator
     ~CheckerboardConfig() = default;                                        // Destructor
 
     // Hold the board so the text reads properly and is at the lower left. The
@@ -115,7 +112,7 @@ namespace fiducial_vlam
       assert(junction_id >= 0 && junction_id < max_junction_id_);
       auto x(junction_id % squares_x_m_1_ + 1);
       auto y(junction_id / squares_x_m_1_ + 1);
-      return SquareAddress(x, y);
+      return {x, y};
     }
 
     SquareId junction_id_to_square_id(JunctionId junction_id) const

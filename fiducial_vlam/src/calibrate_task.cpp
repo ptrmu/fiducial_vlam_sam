@@ -15,7 +15,6 @@
 
 #include <fstream>
 #include <map>
-#include <string_view>
 
 namespace fiducial_vlam
 {
@@ -689,16 +688,16 @@ namespace fiducial_vlam
                        cv::CALIB_FIX_FOCAL_LENGTH | cv::CALIB_FIX_ASPECT_RATIO |
                        cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3;
 #if 1
-          cal.camera_matrix_(0, 0) = 921.170702;
-          cal.camera_matrix_(1, 1) = 919.018377;
-          cal.camera_matrix_(0, 2) = 459.904354;
-          cal.camera_matrix_(1, 2) = 351.238301;
+          cal.camera_matrix_(0, 0) = 964.38450275274;
+          cal.camera_matrix_(1, 1) = 964.384502752749;
+          cal.camera_matrix_(0, 2) = 656.0148256658157;
+          cal.camera_matrix_(1, 2) = 364.7037206674901;
           cal.camera_matrix_(2, 2) = 1.0;
-          cal.dist_coeffs_(0) = -0.033458;
-          cal.dist_coeffs_(1) = 0.105152;
-          cal.dist_coeffs_(2) = 0.001256;
-          cal.dist_coeffs_(3) = -0.006647;
-          cal.dist_coeffs_(4) = 0.000000;
+          cal.dist_coeffs_(0) = -0.00273078850339132;
+          cal.dist_coeffs_(1) = 0.06090272742385654;
+          cal.dist_coeffs_(2) = 0.;
+          cal.dist_coeffs_(3) = 0.;
+          cal.dist_coeffs_(4) = -0.09995825912626571;
 #else
           cal.camera_matrix_(0, 0) = 699.3550;
           cal.camera_matrix_(1, 1) = 699.3550;
