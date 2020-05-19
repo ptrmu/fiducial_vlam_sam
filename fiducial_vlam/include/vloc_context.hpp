@@ -14,96 +14,42 @@ namespace rclcpp
 namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
-  CXT_MACRO_MEMBER(       /* topic for publishing fiducial observations  */ \
-  fiducial_observations_pub_topic,  \
-  std::string, "/fiducial_observations") \
-  CXT_MACRO_MEMBER(       /* topic for publishing camera pose  */ \
-  camera_pose_pub_topic,  \
-  std::string, "camera_pose") \
-  CXT_MACRO_MEMBER(       /* topic for publishing base pose  */ \
-  base_pose_pub_topic,  \
-  std::string, "base_pose") \
-  CXT_MACRO_MEMBER(       /* topic for publishing camera odometry  */ \
-  camera_odometry_pub_topic,  \
-  std::string, "camera_odom") \
-  CXT_MACRO_MEMBER(       /* topic for publishing base odometry  */ \
-  base_odometry_pub_topic,  \
-  std::string, "base_odom") \
-  CXT_MACRO_MEMBER(       /* topic for republishing the image with axes added to fiducial markers  */\
-  image_marked_pub_topic,  \
-  std::string, "image_marked") \
-  \
-  CXT_MACRO_MEMBER(       /* topic for subscription to fiducial_vlam_msgs::msg::Map  */\
-  fiducial_map_sub_topic,  \
-  std::string, "/fiducial_map") \
-  CXT_MACRO_MEMBER(       /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  */ \
-  camera_info_sub_topic,  \
-  std::string, "camera_info") \
-  CXT_MACRO_MEMBER(       /* topic for subscription to sensor_msgs::msg::Image */ \
-  image_raw_sub_topic,  \
-  std::string, "image_raw") \
-  \
-  CXT_MACRO_MEMBER(       /* frame_id for camera pose and tf messages - normally "map"  */ \
-  map_frame_id,  \
-  std::string, "map") \
-  CXT_MACRO_MEMBER(       /* frame_id for the child in the camera tf message  */\
-  camera_frame_id,  \
-  std::string, "camera") \
-  CXT_MACRO_MEMBER(       /* frame_id for the child in the base_link tf message  */\
-  base_frame_id,  \
-  std::string, "base_link") \
-  \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the pose of the camera at every frame  */ \
-  publish_camera_pose,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the pose of the base at every frame  */ \
-  publish_base_pose,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the tf of the camera at every frame  */ \
-  publish_tfs,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the camera tf/pose as determined by each visible marker  */ \
-  publish_tfs_per_marker,  \
-  int, 0) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the odometry of the camera at every frame  */ \
-  publish_camera_odom,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the odometry of the base at every frame  */ \
-  publish_base_odom,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => publish the image_marked at every frame  */ \
-  publish_image_marked,  \
-  int, 1) \
-  CXT_MACRO_MEMBER(       /* non-zero => debug mode, helpful for dealing with rviz when playing bags.  */ \
-  stamp_msgs_with_current_time,  \
-  int, 0) \
-  \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_x,  \
-  double, 0.) \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_y,  \
-  double, 0.) \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_z, \
-  double, -0.035) \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_roll, \
-  double, TF2SIMD_HALF_PI) \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_pitch,  \
-  double, -TF2SIMD_HALF_PI) \
-  CXT_MACRO_MEMBER(       /* camera=>baselink transform component */ \
-  t_camera_base_yaw, \
-  double, 0.) \
-  \
-  CXT_MACRO_MEMBER(       /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */ \
-  sub_camera_info_best_effort_not_reliable, \
-  int, 1) \
-  \
+  /* vlocnode flags */\
   CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 1)         /* calibrate camera instead of localize camera */ \
   CXT_MACRO_MEMBER(loc_camera_sam_not_cv, int, 0)               /* use gtsam not opencv for localizing the camera */\
   CXT_MACRO_MEMBER(loc_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
+  CXT_MACRO_MEMBER(stamp_msgs_with_current_time, int, 0)        /* non-zero => debug mode, helpful for dealing with rviz when playing bags.  */\
+  CXT_MACRO_MEMBER(sub_camera_info_best_effort_not_reliable, int, 1) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */\
+  /* Subscription topics */\
+  CXT_MACRO_MEMBER(fiducial_map_sub_topic, std::string, "/fiducial_map")    /* topic for subscription to fiducial_vlam_msgs::msg::Map  */\
+  CXT_MACRO_MEMBER(camera_info_sub_topic, std::string, "camera_info")       /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  */\
+  CXT_MACRO_MEMBER(image_raw_sub_topic, std::string, "image_raw")           /* topic for subscription to sensor_msgs::msg::Image */\
+  /* Messages to publish */\
+  CXT_MACRO_MEMBER(publish_camera_pose, int, 1)                 /* non-zero => publish the pose of the camera at every frame  */\
+  CXT_MACRO_MEMBER(publish_base_pose, int, 1)                   /* non-zero => publish the pose of the base at every frame  */\
+  CXT_MACRO_MEMBER(publish_tfs, int, 1)                         /* non-zero => publish the tf of the camera at every frame  */\
+  CXT_MACRO_MEMBER(publish_tfs_per_marker, int, 0)              /* non-zero => publish the camera tf/pose as determined by each visible marker  */\
+  CXT_MACRO_MEMBER(publish_camera_odom, int, 1)                 /* non-zero => publish the odometry of the camera at every frame  */\
+  CXT_MACRO_MEMBER(publish_base_odom, int, 1)                   /* non-zero => publish the odometry of the base at every frame  */\
+  CXT_MACRO_MEMBER(publish_image_marked, int, 1)                /* non-zero => publish the image_marked at every frame  */\
+  /* Publish topics */\
+  CXT_MACRO_MEMBER(fiducial_observations_pub_topic, std::string, "/fiducial_observations")  /* topic for publishing fiducial observations  */\
+  CXT_MACRO_MEMBER(camera_pose_pub_topic, std::string, "camera_pose")       /* topic for publishing camera pose  */\
+  CXT_MACRO_MEMBER(base_pose_pub_topic, std::string, "base_pose")           /* topic for publishing base pose  */\
+  CXT_MACRO_MEMBER(camera_odometry_pub_topic, std::string, "camera_odom")   /* topic for publishing camera odometry  */\
+  CXT_MACRO_MEMBER(base_odometry_pub_topic, std::string, "base_odom")       /* topic for publishing base odometry  */\
+  CXT_MACRO_MEMBER(image_marked_pub_topic, std::string, "image_marked")     /* topic for republishing the image with axes added to fiducial markers  */\
+  /* Frame ids for published messages */\
+  CXT_MACRO_MEMBER(map_frame_id, std::string, "map")            /* frame_id for camera pose and tf messages - normally "map"  */\
+  CXT_MACRO_MEMBER(camera_frame_id, std::string, "camera")      /* frame_id for the child in the camera tf message  */\
+  CXT_MACRO_MEMBER(base_frame_id, std::string, "base_link")     /* frame_id for the child in the base_link tf message  */\
+  /* Camera frame -> baselink frame transform */\
+  CXT_MACRO_MEMBER(t_camera_base_x, double, 0.)                 /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(t_camera_base_y, double, 0.)                 /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(t_camera_base_z, double, -0.035)             /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(t_camera_base_yaw, double, 0.)               /* camera=>baselink transform component */\
   /* Corner Kalman Filters */\
   CXT_MACRO_MEMBER(loc_corner_filter_process_std, float, 0.)    /* Process Noise Std Dev for Kalman filtering corners */\
   CXT_MACRO_MEMBER(loc_corner_filter_measure_std, float, 0.)    /* Measurement Noise Std Dev for Kalman filtering corners */\
