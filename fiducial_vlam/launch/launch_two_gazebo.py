@@ -102,7 +102,7 @@ def generate_launch_description():
                  node_name='vloc_main', node_namespace=namespace, parameters=[{
                     'use_sim_time': True,                       # Use /clock if available
                     'publish_tfs': 1,                           # Publish drone and camera /tf
-                    'stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
+                    'mel_stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
                     'base_frame_id': 'base_link' + suffix,
                     'map_init_pose_z': -0.035,
                     'camera_frame_id': 'camera_link' + suffix,

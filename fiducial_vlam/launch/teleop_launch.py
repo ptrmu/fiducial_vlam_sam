@@ -34,7 +34,7 @@ vloc_args = [{
     'map_init_pose_z': -0.035,
     # 'camera_frame_id': 'camera_link' + suffix,
     'base_odometry_pub_topic': 'filtered_odom',
-    'sub_camera_info_best_effort_not_reliable': 1,
+    'mel_sub_camera_info_best_effort_not_reliable': 1,
     'publish_image_marked': 1,
 }]
 

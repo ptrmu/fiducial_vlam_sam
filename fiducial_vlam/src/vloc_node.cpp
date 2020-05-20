@@ -221,11 +221,11 @@ namespace fiducial_vlam
       }
 
       // ROS subscriptions
-      auto camera_info_qos = cxt_.sub_camera_info_best_effort_not_reliable_ ?
+      auto camera_info_qos = cxt_.mel_sub_camera_info_best_effort_not_reliable_ ?
                              rclcpp::QoS{rclcpp::SensorDataQoS()} :
                              rclcpp::QoS{rclcpp::ServicesQoS()};
       camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-        cxt_.camera_info_sub_topic_,
+        cxt_.mel_camera_info_sub_topic_,
         camera_info_qos,
         [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) -> void
         {
@@ -235,7 +235,7 @@ namespace fiducial_vlam
         });
 
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
-        cxt_.image_raw_sub_topic_,
+        cxt_.mel_image_raw_sub_topic_,
         rclcpp::ServicesQoS(rclcpp::KeepLast(1)),
         [this](sensor_msgs::msg::Image::UniquePtr msg) -> void
         {
@@ -261,7 +261,7 @@ namespace fiducial_vlam
             // rviz doesn't like it when time goes backward when a bag is played again.
             // The stamp_msgs_with_current_time_ parameter can help this by replacing the
             // image message time with the current time.
-            stamp = cxt_.stamp_msgs_with_current_time_ ? builtin_interfaces::msg::Time(now()) : stamp;
+            stamp = cxt_.mel_stamp_msgs_with_current_time_ ? builtin_interfaces::msg::Time(now()) : stamp;
             process_image(std::move(msg), std::move(camera_info_msg_), stamp);
           }
 
@@ -269,7 +269,7 @@ namespace fiducial_vlam
         });
 
       map_sub_ = create_subscription<fiducial_vlam_msgs::msg::Map>(
-        cxt_.fiducial_map_sub_topic_,
+        cxt_.mel_fiducial_map_sub_topic_,
         16,
         [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
         {

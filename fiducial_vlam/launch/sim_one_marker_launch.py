@@ -21,9 +21,9 @@ corner_measurement_sigma = 0.7
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
     'publish_tfs': 1,  # Publish drone and camera /tf
-    'stamp_msgs_with_current_time': 1,  # Stamp with now()
+    'mel_stamp_msgs_with_current_time': 1,  # Stamp with now()
     'map_init_pose_z': 0,
-    'sub_camera_info_best_effort_not_reliable': 1,
+    'mel_sub_camera_info_best_effort_not_reliable': 1,
     'publish_tfs_per_marker': 0,
     'publish_image_marked': 1,
     'camera_frame_id': 'forward_camera',
