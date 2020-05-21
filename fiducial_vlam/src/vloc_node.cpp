@@ -195,15 +195,15 @@ namespace fiducial_vlam
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
         cxt_.fiducial_observations_pub_topic_, 16);
 
-      if (cxt_.publish_camera_pose_) {
+      if (cxt_.mel_publish_camera_pose_) {
         camera_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
           cxt_.camera_pose_pub_topic_, 16);
       }
-      if (cxt_.publish_base_pose_) {
+      if (cxt_.mel_publish_base_pose_) {
         base_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
           cxt_.base_pose_pub_topic_, 16);
       }
-      if (cxt_.publish_tfs_) {
+      if (cxt_.mel_publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>(
           "/tf", 16);
       }
@@ -377,13 +377,13 @@ namespace fiducial_vlam
             t_map_camera.cov()};
 
           // Publish the camera an/or base pose in the map frame
-          if (cxt_.publish_camera_pose_) {
+          if (cxt_.mel_publish_camera_pose_) {
             auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
             camera_pose_pub_->publish(pose_msg);
           }
-          if (cxt_.publish_base_pose_) {
+          if (cxt_.mel_publish_base_pose_) {
             auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
@@ -403,13 +403,13 @@ namespace fiducial_vlam
           }
 
           // Also publish the camera's tf
-          if (cxt_.publish_tfs_) {
+          if (cxt_.mel_publish_tfs_) {
             auto tf_message = to_tf_message(stamp, t_map_camera, t_map_base);
             tf_message_pub_->publish(tf_message);
           }
 
           // if requested, publish the camera tf as determined from each marker.
-          if (cxt_.publish_tfs_per_marker_) {
+          if (cxt_.mel_publish_tfs_per_marker_) {
             auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
             auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
             if (!tf_message.transforms.empty()) {

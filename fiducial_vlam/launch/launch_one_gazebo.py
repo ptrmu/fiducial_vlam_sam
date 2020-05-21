@@ -100,7 +100,7 @@ def generate_launch_description():
             Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
                  node_name='vloc_main', node_namespace=namespace, parameters=[{
                     'use_sim_time': True,                       # Use /clock if available
-                    'publish_tfs': 1,                           # Publish drone and camera /tf
+                    'mel_publish_tfs': 1,                           # Publish drone and camera /tf
                     'mel_stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
                     'base_frame_id': 'base_link' + suffix,
                     'map_init_pose_z': -0.035,

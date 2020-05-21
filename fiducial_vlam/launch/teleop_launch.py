@@ -28,7 +28,7 @@ tello_ros_args = [{
 
 vloc_args = [{
     'use_sim_time': False,  # Use /clock if available
-    'publish_tfs': 1,  # Publish drone and camera /tf
+    'mel_publish_tfs': 1,  # Publish drone and camera /tf
     'stamp_msgs_with_current_time': 0,  # Use incoming message time, not now()
     # 'base_frame_id': 'base_link' + suffix,
     'map_init_pose_z': -0.035,
