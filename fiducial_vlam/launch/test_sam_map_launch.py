@@ -39,7 +39,7 @@ vloc_args = [{
     # 'base_odometry_pub_topic': 'filtered_odom',
     'mel_sub_camera_info_best_effort_not_reliable': 1,
     'mel_publish_tfs_per_marker': 0,
-    'publish_image_marked': 1,
+    'mel_publish_image_marked': 1,
 }]
 
 vmap_args = [{

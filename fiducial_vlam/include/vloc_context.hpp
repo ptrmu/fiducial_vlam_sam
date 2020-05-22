@@ -26,13 +26,13 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(mel_camera_info_sub_topic, std::string, "camera_info")   /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  */\
   CXT_MACRO_MEMBER(mel_image_raw_sub_topic, std::string, "image_raw")       /* topic for subscription to sensor_msgs::msg::Image */\
   /* Messages to publish */\
-  CXT_MACRO_MEMBER(mel_publish_camera_pose, int, 1)                 /* non-zero => publish the pose of the camera at every frame  */\
-  CXT_MACRO_MEMBER(mel_publish_base_pose, int, 1)                   /* non-zero => publish the pose of the base at every frame  */\
-  CXT_MACRO_MEMBER(mel_publish_tfs, int, 1)                         /* non-zero => publish the tf of the camera at every frame  */\
-  CXT_MACRO_MEMBER(mel_publish_tfs_per_marker, int, 0)              /* non-zero => publish the camera tf/pose as determined by each visible marker  */\
-  CXT_MACRO_MEMBER(publish_camera_odom, int, 1)                 /* non-zero => publish the odometry of the camera at every frame  */\
-  CXT_MACRO_MEMBER(publish_base_odom, int, 1)                   /* non-zero => publish the odometry of the base at every frame  */\
-  CXT_MACRO_MEMBER(publish_image_marked, int, 1)                /* non-zero => publish the image_marked at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_camera_pose, int, 1)             /* non-zero => publish the pose of the camera at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_base_pose, int, 1)               /* non-zero => publish the pose of the base at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_tfs, int, 1)                     /* non-zero => publish the tf of the camera at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_tfs_per_marker, int, 0)          /* non-zero => publish the camera tf/pose as determined by each visible marker  */\
+  CXT_MACRO_MEMBER(mel_publish_camera_odom, int, 1)             /* non-zero => publish the odometry of the camera at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_base_odom, int, 1)               /* non-zero => publish the odometry of the base at every frame  */\
+  CXT_MACRO_MEMBER(mel_publish_image_marked, int, 1)            /* non-zero => publish the image_marked at every frame  */\
   /* Publish topics */\
   CXT_MACRO_MEMBER(fiducial_observations_pub_topic, std::string, "/fiducial_observations")  /* topic for publishing fiducial observations  */\
   CXT_MACRO_MEMBER(camera_pose_pub_topic, std::string, "camera_pose")       /* topic for publishing camera pose  */\

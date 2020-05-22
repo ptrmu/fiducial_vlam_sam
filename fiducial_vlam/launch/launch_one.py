@@ -116,7 +116,7 @@ def generate_launch_description():
                     'camera_frame_id': 'camera_link' + suffix,
                     'base_odometry_pub_topic': 'filtered_odom',
                     'mel_sub_camera_info_best_effort_not_reliable': 1,
-                    'publish_image_marked': 1,
+                    'mel_publish_image_marked': 1,
                 }]),
 
             # Odometry filter takes camera pose, generates base_link odom, and publishes map to base_link tf

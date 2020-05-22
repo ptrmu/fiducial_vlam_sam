@@ -25,11 +25,11 @@ vloc_args = [{
     'map_init_pose_z': 0,
     'mel_sub_camera_info_best_effort_not_reliable': 1,
     'mel_publish_tfs_per_marker': 0,
-    'publish_image_marked': 1,
+    'mel_publish_image_marked': 1,
     'camera_frame_id': 'forward_camera',
     'mel_publish_base_pose': 1,
-    'publish_camera_odom': 1,
-    'publish_base_odom': 1,
+    'mel_publish_camera_odom': 1,
+    'mel_publish_base_odom': 1,
 }]
 
 vmap_args = [{

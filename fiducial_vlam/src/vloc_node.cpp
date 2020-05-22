@@ -207,15 +207,15 @@ namespace fiducial_vlam
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>(
           "/tf", 16);
       }
-      if (cxt_.publish_camera_odom_) {
+      if (cxt_.mel_publish_camera_odom_) {
         camera_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
           cxt_.camera_odometry_pub_topic_, 16);
       }
-      if (cxt_.publish_base_odom_) {
+      if (cxt_.mel_publish_base_odom_) {
         base_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
           cxt_.base_odometry_pub_topic_, 16);
       }
-      if (cxt_.publish_image_marked_) {
+      if (cxt_.mel_publish_image_marked_) {
         image_marked_pub_ = create_publisher<sensor_msgs::msg::Image>(
           cxt_.image_marked_pub_topic_, 16);
       }
@@ -309,9 +309,9 @@ namespace fiducial_vlam
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImage color_marked;
 
-//      if (cxt_.publish_image_marked_ &&
+//      if (cxt_.mel_publish_image_marked_ &&
 //          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
-      if (cxt_.publish_image_marked_) {
+      if (cxt_.mel_publish_image_marked_) {
 
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
@@ -391,12 +391,12 @@ namespace fiducial_vlam
           }
 
           // Publish odometry of the camera and/or the base.
-          if (cxt_.publish_camera_odom_) {
+          if (cxt_.mel_publish_camera_odom_) {
             auto odom_msg = to_odom_message(stamp, cxt_.camera_frame_id_, t_map_camera);
             add_fixed_covariance(odom_msg.pose);
             camera_odometry_pub_->publish(odom_msg);
           }
-          if (cxt_.publish_base_odom_) {
+          if (cxt_.mel_publish_base_odom_) {
             auto odom_msg = to_odom_message(stamp, cxt_.base_frame_id_, t_map_base);
             add_fixed_covariance(odom_msg.pose);
             base_odometry_pub_->publish(odom_msg);

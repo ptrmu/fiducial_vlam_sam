@@ -27,11 +27,11 @@ vloc_args = [{
     'mel_stamp_msgs_with_current_time': 0,  # Stamp with now()
     'mel_sub_camera_info_best_effort_not_reliable': 1,
     'mel_publish_tfs_per_marker': 0,
-    'publish_image_marked': 1,
+    'mel_publish_image_marked': 1,
     'camera_frame_id': 'forward_camera',
     'mel_publish_base_pose': 1,
-    'publish_camera_odom': 1,
-    'publish_base_odom': 1,
+    'mel_publish_camera_odom': 1,
+    'mel_publish_base_odom': 1,
     'cv4_corner_refinement_method': 2,
     'loc_camera_sam_not_cv': 1,
 }]
