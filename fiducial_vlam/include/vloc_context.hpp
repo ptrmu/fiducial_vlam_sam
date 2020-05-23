@@ -35,22 +35,22 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(mel_publish_image_marked, int, 1)            /* non-zero => publish the image_marked at every frame  */\
   /* Publish topics */\
   CXT_MACRO_MEMBER(mel_fiducial_observations_pub_topic, std::string, "/fiducial_observations")  /* topic for publishing fiducial observations  */\
-  CXT_MACRO_MEMBER(mel_camera_pose_pub_topic, std::string, "camera_pose")       /* topic for publishing camera pose  */\
-  CXT_MACRO_MEMBER(mel_base_pose_pub_topic, std::string, "base_pose")           /* topic for publishing base pose  */\
-  CXT_MACRO_MEMBER(mel_camera_odometry_pub_topic, std::string, "camera_odom")   /* topic for publishing camera odometry  */\
-  CXT_MACRO_MEMBER(mel_base_odometry_pub_topic, std::string, "base_odom")       /* topic for publishing base odometry  */\
-  CXT_MACRO_MEMBER(mel_image_marked_pub_topic, std::string, "image_marked")     /* topic for republishing the image with axes added to fiducial markers  */\
+  CXT_MACRO_MEMBER(mel_camera_pose_pub_topic, std::string, "camera_pose")    /* topic for publishing camera pose  */\
+  CXT_MACRO_MEMBER(mel_base_pose_pub_topic, std::string, "base_pose")        /* topic for publishing base pose  */\
+  CXT_MACRO_MEMBER(mel_camera_odometry_pub_topic, std::string, "camera_odom")/* topic for publishing camera odometry  */\
+  CXT_MACRO_MEMBER(mel_base_odometry_pub_topic, std::string, "base_odom")    /* topic for publishing base odometry  */\
+  CXT_MACRO_MEMBER(mel_image_marked_pub_topic, std::string, "image_marked")  /* topic for republishing the image with axes added to fiducial markers  */\
   /* Frame ids for published messages */\
-  CXT_MACRO_MEMBER(mel_map_frame_id, std::string, "map")            /* frame_id for camera pose and tf messages - normally "map"  */\
-  CXT_MACRO_MEMBER(mel_camera_frame_id, std::string, "camera")      /* frame_id for the child in the camera tf message  */\
-  CXT_MACRO_MEMBER(mel_base_frame_id, std::string, "base_link")     /* frame_id for the child in the base_link tf message  */\
+  CXT_MACRO_MEMBER(mel_map_frame_id, std::string, "map")        /* frame_id for camera pose and tf messages - normally "map"  */\
+  CXT_MACRO_MEMBER(mel_camera_frame_id, std::string, "camera")  /* frame_id for the child in the camera tf message  */\
+  CXT_MACRO_MEMBER(mel_base_frame_id, std::string, "base_link") /* frame_id for the child in the base_link tf message  */\
   /* Camera frame -> baselink frame transform */\
-  CXT_MACRO_MEMBER(t_camera_base_x, double, 0.)                 /* camera=>baselink transform component */\
-  CXT_MACRO_MEMBER(t_camera_base_y, double, 0.)                 /* camera=>baselink transform component */\
-  CXT_MACRO_MEMBER(t_camera_base_z, double, -0.035)             /* camera=>baselink transform component */\
-  CXT_MACRO_MEMBER(t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
-  CXT_MACRO_MEMBER(t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
-  CXT_MACRO_MEMBER(t_camera_base_yaw, double, 0.)               /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_y, double, 0.)             /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_z, double, -0.035)         /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  CXT_MACRO_MEMBER(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
   /* Corner Kalman Filters */\
   CXT_MACRO_MEMBER(loc_corner_filter_process_std, float, 0.)    /* Process Noise Std Dev for Kalman filtering corners */\
   CXT_MACRO_MEMBER(loc_corner_filter_measure_std, float, 0.)    /* Measurement Noise Std Dev for Kalman filtering corners */\

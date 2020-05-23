@@ -123,8 +123,8 @@ namespace fiducial_vlam
     void validate_parameters()
     {
       cxt_.t_camera_base_ = TransformWithCovariance(TransformWithCovariance::mu_type{
-        cxt_.t_camera_base_x_, cxt_.t_camera_base_y_, cxt_.t_camera_base_z_,
-        cxt_.t_camera_base_roll_, cxt_.t_camera_base_pitch_, cxt_.t_camera_base_yaw_});
+        cxt_.loc_t_camera_base_x_, cxt_.loc_t_camera_base_y_, cxt_.loc_t_camera_base_z_,
+        cxt_.loc_t_camera_base_roll_, cxt_.loc_t_camera_base_pitch_, cxt_.loc_t_camera_base_yaw_});
     }
 
     void validate_fm_parameters()
