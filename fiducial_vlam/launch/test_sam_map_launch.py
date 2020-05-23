@@ -33,10 +33,10 @@ vloc_args = [{
     'use_sim_time': False,  # Use /clock if available
     'mel_publish_tfs': 1,  # Publish drone and camera /tf
     'mel_stamp_msgs_with_current_time': 1,  # Use incoming message time, not now()
-    # 'base_frame_id': 'base_link' + suffix,
+    # 'mel_base_frame_id': 'base_link' + suffix,
     'map_init_pose_z': -0.035,
-    # 'camera_frame_id': 'camera_link' + suffix,
-    # 'base_odometry_pub_topic': 'filtered_odom',
+    # 'mel_camera_frame_id': 'camera_link' + suffix,
+    # 'mel_base_odometry_pub_topic': 'filtered_odom',
     'mel_sub_camera_info_best_effort_not_reliable': 1,
     'mel_publish_tfs_per_marker': 0,
     'mel_publish_image_marked': 1,

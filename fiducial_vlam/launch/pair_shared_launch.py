@@ -24,7 +24,7 @@ def generate_one_drone_action_list(drone_name):
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              node_name='vloc_main', node_namespace=ns, parameters=[{
                 'camera_tf_pub_topic': '/tf',
-                'camera_frame_id': drone_name + '_camera'
+                'mel_camera_frame_id': drone_name + '_camera'
             }]),
     ]
 

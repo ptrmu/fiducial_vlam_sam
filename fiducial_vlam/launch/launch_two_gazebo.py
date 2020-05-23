@@ -103,10 +103,10 @@ def generate_launch_description():
                     'use_sim_time': True,                       # Use /clock if available
                     'mel_publish_tfs': 1,                           # Publish drone and camera /tf
                     'mel_stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
-                    'base_frame_id': 'base_link' + suffix,
+                    'mel_base_frame_id': 'base_link' + suffix,
                     'map_init_pose_z': -0.035,
-                    'camera_frame_id': 'camera_link' + suffix,
-                    'base_odometry_pub_topic': 'filtered_odom',
+                    'mel_camera_frame_id': 'camera_link' + suffix,
+                    'mel_base_odometry_pub_topic': 'filtered_odom',
                 }]),
 
             # Odometry filter takes camera pose, generates base_link odom, and publishes map to base_link tf

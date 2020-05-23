@@ -193,15 +193,15 @@ namespace fiducial_vlam
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
-        cxt_.fiducial_observations_pub_topic_, 16);
+        cxt_.mel_fiducial_observations_pub_topic_, 16);
 
       if (cxt_.mel_publish_camera_pose_) {
         camera_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          cxt_.camera_pose_pub_topic_, 16);
+          cxt_.mel_camera_pose_pub_topic_, 16);
       }
       if (cxt_.mel_publish_base_pose_) {
         base_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          cxt_.base_pose_pub_topic_, 16);
+          cxt_.mel_base_pose_pub_topic_, 16);
       }
       if (cxt_.mel_publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>(
@@ -209,15 +209,15 @@ namespace fiducial_vlam
       }
       if (cxt_.mel_publish_camera_odom_) {
         camera_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
-          cxt_.camera_odometry_pub_topic_, 16);
+          cxt_.mel_camera_odometry_pub_topic_, 16);
       }
       if (cxt_.mel_publish_base_odom_) {
         base_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
-          cxt_.base_odometry_pub_topic_, 16);
+          cxt_.mel_base_odometry_pub_topic_, 16);
       }
       if (cxt_.mel_publish_image_marked_) {
         image_marked_pub_ = create_publisher<sensor_msgs::msg::Image>(
-          cxt_.image_marked_pub_topic_, 16);
+          cxt_.mel_image_marked_pub_topic_, 16);
       }
 
       // ROS subscriptions
@@ -310,7 +310,7 @@ namespace fiducial_vlam
       cv_bridge::CvImage color_marked;
 
 //      if (cxt_.mel_publish_image_marked_ &&
-//          count_subscribers(cxt_.image_marked_pub_topic_) > 0) {
+//          count_subscribers(cxt_.mel_image_marked_pub_topic_) > 0) {
       if (cxt_.mel_publish_image_marked_) {
 
         // The toCvShare only makes ConstCvImage because they don't want
@@ -378,13 +378,13 @@ namespace fiducial_vlam
 
           // Publish the camera an/or base pose in the map frame
           if (cxt_.mel_publish_camera_pose_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.map_frame_id_);
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.mel_map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
             camera_pose_pub_->publish(pose_msg);
           }
           if (cxt_.mel_publish_base_pose_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.map_frame_id_);
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.mel_map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
             base_pose_pub_->publish(pose_msg);
@@ -392,12 +392,12 @@ namespace fiducial_vlam
 
           // Publish odometry of the camera and/or the base.
           if (cxt_.mel_publish_camera_odom_) {
-            auto odom_msg = to_odom_message(stamp, cxt_.camera_frame_id_, t_map_camera);
+            auto odom_msg = to_odom_message(stamp, cxt_.mel_camera_frame_id_, t_map_camera);
             add_fixed_covariance(odom_msg.pose);
             camera_odometry_pub_->publish(odom_msg);
           }
           if (cxt_.mel_publish_base_odom_) {
-            auto odom_msg = to_odom_message(stamp, cxt_.base_frame_id_, t_map_base);
+            auto odom_msg = to_odom_message(stamp, cxt_.mel_base_frame_id_, t_map_base);
             add_fixed_covariance(odom_msg.pose);
             base_odometry_pub_->publish(odom_msg);
           }
@@ -434,7 +434,7 @@ namespace fiducial_vlam
       nav_msgs::msg::Odometry odom_message;
 
       odom_message.header.stamp = stamp;
-      odom_message.header.frame_id = cxt_.map_frame_id_;
+      odom_message.header.frame_id = cxt_.mel_map_frame_id_;
       odom_message.child_frame_id = child_frame_id;
       odom_message.pose = to_PoseWithCovariance_msg(t);
       return odom_message;
@@ -448,17 +448,17 @@ namespace fiducial_vlam
 
       geometry_msgs::msg::TransformStamped msg;
       msg.header.stamp = stamp;
-      msg.header.frame_id = cxt_.map_frame_id_;
+      msg.header.frame_id = cxt_.mel_map_frame_id_;
 
-      // The camera_frame_id parameter is non-empty to publish the camera tf.
-      // The base_frame_id parameter is non-empty to publish the base tf.
-      if (!cxt_.camera_frame_id_.empty()) {
-        msg.child_frame_id = cxt_.camera_frame_id_;
+      // The mel_camera_frame_id parameter is non-empty to publish the camera tf.
+      // The mel_base_frame_id parameter is non-empty to publish the base tf.
+      if (!cxt_.mel_camera_frame_id_.empty()) {
+        msg.child_frame_id = cxt_.mel_camera_frame_id_;
         msg.transform = tf2::toMsg(t_map_camera.transform());
         tf_message.transforms.emplace_back(msg);
       }
-      if (!cxt_.base_frame_id_.empty()) {
-        msg.child_frame_id = cxt_.base_frame_id_;
+      if (!cxt_.mel_base_frame_id_.empty()) {
+        msg.child_frame_id = cxt_.mel_base_frame_id_;
         msg.transform = tf2::toMsg(t_map_base.transform());
         tf_message.transforms.emplace_back(msg);
       }
@@ -475,7 +475,7 @@ namespace fiducial_vlam
 
       geometry_msgs::msg::TransformStamped msg;
       msg.header.stamp = stamp;
-      msg.header.frame_id = cxt_.map_frame_id_;
+      msg.header.frame_id = cxt_.mel_map_frame_id_;
 
       for (int i = 0; i < observations.size(); i += 1) {
         auto &observation = observations.observations()[i];
@@ -483,9 +483,9 @@ namespace fiducial_vlam
 
         if (t_map_camera.is_valid()) {
 
-          if (!cxt_.camera_frame_id_.empty()) {
+          if (!cxt_.mel_camera_frame_id_.empty()) {
             std::ostringstream oss_child_frame_id;
-            oss_child_frame_id << cxt_.camera_frame_id_ << "_m" << std::setfill('0') << std::setw(3)
+            oss_child_frame_id << cxt_.mel_camera_frame_id_ << "_m" << std::setfill('0') << std::setw(3)
                                << observation.id();
             msg.child_frame_id = oss_child_frame_id.str();
             msg.transform = tf2::toMsg(t_map_camera.transform());
