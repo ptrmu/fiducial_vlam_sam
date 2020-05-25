@@ -122,7 +122,7 @@ namespace fiducial_vlam
 
     void validate_parameters()
     {
-      cxt_.t_camera_base_ = TransformWithCovariance(TransformWithCovariance::mu_type{
+      cxt_.loc_t_camera_base_ = TransformWithCovariance(TransformWithCovariance::mu_type{
         cxt_.loc_t_camera_base_x_, cxt_.loc_t_camera_base_y_, cxt_.loc_t_camera_base_z_,
         cxt_.loc_t_camera_base_roll_, cxt_.loc_t_camera_base_pitch_, cxt_.loc_t_camera_base_yaw_});
     }
@@ -373,7 +373,7 @@ namespace fiducial_vlam
           // Note: the covariance values are with respect to the map frame so both t_map_camera and
           // t_map_base have the same covariance.
           TransformWithCovariance t_map_base{
-            t_map_camera.transform() * cxt_.t_camera_base_.transform(),
+            t_map_camera.transform() * cxt_.loc_t_camera_base_.transform(),
             t_map_camera.cov()};
 
           // Publish the camera an/or base pose in the map frame

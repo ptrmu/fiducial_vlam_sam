@@ -67,7 +67,7 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
     VLOC_ALL_PARAMS
 
-    TransformWithCovariance t_camera_base_;
+    TransformWithCovariance loc_t_camera_base_;
   };
 }
 
