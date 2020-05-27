@@ -20,7 +20,7 @@
   <depend>fiducial_vlam_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>GTSAM</depend>
-  <depend>OpenCV</depend>
+  <depend>libopencv-dev</depend>
   <depend>rclcpp</depend>
   <depend>ros2_shared</depend>
   <depend>sensor_msgs</depend>
