@@ -32,7 +32,7 @@ def generate_launch_description():
 
     entities = [
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
-             node_name='opencv_cam', parameters=opencv_zed_params),
+             node_name='opencv_cam', parameters=opencv_lifecam_params),
 
         # Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
         #      parameters=vloc_args),
