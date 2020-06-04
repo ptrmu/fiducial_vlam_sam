@@ -15,10 +15,10 @@ namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
-  CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 1)         /* calibrate camera instead of localize camera */ \
+  CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 0)         /* calibrate camera instead of localize camera */ \
   CXT_MACRO_MEMBER(loc_camera_sam_not_cv, int, 0)               /* use gtsam not opencv for localizing the camera */\
   CXT_MACRO_MEMBER(loc_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
-  /* MEssages for vLocnode options */\
+  /* Mssages for vLocnode options */\
   CXT_MACRO_MEMBER(mel_stamp_msgs_with_current_time, int, 0)    /* non-zero => debug mode, helpful for dealing with rviz when playing bags.  */\
   CXT_MACRO_MEMBER(mel_sub_camera_info_best_effort_not_reliable, int, 1) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */\
   /* Subscription topics */\
