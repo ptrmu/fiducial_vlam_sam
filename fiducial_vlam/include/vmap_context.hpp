@@ -12,17 +12,16 @@ namespace rclcpp
 namespace fiducial_vlam
 {
 #define VMAP_ALL_PUBSUB_PARAMS \
-  CXT_MACRO_MEMBER(fiducial_map_pub_topic, std::string, "/fiducial_map") /* topic for publishing map of markers  */\
-  CXT_MACRO_MEMBER(fiducial_markers_pub_topic, std::string, "fiducial_markers") /* topic for publishing rviz visualizations of the fiducial markers  */\
+  CXT_MACRO_MEMBER(mem_fiducial_map_pub_topic, std::string, "/fiducial_map") /* topic for publishing map of markers  */\
+  CXT_MACRO_MEMBER(mem_fiducial_markers_pub_topic, std::string, "fiducial_markers") /* topic for publishing rviz visualizations of the fiducial markers  */\
+  CXT_MACRO_MEMBER(mem_fiducial_observations_sub_topic, std::string, "/fiducial_observations") /* topic for subscription to fiducial_vlam_msgs::msg::Observations  */\
   \
-  CXT_MACRO_MEMBER(fiducial_observations_sub_topic, std::string, "/fiducial_observations") /* topic for subscription to fiducial_vlam_msgs::msg::Observations  */\
+  CXT_MACRO_MEMBER(mem_map_frame_id, std::string, "map")            /* frame_id for marker and tf messages - normally "map"  */\
+  CXT_MACRO_MEMBER(mem_marker_prefix_frame_id, std::string, "marker_") /* frame_id for the child in the marker tf message  */\
   \
-  CXT_MACRO_MEMBER(map_frame_id, std::string, "map")                /* frame_id for marker and tf messages - normally "map"  */\
-  CXT_MACRO_MEMBER(marker_prefix_frame_id, std::string, "marker_")  /* frame_id for the child in the marker tf message  */\
-  \
-  CXT_MACRO_MEMBER(publish_tfs, int, 1)                             /* non-zero => publish the tf of all the known markers  */\
-  CXT_MACRO_MEMBER(publish_marker_visualizations, int, 1)           /* non-zero => publish a shape that represents a marker  */\
-  CXT_MACRO_MEMBER(marker_map_publish_frequency_hz, double, 0.)     /* Hz => rate at which the marker map is published */\
+  CXT_MACRO_MEMBER(mem_publish_tfs, int, 1)                         /* non-zero => publish the tf of all the known markers  */\
+  CXT_MACRO_MEMBER(mem_publish_marker_visualizations, int, 1)       /* non-zero => publish a shape that represents a marker  */\
+  CXT_MACRO_MEMBER(mem_marker_map_publish_frequency_hz, double, 0.) /* Hz => rate at which the marker map is published */\
   /* End of list */
 
 

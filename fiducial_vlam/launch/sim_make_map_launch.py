@@ -14,7 +14,7 @@ sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
 world_name = "circle_of_markers"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
-existing_map_filename = os.path.join(worlds_directory,  world_name + '_map.yaml')
+existing_map_filename = os.path.join(worlds_directory, world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
 elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
@@ -39,15 +39,14 @@ vloc_args = [{
 
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'publish_tfs': 1,  # Publish marker /tf
+    'mem_publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1775,  # Marker length
     'marker_map_save_full_filename': created_map_filename,
     'marker_map_load_full_filename': existing_map_filename,
     'corner_measurement_sigma': corner_measurement_sigma,
-    'build_marker_map_skip_images' : 3,
+    'build_marker_map_skip_images': 3,
     'build_marker_map_cmd': 'none',
 }]
-
 
 
 def generate_launch_description():

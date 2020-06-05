@@ -300,10 +300,10 @@ namespace fiducial_vlam
 
     void validate_parameters()
     {
-      if (std::abs(cxt_.marker_map_publish_frequency_hz_) < 1.e-10) {
-        cxt_.marker_map_publish_frequency_hz_ = 30. / 60.;
+      if (std::abs(cxt_.mem_marker_map_publish_frequency_hz_) < 1.e-10) {
+        cxt_.mem_marker_map_publish_frequency_hz_ = 30. / 60.;
       }
-      cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.marker_map_publish_frequency_hz_);
+      cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.mem_marker_map_publish_frequency_hz_);
 
       cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
         cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
@@ -388,14 +388,14 @@ namespace fiducial_vlam
 
       // ROS publishers.
       fiducial_map_pub_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
-        cxt_.fiducial_map_pub_topic_, 16);
+        cxt_.mem_fiducial_map_pub_topic_, 16);
 
-      if (cxt_.publish_marker_visualizations_) {
+      if (cxt_.mem_publish_marker_visualizations_) {
         fiducial_markers_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
-          cxt_.fiducial_markers_pub_topic_, 16);
+          cxt_.mem_fiducial_markers_pub_topic_, 16);
       }
 
-      if (cxt_.publish_tfs_) {
+      if (cxt_.mem_publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>("tf", 16);
       }
 
@@ -470,16 +470,16 @@ namespace fiducial_vlam
       // publish the map
       std_msgs::msg::Header header;
       header.stamp = now();
-      header.frame_id = cxt_.map_frame_id_;
+      header.frame_id = cxt_.mem_map_frame_id_;
       fiducial_map_pub_->publish(*map_->to_map_msg(header));
 
       // Publish the marker Visualization
-      if (cxt_.publish_marker_visualizations_) {
+      if (cxt_.mem_publish_marker_visualizations_) {
         fiducial_markers_pub_->publish(to_marker_array_msg());
       }
 
       // Publish the transform tree
-      if (cxt_.publish_tfs_) {
+      if (cxt_.mem_publish_tfs_) {
         tf_message_pub_->publish(to_tf_message());
       }
     }
@@ -502,7 +502,7 @@ namespace fiducial_vlam
         // Subscribe to observations messages if we have not already.
         if (observations_sub_ == nullptr) {
           observations_sub_ = create_subscription<fiducial_vlam_msgs::msg::Observations>(
-            cxt_.fiducial_observations_sub_topic_,
+            cxt_.mem_fiducial_observations_sub_topic_,
             512,
             [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
             {
@@ -567,7 +567,7 @@ namespace fiducial_vlam
         auto mu = marker.t_map_marker().mu();
 
         std::ostringstream oss_child_frame_id;
-        oss_child_frame_id << cxt_.marker_prefix_frame_id_ << std::setfill('0') << std::setw(3) << marker.id();
+        oss_child_frame_id << cxt_.mem_marker_prefix_frame_id_ << std::setfill('0') << std::setw(3) << marker.id();
 
         tf2::Quaternion q;
         q.setRPY(mu[3], mu[4], mu[5]);
@@ -575,7 +575,7 @@ namespace fiducial_vlam
 
         geometry_msgs::msg::TransformStamped msg;
         msg.header.stamp = stamp;
-        msg.header.frame_id = cxt_.map_frame_id_;
+        msg.header.frame_id = cxt_.mem_map_frame_id_;
         msg.child_frame_id = oss_child_frame_id.str();
         msg.transform = tf2::toMsg(tf2_transform);
 
@@ -592,7 +592,7 @@ namespace fiducial_vlam
         auto &marker = marker_pair.second;
         visualization_msgs::msg::Marker marker_msg;
         marker_msg.id = marker.id();
-        marker_msg.header.frame_id = cxt_.map_frame_id_;
+        marker_msg.header.frame_id = cxt_.mem_map_frame_id_;
         marker_msg.pose = to_Pose_msg(marker.t_map_marker());
         marker_msg.type = visualization_msgs::msg::Marker::CUBE;
         marker_msg.action = visualization_msgs::msg::Marker::ADD;

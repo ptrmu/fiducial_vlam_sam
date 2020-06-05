@@ -44,7 +44,7 @@ vloc_args = [{
 
 vmap_args = [{
     'use_sim_time': False,  # Use /clock if available
-    'publish_tfs': 1,  # Publish marker /tf
+    'mem_publish_tfs': 1,  # Publish marker /tf
     'marker_length': 0.1627,  # Marker length
     'marker_map_save_full_filename': created_map_filename,
     'marker_map_load_full_filename': existing_map_filename,
