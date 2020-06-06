@@ -51,9 +51,9 @@ def generate_launch_description():
         Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              node_name='vmap_main', parameters=[{
                 'use_sim_time': True,                           # Use /clock if available
-                'mel_publish_tfs': 1,                               # Publish marker /tf
-                'marker_length': 0.1778,                        # Marker length
-                'marker_map_load_full_filename': map_path,      # Load a pre-built map from disk
+                'mel_publish_tfs': 1,                           # Publish marker /tf
+                'map_marker_length': 0.1778,                    # Marker length
+                'map_load_filename': map_path,                  # Load a pre-built map from disk
             }]),
 
         # Joystick driver, generates /namespace/joy messages

@@ -106,7 +106,7 @@ namespace fiducial_vlam
 
     virtual std::string build_marker_map(Map &map) = 0;
 
-    virtual std::string build_marker_map_cmd(std::string &cmd) = 0;
+    virtual std::string map_cmd(std::string &cmd) = 0;
   };
 
   std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,

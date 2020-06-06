@@ -51,8 +51,8 @@ def generate_launch_description():
              node_name='vmap_main', parameters=[{
                 'use_sim_time': True,                           # Use /clock if available
                 'mem_publish_tfs': 1,                           # Publish marker /tf
-                'marker_length': 0.1778,                        # Marker length
-                'marker_map_load_full_filename': map_path,      # Load a pre-built map from disk
+                'map_marker_length': 0.1778,                    # Marker length
+                'map_load_filename': map_path,                  # Load a pre-built map from disk
             }]),
 
         # Joystick driver, generates /namespace/joy messages

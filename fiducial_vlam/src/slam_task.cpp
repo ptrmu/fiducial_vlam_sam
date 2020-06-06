@@ -619,7 +619,7 @@ namespace fiducial_vlam
                                           msg.c_str(), solve_map_updates_count_);
     }
 
-    std::string build_marker_map_cmd(std::string &cmd) override
+    std::string map_cmd(std::string &cmd) override
     {
       if (cmd == "start") {
         return std::string{"SamBuildMarkerMap Start map creation."};
