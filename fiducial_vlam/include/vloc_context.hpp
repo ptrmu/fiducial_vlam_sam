@@ -16,7 +16,7 @@ namespace fiducial_vlam
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
   CXT_MACRO_MEMBER(loc_calibrate_not_loocalize, int, 0)         /* calibrate camera instead of localize camera */ \
-  CXT_MACRO_MEMBER(loc_camera_sam_not_cv, int, 1)               /* use gtsam not opencv for localizing the camera */\
+  CXT_MACRO_MEMBER(loc_camera_sam_not_cv, int, 0)               /* use gtsam not opencv for localizing the camera */\
   CXT_MACRO_MEMBER(loc_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
   /* Mssages for vLocnode options */\
   CXT_MACRO_MEMBER(mel_stamp_msgs_with_current_time, int, 0)    /* non-zero => debug mode, helpful for dealing with rviz when playing bags.  */\
@@ -56,7 +56,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(loc_corner_filter_measure_std, float, 0.)    /* Measurement Noise Std Dev for Kalman filtering corners */\
   CXT_MACRO_MEMBER(loc_corner_filter_max_skipped, int, 3)       /* Max number of frames that to predict_only corner locations */\
   /* Aruco markers */\
-  CXT_MACRO_MEMBER(loc_aruco_dictionary_id, int, 10)            /* Aruco dictionary id for localization markers  */ \
+  CXT_MACRO_MEMBER(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers  */ \
   CXT_MACRO_MEMBER(loc_cv3_do_corner_refinement, int, 1)        /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */\
   CXT_MACRO_MEMBER(loc_cv4_corner_refinement_method, int, 2)    /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* End of list */

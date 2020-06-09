@@ -36,11 +36,13 @@ namespace fiducial_vlam
       camera_matrix_.at<double>(2, 2) = 1.;
 
       // ROS and OpenCV (and everybody?) agree on this ordering: k1, k2, t1 (p1), t2 (p2), k3
-      dist_coeffs_.at<double>(0) = msg.d[0];
-      dist_coeffs_.at<double>(1) = msg.d[1];
-      dist_coeffs_.at<double>(2) = msg.d[2];
-      dist_coeffs_.at<double>(3) = msg.d[3];
-      dist_coeffs_.at<double>(4) = msg.d[4];
+      if (!msg.d.empty()) {
+        dist_coeffs_.at<double>(0) = msg.d[0];
+        dist_coeffs_.at<double>(1) = msg.d[1];
+        dist_coeffs_.at<double>(2) = msg.d[2];
+        dist_coeffs_.at<double>(3) = msg.d[3];
+        dist_coeffs_.at<double>(4) = msg.d[4];
+      }
     }
 
     const cv::Mat &camera_matrix() const override

@@ -68,8 +68,8 @@ def generate_launch_description():
         # Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
         #      arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        # Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
-        #      parameters=vloc_args, node_namespace='forward_camera'),
+        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+             parameters=vloc_args, node_namespace='forward_camera'),
         Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]
