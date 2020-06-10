@@ -486,17 +486,7 @@ namespace fiducial_vlam
 
     std::string process_update_map_cmd(std::string &cmd)
     {
-      // If we have and active map builder, then just pass the command along and
-      // then kill the process if the command was 'done'
-      if (build_marker_map_) {
-        auto ret_str = build_marker_map_->map_cmd(cmd);
-        if (cmd == "done") {
-          build_marker_map_.reset(nullptr);
-        }
-        return ret_str;
-      }
-
-      // If no builder is active, then look for the start command
+      // Look for the start command
       if (cmd == "start") {
 
         // Subscribe to observations messages if we have not already.
@@ -516,11 +506,25 @@ namespace fiducial_vlam
         map_ = initialize_map("", Map::MapStyles::pose);
 
         // Create a builder object. Now any observation messages will get passed to it.
+        // Notice that a running map builder will get shut down here.
         build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *map_);
 
-        // Pass the "start" command to the builder incase it wants to do anything (like report status)
+        // Pass the "start" command to the builder in-case it wants to do anything (like report status)
         return build_marker_map_->map_cmd(cmd);
       }
+
+      // Reset the map building.
+      if (cmd == "reset") {
+        build_marker_map_.reset(nullptr);
+        return std::string("Map building reset.");
+      }
+
+      // If we have and active map builder, then just pass the command along.
+      if (build_marker_map_) {
+        auto ret_str = build_marker_map_->map_cmd(cmd);
+        return ret_str;
+      }
+
 
       return std::string("No Update active");
 

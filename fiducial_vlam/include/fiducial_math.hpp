@@ -33,8 +33,8 @@ namespace fiducial_vlam
   {
   public:
     virtual ~CameraInfoInterface() = default; //
-    virtual const cv::Mat &camera_matrix() const = 0; //
-    virtual const cv::Mat &dist_coeffs() const = 0; //
+    virtual const cv::Matx33d &camera_matrix() const = 0; //
+    virtual const cv::Vec<double, 5> &dist_coeffs() const = 0; //
   };
 
   std::unique_ptr<const CameraInfoInterface> make_camera_info(const sensor_msgs::msg::CameraInfo &msg);

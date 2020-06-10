@@ -22,35 +22,35 @@ namespace fiducial_vlam
 
   class CameraInfoImpl : public CameraInfoInterface
   {
-    cv::Mat camera_matrix_;
-    cv::Mat dist_coeffs_;
+    cv::Matx33d camera_matrix_;
+    cv::Vec<double, 5> dist_coeffs_;
 
   public:
     explicit CameraInfoImpl(const sensor_msgs::msg::CameraInfo &msg) :
       camera_matrix_{3, 3, CV_64F, 0.}, dist_coeffs_{5, 1, CV_64F, 0.}
     {
-      camera_matrix_.at<double>(0, 0) = msg.k[0];
-      camera_matrix_.at<double>(0, 2) = msg.k[2];
-      camera_matrix_.at<double>(1, 1) = msg.k[4];
-      camera_matrix_.at<double>(1, 2) = msg.k[5];
-      camera_matrix_.at<double>(2, 2) = 1.;
+      camera_matrix_(0, 0) = msg.k[0];
+      camera_matrix_(0, 2) = msg.k[2];
+      camera_matrix_(1, 1) = msg.k[4];
+      camera_matrix_(1, 2) = msg.k[5];
+      camera_matrix_(2, 2) = 1.;
 
       // ROS and OpenCV (and everybody?) agree on this ordering: k1, k2, t1 (p1), t2 (p2), k3
       if (!msg.d.empty()) {
-        dist_coeffs_.at<double>(0) = msg.d[0];
-        dist_coeffs_.at<double>(1) = msg.d[1];
-        dist_coeffs_.at<double>(2) = msg.d[2];
-        dist_coeffs_.at<double>(3) = msg.d[3];
-        dist_coeffs_.at<double>(4) = msg.d[4];
+        dist_coeffs_(0) = msg.d[0];
+        dist_coeffs_(1) = msg.d[1];
+        dist_coeffs_(2) = msg.d[2];
+        dist_coeffs_(3) = msg.d[3];
+        dist_coeffs_(4) = msg.d[4];
       }
     }
 
-    const cv::Mat &camera_matrix() const override
+    const cv::Matx33d &camera_matrix() const override
     {
       return camera_matrix_;
     }
 
-    const cv::Mat &dist_coeffs() const override
+    const cv::Vec<double, 5> &dist_coeffs() const override
     {
       return dist_coeffs_;
     }

@@ -128,15 +128,15 @@ namespace fiducial_vlam
     {
       auto &cm{camera_info.camera_matrix()};
       auto &dc{camera_info.dist_coeffs()};
-      return std::make_shared<const gtsam::Cal3DS2>(cm.at<double>(0, 0),  // fx
-                                                    cm.at<double>(1, 1),  // fy
+      return std::make_shared<const gtsam::Cal3DS2>(cm(0, 0),  // fx
+                                                    cm(1, 1),  // fy
                                                     1.0, // s
-                                                    cm.at<double>(0, 2),  // u0
-                                                    cm.at<double>(1, 2),  // v0
-                                                    dc.at<double>(0), // k1
-                                                    dc.at<double>(1), // k2
-                                                    dc.at<double>(2), // p1
-                                                    dc.at<double>(3));// p2
+                                                    cm(0, 2),  // u0
+                                                    cm(1, 2),  // v0
+                                                    dc(0), // k1
+                                                    dc(1), // k2
+                                                    dc(2), // p1
+                                                    dc(3));// p2
     }
   };
 
@@ -178,6 +178,11 @@ namespace fiducial_vlam
         point_f_marker_,
         H1 ? gtsam::OptionalJacobian<3, 6>(d_point3_wrt_pose3) : boost::none);
 
+//      marker_f_world.print("\nmarker_f_world\n");
+//      camera_f_world.print("\ncamera_f_world\n");
+//      cal3ds2_->print("\ncal3ds2\n");
+//      point_f_world.print("point_f_world\n");
+
       // Project this point to the camera's image frame. Catch and return a default
       // value on a CheiralityException.
       auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{camera_f_world, *cal3ds2_};
@@ -186,6 +191,8 @@ namespace fiducial_vlam
           point_f_world,
           H2 ? gtsam::OptionalJacobian<2, 6>(d_point2_wrt_pose3) : boost::none,
           H1 ? gtsam::OptionalJacobian<2, 3>(d_point2_wrt_point3) : boost::none);
+
+//        point_f_image.print("point_f_image\n");
 
         // Return the Jacobian for each input
         if (H1) {
@@ -369,7 +376,11 @@ namespace fiducial_vlam
         gtsam::NonlinearFactorGraph graph{};
         gtsam::Values initial{};
 
-        // Prepare for the best marker search.
+        // Prepare for the best marker search. When we optimize the system given the known markers,
+        // we need to have an estimate for the camera pose for this frame. This will be used as the
+        // initial pose of the camera for the optimization. To find an appropriate camera pose estimate
+        // we will choose one "best" marker and use it's location and measurement to estimate an
+        // initial pose for the camera.
         good_marker_start();
 
         auto do_add_func = [this, &unknown_exist](bool known_marker, const Observation &observation) -> bool
@@ -537,29 +548,29 @@ namespace fiducial_vlam
     const FiducialMathContext cxt_;
     std::unique_ptr<Map> empty_map_;
 
-    std::unique_ptr<SamBuildMarkerMapTask> stw_; // This will ultimately get owned by the thread
-    std::unique_ptr<task_thread::TaskThread<SamBuildMarkerMapTask>> task_thread_{};
+    task_thread::TaskThread<SamBuildMarkerMapTask> task_thread_;
     std::future<std::unique_ptr<Map>> solve_map_future_{};
 
     std::uint64_t frames_added_count_{0};
     std::uint64_t solve_map_updates_count_{0};
+    bool stop_adding_observations_{false};
 
   public:
     SamBuildMarkerMapImpl(const FiducialMathContext &cxt,
                           const Map &empty_map) :
       cxt_{cxt},
       empty_map_{std::make_unique<Map>(empty_map)},
-      stw_{std::make_unique<SamBuildMarkerMapTask>(cxt_, *empty_map_)}
-    {
-      // If we are using a thread, create it and pass the work object to it.
-      if (cxt.compute_on_thread_) {
-        task_thread_ = std::make_unique<task_thread::TaskThread<SamBuildMarkerMapTask>>(std::move(stw_));
-      }
-    }
+      task_thread_(std::make_unique<SamBuildMarkerMapTask>(cxt_, *empty_map_), !cxt.compute_on_thread_)
+    {}
 
     void process_observations(std::unique_ptr<const Observations> observations,
                               std::unique_ptr<const CameraInfoInterface> camera_info) override
     {
+      // A stop command will stop adding observations.
+      if (stop_adding_observations_) {
+        return;
+      }
+
       frames_added_count_ += 1;
 
       auto func = [obs = std::move(observations), ci = std::move(camera_info)](SamBuildMarkerMapTask &stw) -> void
@@ -567,18 +578,14 @@ namespace fiducial_vlam
         stw.process_observations(*obs, *ci);
       };
 
-      if (task_thread_) {
-        task_thread_->push(std::move(func));
-      } else {
-        func(*stw_);
-      }
+      task_thread_.push(std::move(func));
     }
 
     std::string build_marker_map(Map &map) override
     {
       auto msg{ros2_shared::string_print::f("build_marker_map frames: added %d, processed %d",
                                             frames_added_count_,
-                                            frames_added_count_ - task_thread_->tasks_in_queue())};
+                                            frames_added_count_ - task_thread_.tasks_in_queue())};
 
       // If the future is valid, then a map is being solved and we should check
       // to see if it is complete
@@ -591,6 +598,9 @@ namespace fiducial_vlam
                                               msg.c_str(), solve_map_updates_count_);
         }
 
+        // If this .get() throws a "broken promise" exception the cause is likely the stw.solve_map() line
+        // below. solve_map() probably throws an exception that isn't caught and prevents the set_value()
+        // method from executing.
         auto new_map = solve_map_future_.get();
         map.reset(*new_map);
         return ros2_shared::string_print::f("%s, map complete with %d markers.",
@@ -609,11 +619,7 @@ namespace fiducial_vlam
         promise.set_value(std::move(new_map));
       };
 
-      if (task_thread_) {
-        task_thread_->push(std::move(func));
-      } else {
-        func(*stw_);
-      }
+      task_thread_.push(std::move(func));
 
       return ros2_shared::string_print::f("%s, need %d, build map task queued",
                                           msg.c_str(), solve_map_updates_count_);
@@ -624,6 +630,12 @@ namespace fiducial_vlam
       if (cmd == "start") {
         return std::string{"SamBuildMarkerMap Start map creation."};
       }
+
+      if (cmd == "done" || cmd == "stop") {
+        stop_adding_observations_ = true;
+        return std::string{"SamBuildMarkerMap no more observations will be processed."};
+      }
+
       return std::string{};
     }
   };

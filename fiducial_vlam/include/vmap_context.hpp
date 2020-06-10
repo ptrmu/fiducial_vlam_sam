@@ -36,10 +36,10 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(map_init_pose_roll, double, TF2SIMD_HALF_PI) /* pose component for map initialization */\
   CXT_MACRO_MEMBER(map_init_pose_pitch, double, 0.)             /* pose component for map initialization */\
   CXT_MACRO_MEMBER(map_init_pose_yaw, double, -TF2SIMD_HALF_PI) /* pose component for map initialization */\
-  CXT_MACRO_MEMBER(map_marker_length, double, 0.1775)           /* length of a side of a marker in meters */\
+  CXT_MACRO_MEMBER(map_marker_length, double, 0.2100)           /* length of a side of a marker in meters */\
   \
   CXT_MACRO_MEMBER(map_cmd, std::string, "")                    /* commands to the build_marker_map system  */\
-  CXT_MACRO_MEMBER(map_skip_images, int, 0)                     /* image frames to skip when creating map. 1=>use all frames, 2=>use every other frame, ...  */\
+  CXT_MACRO_MEMBER(map_skip_images, int, 5)                     /* image frames to skip when creating map. 1=>use all frames, 2=>use every other frame, ...  */\
   /* End of list */
 
 
