@@ -23,6 +23,7 @@ namespace fiducial_vlam
   class TransformWithCovariance; //
   class Map; //
   class VlocContext; //
+  class VmapContext; //
   class SmoothObservationsInterface; //
 
 // ==============================================================================
@@ -38,23 +39,6 @@ namespace fiducial_vlam
   };
 
   std::unique_ptr<const CameraInfoInterface> make_camera_info(const sensor_msgs::msg::CameraInfo &msg);
-
-// ==============================================================================
-// FiducialMathContext class
-// ==============================================================================
-
-#define FM_ALL_PARAMS \
-  CXT_MACRO_MEMBER(corner_measurement_sigma, double, 2.0)     /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
-  CXT_MACRO_MEMBER(build_marker_map_sam_not_cv, int, 1)       /* use gtsam not opencv for building the marker map */\
-  CXT_MACRO_MEMBER(compute_on_thread, int, 1)                 /* Do heavy-duty computation on a thread. */\
-  /* End of list */
-
-  struct FiducialMathContext
-  {
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
-    FM_ALL_PARAMS
-  };
 
 // ==============================================================================
 // CvFiducialMathInterface class
@@ -109,7 +93,7 @@ namespace fiducial_vlam
     virtual std::string map_cmd(std::string &cmd) = 0;
   };
 
-  std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
+  std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const VmapContext &cxt,
                                                                      const Map &empty_map);
 
 // ==============================================================================

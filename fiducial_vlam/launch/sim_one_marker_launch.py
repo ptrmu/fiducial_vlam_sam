@@ -20,25 +20,25 @@ corner_measurement_sigma = 0.7
 
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'mel_publish_tfs': 1,  # Publish drone and camera /tf
-    'mel_stamp_msgs_with_current_time': 1,  # Stamp with now()
+    'psl_publish_tfs': 1,  # Publish drone and camera /tf
+    'psl_stamp_msgs_with_current_time': 1,  # Stamp with now()
     'map_init_pose_z': 0,
-    'mel_sub_camera_info_best_effort_not_reliable': 1,
-    'mel_publish_tfs_per_marker': 0,
-    'mel_publish_image_marked': 1,
-    'mel_camera_frame_id': 'forward_camera',
-    'mel_publish_base_pose': 1,
-    'mel_publish_camera_odom': 1,
-    'mel_publish_base_odom': 1,
+    'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_publish_tfs_per_marker': 0,
+    'psl_publish_image_marked': 1,
+    'psl_camera_frame_id': 'forward_camera',
+    'psl_publish_base_pose': 1,
+    'psl_publish_camera_odom': 1,
+    'psl_publish_base_odom': 1,
 }]
 
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'mem_publish_tfs': 1,  # Publish marker /tf
+    'psm_publish_tfs': 1,  # Publish marker /tf
     'map_marker_length': 0.1778,  # Marker length
     'map_save_filename': map_filename,
     'map_load_filename': map_filename,
-    'corner_measurement_sigma': corner_measurement_sigma,
+    'map_corner_measurement_sigma': corner_measurement_sigma,
 }]
 
 

@@ -10,7 +10,7 @@ vlam_cfg_directory = os.path.join(vlam_package_share_directory, 'cfg')
 
 corner_measurement_sigma = 2.0
 created_map_filename = "nook_walls_map_new.yaml"
-existing_map_filename = "nook_walls_map.yaml"
+existing_map_filename = "nook_walls_map_new.yaml"
 
 opencv_zed_params = [{
     'file': False,
@@ -34,28 +34,28 @@ opencv_lifecam_params = [{
 
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'mel_publish_tfs': 1,  # Publish drone and camera /tf
+    'psl_publish_tfs': 1,  # Publish drone and camera /tf
     'loc_aruco_dictionary_id': 0,  # aruco marker dictionary
-    'mel_stamp_msgs_with_current_time': 0,  # Stamp with now()
-    'mel_sub_camera_info_best_effort_not_reliable': 1,
-    'mel_publish_tfs_per_marker': 0,
-    'mel_publish_image_marked': 1,
-    'mel_camera_frame_id': 'forward_camera',
-    'mel_publish_base_pose': 1,
-    'mel_publish_camera_odom': 1,
-    'mel_publish_base_odom': 1,
+    'psl_stamp_msgs_with_current_time': 0,  # Stamp with now()
+    'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_publish_tfs_per_marker': 0,
+    'psl_publish_image_marked': 1,
+    'psl_camera_frame_id': 'forward_camera',
+    'psl_publish_base_pose': 1,
+    'psl_publish_camera_odom': 1,
+    'psl_publish_base_odom': 1,
     'loc_cv4_corner_refinement_method': 2,
     'loc_camera_sam_not_cv': 1,
 }]
 
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'mem_publish_tfs': 1,  # Publish marker /tf
+    'psm_publish_tfs': 1,  # Publish marker /tf
     'map_marker_length': 0.21,  # Marker length
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
-    'corner_measurement_sigma': corner_measurement_sigma,
-    'map_skip_images': 3,
+    'map_corner_measurement_sigma': corner_measurement_sigma,
+    'map_skip_images': 5,
     'map_cmd': 'none',
 }]
 
@@ -66,8 +66,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args),
-        # Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)

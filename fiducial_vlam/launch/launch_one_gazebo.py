@@ -50,7 +50,7 @@ def generate_launch_description():
         Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
              node_name='vmap_main', parameters=[{
                 'use_sim_time': True,                           # Use /clock if available
-                'mem_publish_tfs': 1,                           # Publish marker /tf
+                'psm_publish_tfs': 1,                           # Publish marker /tf
                 'map_marker_length': 0.1778,                    # Marker length
                 'map_load_filename': map_path,                  # Load a pre-built map from disk
             }]),
@@ -100,13 +100,13 @@ def generate_launch_description():
             Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
                  node_name='vloc_main', node_namespace=namespace, parameters=[{
                     'use_sim_time': True,                       # Use /clock if available
-                    'mel_publish_tfs': 1,                           # Publish drone and camera /tf
-                    'mel_stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
-                    'mel_base_frame_id': 'base_link' + suffix,
+                    'psl_publish_tfs': 1,                           # Publish drone and camera /tf
+                    'psl_stamp_msgs_with_current_time': 0,          # Use incoming message time, not now()
+                    'psl_base_frame_id': 'base_link' + suffix,
                     'map_init_pose_z': -0.035,
-                    'mel_camera_frame_id': 'camera_link' + suffix,
-                    'mel_base_odometry_pub_topic': 'filtered_odom',
-                    'mel_sub_camera_info_best_effort_not_reliable': 1,
+                    'psl_camera_frame_id': 'camera_link' + suffix,
+                    'psl_base_odometry_pub_topic': 'filtered_odom',
+                    'psl_sub_camera_info_best_effort_not_reliable': 1,
                 }]),
 
             # Odometry filter takes camera pose, generates base_link odom, and publishes map to base_link tf

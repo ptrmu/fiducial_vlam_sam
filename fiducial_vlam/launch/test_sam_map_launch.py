@@ -31,24 +31,24 @@ tello_args = [{
 
 vloc_args = [{
     'use_sim_time': False,  # Use /clock if available
-    'mel_publish_tfs': 1,  # Publish drone and camera /tf
-    'mel_stamp_msgs_with_current_time': 1,  # Use incoming message time, not now()
-    # 'mel_base_frame_id': 'base_link' + suffix,
+    'psl_publish_tfs': 1,  # Publish drone and camera /tf
+    'psl_stamp_msgs_with_current_time': 1,  # Use incoming message time, not now()
+    # 'psl_base_frame_id': 'base_link' + suffix,
     'map_init_pose_z': -0.035,
-    # 'mel_camera_frame_id': 'camera_link' + suffix,
-    # 'mel_base_odometry_pub_topic': 'filtered_odom',
-    'mel_sub_camera_info_best_effort_not_reliable': 1,
-    'mel_publish_tfs_per_marker': 0,
-    'mel_publish_image_marked': 1,
+    # 'psl_camera_frame_id': 'camera_link' + suffix,
+    # 'psl_base_odometry_pub_topic': 'filtered_odom',
+    'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_publish_tfs_per_marker': 0,
+    'psl_publish_image_marked': 1,
 }]
 
 vmap_args = [{
     'use_sim_time': False,  # Use /clock if available
-    'mem_publish_tfs': 1,  # Publish marker /tf
+    'psm_publish_tfs': 1,  # Publish marker /tf
     'map_marker_length': 0.1627,  # Marker length
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
-    'corner_measurement_sigma': corner_measurement_sigma,
+    'map_corner_measurement_sigma': corner_measurement_sigma,
     'map_skip_images' : 15,
     'map_init_id': 1,
 }]

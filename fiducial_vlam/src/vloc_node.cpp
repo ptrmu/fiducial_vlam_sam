@@ -18,6 +18,21 @@
 namespace fiducial_vlam
 {
 
+// ==============================================================================
+// PslContext class
+// ==============================================================================
+
+  struct PslContext
+  {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
+    PSL_ALL_PARAMS
+  };
+
+// ==============================================================================
+// annotate_image_with_marker_axes routine
+// ==============================================================================
+
   static void annotate_image_with_marker_axes(
     cv_bridge::CvImage &color_marked,
     const TransformWithCovariance &t_map_camera,
@@ -44,7 +59,6 @@ namespace fiducial_vlam
       }
     }
   }
-
 
 // ==============================================================================
 // LocalizeCameraProcessImageImpl class
@@ -97,6 +111,7 @@ namespace fiducial_vlam
   {
     rclcpp::Logger ros_logger_inst_;
     VlocContext cxt_{};
+    PslContext psl_cxt_{};
     CalibrateContext cal_cxt_{};
     std::unique_ptr<SmoothObservationsInterface> so_;
     std::unique_ptr<CvFiducialMathInterface> fm_;
@@ -144,6 +159,15 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
 
+      // Do the PubSub Loc parameters
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), psl_cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(PSL_ALL_PARAMS, validate_parameters)
+
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(psl_cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), PSL_ALL_PARAMS, validate_parameters)
+
       // Do the calibrate  parameters
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cal_cxt_, n, t, d)
@@ -159,13 +183,17 @@ namespace fiducial_vlam
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VlocNode Parameters", VLOC_ALL_PARAMS)
 
 #undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(psl_cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "PubSub Loc Parameters", PSL_ALL_PARAMS)
+
+#undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cal_cxt_, n, t, d)
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "Calibrate Parameters", CAL_ALL_PARAMS)
 
       // Check that all command line parameters are registered
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS CAL_ALL_PARAMS)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS PSL_ALL_PARAMS CAL_ALL_PARAMS)
     }
 
     ProcessImageInterface &pi()
@@ -193,39 +221,39 @@ namespace fiducial_vlam
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
-        cxt_.mel_fiducial_observations_pub_topic_, 16);
+        psl_cxt_.psl_fiducial_observations_pub_topic_, 16);
 
-      if (cxt_.mel_publish_camera_pose_) {
+      if (psl_cxt_.psl_publish_camera_pose_) {
         camera_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          cxt_.mel_camera_pose_pub_topic_, 16);
+          psl_cxt_.psl_camera_pose_pub_topic_, 16);
       }
-      if (cxt_.mel_publish_base_pose_) {
+      if (psl_cxt_.psl_publish_base_pose_) {
         base_pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          cxt_.mel_base_pose_pub_topic_, 16);
+          psl_cxt_.psl_base_pose_pub_topic_, 16);
       }
-      if (cxt_.mel_publish_tfs_) {
+      if (psl_cxt_.psl_publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>(
           "/tf", 16);
       }
-      if (cxt_.mel_publish_camera_odom_) {
+      if (psl_cxt_.psl_publish_camera_odom_) {
         camera_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
-          cxt_.mel_camera_odometry_pub_topic_, 16);
+          psl_cxt_.psl_camera_odometry_pub_topic_, 16);
       }
-      if (cxt_.mel_publish_base_odom_) {
+      if (psl_cxt_.psl_publish_base_odom_) {
         base_odometry_pub_ = create_publisher<nav_msgs::msg::Odometry>(
-          cxt_.mel_base_odometry_pub_topic_, 16);
+          psl_cxt_.psl_base_odometry_pub_topic_, 16);
       }
-      if (cxt_.mel_publish_image_marked_) {
+      if (psl_cxt_.psl_publish_image_marked_) {
         image_marked_pub_ = create_publisher<sensor_msgs::msg::Image>(
-          cxt_.mel_image_marked_pub_topic_, 16);
+          psl_cxt_.psl_image_marked_pub_topic_, 16);
       }
 
       // ROS subscriptions
-      auto camera_info_qos = cxt_.mel_sub_camera_info_best_effort_not_reliable_ ?
+      auto camera_info_qos = psl_cxt_.psl_sub_camera_info_best_effort_not_reliable_ ?
                              rclcpp::QoS{rclcpp::SensorDataQoS()} :
                              rclcpp::QoS{rclcpp::ServicesQoS()};
       camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-        cxt_.mel_camera_info_sub_topic_,
+        psl_cxt_.psl_camera_info_sub_topic_,
         camera_info_qos,
         [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) -> void
         {
@@ -235,7 +263,7 @@ namespace fiducial_vlam
         });
 
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
-        cxt_.mel_image_raw_sub_topic_,
+        psl_cxt_.psl_image_raw_sub_topic_,
         rclcpp::ServicesQoS(rclcpp::KeepLast(1)),
         [this](sensor_msgs::msg::Image::UniquePtr msg) -> void
         {
@@ -261,7 +289,7 @@ namespace fiducial_vlam
             // rviz doesn't like it when time goes backward when a bag is played again.
             // The stamp_msgs_with_current_time_ parameter can help this by replacing the
             // image message time with the current time.
-            stamp = cxt_.mel_stamp_msgs_with_current_time_ ? builtin_interfaces::msg::Time(now()) : stamp;
+            stamp = psl_cxt_.psl_stamp_msgs_with_current_time_ ? builtin_interfaces::msg::Time(now()) : stamp;
             process_image(std::move(msg), std::move(camera_info_msg_), stamp);
           }
 
@@ -269,7 +297,7 @@ namespace fiducial_vlam
         });
 
       map_sub_ = create_subscription<fiducial_vlam_msgs::msg::Map>(
-        cxt_.mel_fiducial_map_sub_topic_,
+        psl_cxt_.psl_fiducial_map_sub_topic_,
         16,
         [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
         {
@@ -309,9 +337,9 @@ namespace fiducial_vlam
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImage color_marked;
 
-//      if (cxt_.mel_publish_image_marked_ &&
-//          count_subscribers(cxt_.mel_image_marked_pub_topic_) > 0) {
-      if (cxt_.mel_publish_image_marked_) {
+//      if (cxt_.psl_publish_image_marked_ &&
+//          count_subscribers(cxt_.psl_image_marked_pub_topic_) > 0) {
+      if (psl_cxt_.psl_publish_image_marked_) {
 
         // The toCvShare only makes ConstCvImage because they don't want
         // to modify the original message data. I want to modify the original
@@ -377,39 +405,39 @@ namespace fiducial_vlam
             t_map_camera.cov()};
 
           // Publish the camera an/or base pose in the map frame
-          if (cxt_.mel_publish_camera_pose_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, cxt_.mel_map_frame_id_);
+          if (psl_cxt_.psl_publish_camera_pose_) {
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, psl_cxt_.psl_map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
             camera_pose_pub_->publish(pose_msg);
           }
-          if (cxt_.mel_publish_base_pose_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, cxt_.mel_map_frame_id_);
+          if (psl_cxt_.psl_publish_base_pose_) {
+            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, psl_cxt_.psl_map_frame_id_);
             // add some fixed variance for now.
             add_fixed_covariance(pose_msg.pose);
             base_pose_pub_->publish(pose_msg);
           }
 
           // Publish odometry of the camera and/or the base.
-          if (cxt_.mel_publish_camera_odom_) {
-            auto odom_msg = to_odom_message(stamp, cxt_.mel_camera_frame_id_, t_map_camera);
+          if (psl_cxt_.psl_publish_camera_odom_) {
+            auto odom_msg = to_odom_message(stamp, psl_cxt_.psl_camera_frame_id_, t_map_camera);
             add_fixed_covariance(odom_msg.pose);
             camera_odometry_pub_->publish(odom_msg);
           }
-          if (cxt_.mel_publish_base_odom_) {
-            auto odom_msg = to_odom_message(stamp, cxt_.mel_base_frame_id_, t_map_base);
+          if (psl_cxt_.psl_publish_base_odom_) {
+            auto odom_msg = to_odom_message(stamp, psl_cxt_.psl_base_frame_id_, t_map_base);
             add_fixed_covariance(odom_msg.pose);
             base_odometry_pub_->publish(odom_msg);
           }
 
           // Also publish the camera's tf
-          if (cxt_.mel_publish_tfs_) {
+          if (psl_cxt_.psl_publish_tfs_) {
             auto tf_message = to_tf_message(stamp, t_map_camera, t_map_base);
             tf_message_pub_->publish(tf_message);
           }
 
           // if requested, publish the camera tf as determined from each marker.
-          if (cxt_.mel_publish_tfs_per_marker_) {
+          if (psl_cxt_.psl_publish_tfs_per_marker_) {
             auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
             auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
             if (!tf_message.transforms.empty()) {
@@ -434,7 +462,7 @@ namespace fiducial_vlam
       nav_msgs::msg::Odometry odom_message;
 
       odom_message.header.stamp = stamp;
-      odom_message.header.frame_id = cxt_.mel_map_frame_id_;
+      odom_message.header.frame_id = psl_cxt_.psl_map_frame_id_;
       odom_message.child_frame_id = child_frame_id;
       odom_message.pose = to_PoseWithCovariance_msg(t);
       return odom_message;
@@ -448,17 +476,17 @@ namespace fiducial_vlam
 
       geometry_msgs::msg::TransformStamped msg;
       msg.header.stamp = stamp;
-      msg.header.frame_id = cxt_.mel_map_frame_id_;
+      msg.header.frame_id = psl_cxt_.psl_map_frame_id_;
 
-      // The mel_camera_frame_id parameter is non-empty to publish the camera tf.
-      // The mel_base_frame_id parameter is non-empty to publish the base tf.
-      if (!cxt_.mel_camera_frame_id_.empty()) {
-        msg.child_frame_id = cxt_.mel_camera_frame_id_;
+      // The psl_camera_frame_id parameter is non-empty to publish the camera tf.
+      // The psl_base_frame_id parameter is non-empty to publish the base tf.
+      if (!psl_cxt_.psl_camera_frame_id_.empty()) {
+        msg.child_frame_id = psl_cxt_.psl_camera_frame_id_;
         msg.transform = tf2::toMsg(t_map_camera.transform());
         tf_message.transforms.emplace_back(msg);
       }
-      if (!cxt_.mel_base_frame_id_.empty()) {
-        msg.child_frame_id = cxt_.mel_base_frame_id_;
+      if (!psl_cxt_.psl_base_frame_id_.empty()) {
+        msg.child_frame_id = psl_cxt_.psl_base_frame_id_;
         msg.transform = tf2::toMsg(t_map_base.transform());
         tf_message.transforms.emplace_back(msg);
       }
@@ -475,7 +503,7 @@ namespace fiducial_vlam
 
       geometry_msgs::msg::TransformStamped msg;
       msg.header.stamp = stamp;
-      msg.header.frame_id = cxt_.mel_map_frame_id_;
+      msg.header.frame_id = psl_cxt_.psl_map_frame_id_;
 
       for (int i = 0; i < observations.size(); i += 1) {
         auto &observation = observations.observations()[i];
@@ -483,9 +511,9 @@ namespace fiducial_vlam
 
         if (t_map_camera.is_valid()) {
 
-          if (!cxt_.mel_camera_frame_id_.empty()) {
+          if (!psl_cxt_.psl_camera_frame_id_.empty()) {
             std::ostringstream oss_child_frame_id;
-            oss_child_frame_id << cxt_.mel_camera_frame_id_ << "_m" << std::setfill('0') << std::setw(3)
+            oss_child_frame_id << psl_cxt_.psl_camera_frame_id_ << "_m" << std::setfill('0') << std::setw(3)
                                << observation.id();
             msg.child_frame_id = oss_child_frame_id.str();
             msg.transform = tf2::toMsg(t_map_camera.transform());

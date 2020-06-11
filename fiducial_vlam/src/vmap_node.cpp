@@ -20,6 +20,20 @@
 
 namespace fiducial_vlam
 {
+
+// ==============================================================================
+// PsmContext class
+// ==============================================================================
+
+  struct PsmContext
+  {
+#undef CXT_MACRO_MEMBER
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
+    PSM_ALL_PARAMS
+
+    int timer_period_milliseconds_;
+  };
+
 // ==============================================================================
 // ToYAML class
 // ==============================================================================
@@ -283,7 +297,7 @@ namespace fiducial_vlam
   class VmapNode : public rclcpp::Node
   {
     VmapContext cxt_{};
-    FiducialMathContext fm_cxt_{};
+    PsmContext psm_cxt_{};
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
@@ -300,10 +314,10 @@ namespace fiducial_vlam
 
     void validate_parameters()
     {
-      if (std::abs(cxt_.mem_marker_map_publish_frequency_hz_) < 1.e-10) {
-        cxt_.mem_marker_map_publish_frequency_hz_ = 30. / 60.;
+      if (std::abs(psm_cxt_.psm_marker_map_publish_frequency_hz_) < 1.e-10) {
+        psm_cxt_.psm_marker_map_publish_frequency_hz_ = 30. / 60.;
       }
-      cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / cxt_.mem_marker_map_publish_frequency_hz_);
+      psm_cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / psm_cxt_.psm_marker_map_publish_frequency_hz_);
 
       cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
         cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
@@ -326,14 +340,14 @@ namespace fiducial_vlam
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
       CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VMAP_ALL_PARAMS, validate_parameters)
 
-      // Do Fiducial Math parameters
+      // Do PubSub Map parameters
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), fm_cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(FM_ALL_PARAMS, validate_fm_parameters)
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), psm_cxt_, n, t, d)
+      CXT_MACRO_INIT_PARAMETERS(PSM_ALL_PARAMS, validate_parameters)
 
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(fm_cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), FM_ALL_PARAMS, validate_fm_parameters)
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(psm_cxt_, n, t)
+      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), PSM_ALL_PARAMS, validate_parameters)
 
       // Display all the parameters
 #undef CXT_MACRO_MEMBER
@@ -341,13 +355,13 @@ namespace fiducial_vlam
       CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VmapNode Parameters", VMAP_ALL_PARAMS)
 
 #undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(fm_cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "FiducialMath Parameters", FM_ALL_PARAMS)
+#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(psm_cxt_, n, t, d)
+      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "PubSub Map Parameters", PSM_ALL_PARAMS)
 
       // Check that all command line parameters are defined
 #undef CXT_MACRO_MEMBER
 #define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VMAP_ALL_PARAMS FM_ALL_PARAMS)
+      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VMAP_ALL_PARAMS PSM_ALL_PARAMS)
     }
 
     // Special "initialize map from camera location" mode
@@ -388,20 +402,20 @@ namespace fiducial_vlam
 
       // ROS publishers.
       fiducial_map_pub_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
-        cxt_.mem_fiducial_map_pub_topic_, 16);
+        psm_cxt_.psm_fiducial_map_pub_topic_, 16);
 
-      if (cxt_.mem_publish_marker_visualizations_) {
+      if (psm_cxt_.psm_publish_marker_visualizations_) {
         fiducial_markers_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
-          cxt_.mem_fiducial_markers_pub_topic_, 16);
+          psm_cxt_.psm_fiducial_markers_pub_topic_, 16);
       }
 
-      if (cxt_.mem_publish_tfs_) {
+      if (psm_cxt_.psm_publish_tfs_) {
         tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>("tf", 16);
       }
 
       // Timer for publishing map info
       map_pub_timer_ = create_wall_timer(
-        std::chrono::milliseconds(cxt_.timer_period_milliseconds_),
+        std::chrono::milliseconds(psm_cxt_.timer_period_milliseconds_),
         [this]() -> void
         {
           timer_msg_callback();
@@ -423,7 +437,7 @@ namespace fiducial_vlam
         // Give a little time for other tasks to process. For large optimizations, this timer routine
         // sucks up CPU cycles and other tasks are starved.
         if ((enter_build_map_time - exit_build_map_time_) >=
-            std::chrono::milliseconds(cxt_.timer_period_milliseconds_) / 2) {
+            std::chrono::milliseconds(psm_cxt_.timer_period_milliseconds_) / 2) {
           build_map();
         }
         exit_build_map_time_ = now();
@@ -439,7 +453,7 @@ namespace fiducial_vlam
         // Reset the cmd_string in preparation for the next command.
         CXT_MACRO_SET_PARAMETER((*this), cxt_, map_cmd, "");
 
-        auto ret_str = process_update_map_cmd(cmd);
+        auto ret_str = process_map_cmd(cmd);
         if (!ret_str.empty()) {
           RCLCPP_INFO(get_logger(), "UpdateMapCmd response: %s", ret_str.c_str());
         }
@@ -470,21 +484,21 @@ namespace fiducial_vlam
       // publish the map
       std_msgs::msg::Header header;
       header.stamp = now();
-      header.frame_id = cxt_.mem_map_frame_id_;
+      header.frame_id = psm_cxt_.psm_map_frame_id_;
       fiducial_map_pub_->publish(*map_->to_map_msg(header));
 
       // Publish the marker Visualization
-      if (cxt_.mem_publish_marker_visualizations_) {
+      if (psm_cxt_.psm_publish_marker_visualizations_) {
         fiducial_markers_pub_->publish(to_marker_array_msg());
       }
 
       // Publish the transform tree
-      if (cxt_.mem_publish_tfs_) {
+      if (psm_cxt_.psm_publish_tfs_) {
         tf_message_pub_->publish(to_tf_message());
       }
     }
 
-    std::string process_update_map_cmd(std::string &cmd)
+    std::string process_map_cmd(std::string &cmd)
     {
       // Look for the start command
       if (cmd == "start") {
@@ -492,7 +506,7 @@ namespace fiducial_vlam
         // Subscribe to observations messages if we have not already.
         if (observations_sub_ == nullptr) {
           observations_sub_ = create_subscription<fiducial_vlam_msgs::msg::Observations>(
-            cxt_.mem_fiducial_observations_sub_topic_,
+            psm_cxt_.psm_fiducial_observations_sub_topic_,
             512,
             [this](const fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
             {
@@ -507,7 +521,7 @@ namespace fiducial_vlam
 
         // Create a builder object. Now any observation messages will get passed to it.
         // Notice that a running map builder will get shut down here.
-        build_marker_map_ = make_sam_build_marker_map(fm_cxt_, *map_);
+        build_marker_map_ = make_sam_build_marker_map(cxt_, *map_);
 
         // Pass the "start" command to the builder in-case it wants to do anything (like report status)
         return build_marker_map_->map_cmd(cmd);
@@ -525,9 +539,7 @@ namespace fiducial_vlam
         return ret_str;
       }
 
-
       return std::string("No Update active");
-
     }
 
     void observations_msg_callback(const fiducial_vlam_msgs::msg::Observations::UniquePtr &msg)
@@ -571,7 +583,7 @@ namespace fiducial_vlam
         auto mu = marker.t_map_marker().mu();
 
         std::ostringstream oss_child_frame_id;
-        oss_child_frame_id << cxt_.mem_marker_prefix_frame_id_ << std::setfill('0') << std::setw(3) << marker.id();
+        oss_child_frame_id << psm_cxt_.psm_marker_prefix_frame_id_ << std::setfill('0') << std::setw(3) << marker.id();
 
         tf2::Quaternion q;
         q.setRPY(mu[3], mu[4], mu[5]);
@@ -579,7 +591,7 @@ namespace fiducial_vlam
 
         geometry_msgs::msg::TransformStamped msg;
         msg.header.stamp = stamp;
-        msg.header.frame_id = cxt_.mem_map_frame_id_;
+        msg.header.frame_id = psm_cxt_.psm_map_frame_id_;
         msg.child_frame_id = oss_child_frame_id.str();
         msg.transform = tf2::toMsg(tf2_transform);
 
@@ -596,7 +608,7 @@ namespace fiducial_vlam
         auto &marker = marker_pair.second;
         visualization_msgs::msg::Marker marker_msg;
         marker_msg.id = marker.id();
-        marker_msg.header.frame_id = cxt_.mem_map_frame_id_;
+        marker_msg.header.frame_id = psm_cxt_.psm_map_frame_id_;
         marker_msg.pose = to_Pose_msg(marker.t_map_marker());
         marker_msg.type = visualization_msgs::msg::Marker::CUBE;
         marker_msg.action = visualization_msgs::msg::Marker::ADD;

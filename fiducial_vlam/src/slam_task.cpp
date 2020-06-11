@@ -23,6 +23,7 @@
 #include "task_thread.hpp"
 #include "tf_utils.hpp"
 #include "vloc_context.hpp"
+#include "vmap_context.hpp"
 
 namespace fiducial_vlam
 {
@@ -220,7 +221,7 @@ namespace fiducial_vlam
 
   class SamBuildMarkerMapTask
   {
-    const FiducialMathContext &cxt_;
+    const VmapContext &cxt_;
     const Map &empty_map_;
     const gtsam::SharedNoiseModel corner_noise_;
 
@@ -228,7 +229,6 @@ namespace fiducial_vlam
     std::map<gtsam::Key, std::uint64_t> marker_seen_counts_{};
 
     std::uint64_t frames_processed_{0};
-    std::uint64_t last_frames_processed_{0};
 
     static gtsam::ISAM2Params get_isam2_params()
     {
@@ -331,9 +331,9 @@ namespace fiducial_vlam
     }
 
   public:
-    SamBuildMarkerMapTask(const FiducialMathContext &cxt, const Map &empty_map) :
+    SamBuildMarkerMapTask(const VmapContext &cxt, const Map &empty_map) :
       cxt_{cxt}, empty_map_{empty_map},
-      corner_noise_{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.corner_measurement_sigma_)}
+      corner_noise_{gtsam::noiseModel::Isotropic::Sigma(2, cxt_.map_corner_measurement_sigma_)}
     {
       // Initialize the isam with the fixed prior
       gtsam::NonlinearFactorGraph graph{};
@@ -475,13 +475,6 @@ namespace fiducial_vlam
       gttic(solve_map);
       auto new_map = std::make_unique<Map>(empty_map_);
 
-      // Don't bother publishing a new map if no new frames have been processed.
-      if (last_frames_processed_ == frames_processed_) {
-        return new_map;
-      }
-      last_frames_processed_ = frames_processed_;
-
-
       // Build up the new map by looping through all the marker_seen_counts and
       // adding them to the map.
       gtsam::Values bestEstimate = isam_.calculateBestEstimate();
@@ -545,7 +538,7 @@ namespace fiducial_vlam
   {
     // These parameters are captured when the class is constructed. This allows
     // the map creation to proceed in one mode.
-    const FiducialMathContext cxt_;
+    const VmapContext cxt_;
     std::unique_ptr<Map> empty_map_;
 
     task_thread::TaskThread<SamBuildMarkerMapTask> task_thread_;
@@ -556,11 +549,11 @@ namespace fiducial_vlam
     bool stop_adding_observations_{false};
 
   public:
-    SamBuildMarkerMapImpl(const FiducialMathContext &cxt,
+    SamBuildMarkerMapImpl(const VmapContext &cxt,
                           const Map &empty_map) :
       cxt_{cxt},
       empty_map_{std::make_unique<Map>(empty_map)},
-      task_thread_(std::make_unique<SamBuildMarkerMapTask>(cxt_, *empty_map_), !cxt.compute_on_thread_)
+      task_thread_(std::make_unique<SamBuildMarkerMapTask>(cxt_, *empty_map_), !cxt.map_compute_on_thread_)
     {}
 
     void process_observations(std::unique_ptr<const Observations> observations,
@@ -640,7 +633,7 @@ namespace fiducial_vlam
     }
   };
 
-  std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const FiducialMathContext &cxt,
+  std::unique_ptr<BuildMarkerMapInterface> make_sam_build_marker_map(const VmapContext &cxt,
                                                                      const Map &empty_map)
   {
     return std::make_unique<SamBuildMarkerMapImpl>(cxt, empty_map);
