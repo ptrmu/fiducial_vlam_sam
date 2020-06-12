@@ -595,7 +595,9 @@ namespace fiducial_vlam
         // below. solve_map() probably throws an exception that isn't caught and prevents the set_value()
         // method from executing.
         auto new_map = solve_map_future_.get();
-        map.reset(*new_map);
+        if (new_map) {
+          map.reset(*new_map);
+        }
         return ros2_shared::string_print::f("%s, map complete with %d markers.",
                                             msg.c_str(), map.markers().size());
       }
@@ -608,7 +610,12 @@ namespace fiducial_vlam
 
       auto func = [promise = std::move(solve_map_promise)](SamBuildMarkerMapTask &stw) mutable -> void
       {
-        auto new_map = stw.solve_map();
+        std::unique_ptr<Map> new_map{};
+        try {
+          new_map = stw.solve_map();
+        } catch (const std::exception &e) {
+          std::cout << "EXCEPTION :" << e.what() << std::endl;
+        }
         promise.set_value(std::move(new_map));
       };
 
