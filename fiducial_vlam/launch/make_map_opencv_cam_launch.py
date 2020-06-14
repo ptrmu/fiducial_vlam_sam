@@ -24,7 +24,8 @@ opencv_zed_params = [{
 
 opencv_lifecam_params = [{
     'file': False,
-    'index': 2,
+    'index': 0,
+    'camera_info_path': os.path.join(vlam_cfg_directory, "camera_info_LifeCam.yaml"),
     'vcp_property0': 'CAP_PROP_FRAME_WIDTH', 'vcp_value0': 1280.,
     'vcp_property1': 'CAP_PROP_FRAME_HEIGHT', 'vcp_value1': 720.,
     'vcp_property2': 'CAP_PROP_AUTOFOCUS', 'vcp_value2': 0.,
@@ -37,7 +38,7 @@ vloc_args = [{
     'psl_publish_tfs': 1,  # Publish drone and camera /tf
     'loc_aruco_dictionary_id': 0,  # aruco marker dictionary
     'psl_stamp_msgs_with_current_time': 0,  # Stamp with now()
-    'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_sub_camera_info_best_effort_not_reliable': 0,
     'psl_publish_tfs_per_marker': 0,
     'psl_publish_image_marked': 1,
     'psl_camera_frame_id': 'forward_camera',
@@ -62,7 +63,7 @@ vmap_args = [{
 def generate_launch_description():
     entities = [
         Node(package='opencv_cam', node_executable='opencv_cam_main', output='screen',
-             node_name='opencv_cam', parameters=opencv_zed_params),
+             node_name='opencv_cam', parameters=opencv_lifecam_params),
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args),
