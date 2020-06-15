@@ -313,6 +313,12 @@ namespace fiducial_vlam
         });
 
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
+      RCLCPP_INFO(get_logger(), "To calibrate camera - set cal_cmd parameter.");
+      RCLCPP_INFO(get_logger(), "  cal_cmd capture - Capture an image and add it to the set of calibration images.");
+      RCLCPP_INFO(get_logger(), "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.");
+      RCLCPP_INFO(get_logger(), "  cal_cmd status - Report on the number of images in the set of calibration images.");
+      RCLCPP_INFO(get_logger(), "  cal_cmd load_images - Load the set of calibration images from files.");
+      RCLCPP_INFO(get_logger(), "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.");
       RCLCPP_INFO(get_logger(), "vloc_node ready");
 
       (void) camera_info_sub_;
