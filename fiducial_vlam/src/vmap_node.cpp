@@ -423,6 +423,11 @@ namespace fiducial_vlam
 
       (void) observations_sub_;
       (void) map_pub_timer_;
+      RCLCPP_INFO(get_logger(), "To build a map of markers - set map_cmd parameter.");
+      RCLCPP_INFO(get_logger(), "  map_cmd start - Start capturing and incrementally processing images to build a map of markers.");
+      RCLCPP_INFO(get_logger(), "  map_cmd stop - Stop capturing images but continue processing images already captured.");
+      RCLCPP_INFO(get_logger(), "  map_cmd continue - Continue capturing images and processing them.");
+      RCLCPP_INFO(get_logger(), "  map_cmd done - Stop capturing and processing images. The last finished map is saved and the map building state is cleared.");
       RCLCPP_INFO(get_logger(), "vmap_node ready");
     }
 
