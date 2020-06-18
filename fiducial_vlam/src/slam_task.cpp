@@ -631,9 +631,14 @@ namespace fiducial_vlam
         return std::string{"SamBuildMarkerMap Start map creation."};
       }
 
-      if (cmd == "done" || cmd == "stop") {
+      if (cmd == "stop") {
         stop_adding_observations_ = true;
-        return std::string{"SamBuildMarkerMap no more observations will be processed."};
+        return std::string{"SamBuildMarkerMap no observations will be processed."};
+      }
+
+      if (cmd == "continue") {
+        stop_adding_observations_ = false;
+        return std::string{"SamBuildMarkerMap observations will again be processed."};
       }
 
       return std::string{};

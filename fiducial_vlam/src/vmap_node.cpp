@@ -520,7 +520,7 @@ namespace fiducial_vlam
         }
 
         // Initialize the map to empty. Use the covariance style in this case because we
-        // only have sam map creators at this point. At this point, it doessn't seem that
+        // only have SAM map creators at this point. For SAM, it doesn't seem that
         // using the covariance of the discovered markers helps in locating the camera.
         map_ = initialize_map("", Map::MapStyles::pose);
 
