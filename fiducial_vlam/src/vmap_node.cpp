@@ -533,9 +533,9 @@ namespace fiducial_vlam
       }
 
       // Reset the map building.
-      if (cmd == "reset") {
+      if (cmd == "done") {
         build_marker_map_.reset(nullptr);
-        return std::string("Map building reset.");
+        return std::string("Map building terminated.");
       }
 
       // If we have and active map builder, then just pass the command along.
