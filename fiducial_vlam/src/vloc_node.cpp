@@ -103,6 +103,13 @@ namespace fiducial_vlam
     }
   };
 
+
+  std::unique_ptr<ProcessImageInterface> make_localize_camera_process_image(const VlocContext &cxt,
+                                                                            CvFiducialMathInterface &fm)
+  {
+    return std::make_unique<LocalizeCameraProcessImageImpl>(cxt, fm);
+  }
+
 // ==============================================================================
 // VlocNode class
 // ==============================================================================
@@ -113,8 +120,8 @@ namespace fiducial_vlam
     VlocContext cxt_{};
     PslContext psl_cxt_{};
     CalibrateContext cal_cxt_{};
-    std::unique_ptr<SmoothObservationsInterface> so_;
-    std::unique_ptr<CvFiducialMathInterface> fm_;
+    std::unique_ptr<SmoothObservationsInterface> so_{};
+    std::unique_ptr<CvFiducialMathInterface> fm_{};
     std::unique_ptr<ProcessImageInterface> lc_pi_{};
     std::unique_ptr<CalibrateCameraInterface> cc_pi_{};
 
@@ -210,14 +217,16 @@ namespace fiducial_vlam
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
-      ros_logger_inst_{get_logger()},
-      so_{make_smooth_observations(cxt_)},
-      fm_{make_cv_fiducial_math(cxt_, *so_)},
-      lc_pi_{std::make_unique<LocalizeCameraProcessImageImpl>(cxt_, *fm_)},
-      cc_pi_{make_calibrate_camera(ros_logger_inst_, cal_cxt_)}
+      ros_logger_inst_{get_logger()}
     {
       // Get parameters from the command line
       setup_parameters();
+
+      // Initialize work objects after parameters have been loaded.
+      so_ = make_smooth_observations(cxt_);
+      fm_ = make_cv_fiducial_math(cxt_, *so_);
+      lc_pi_ = make_localize_camera_process_image(cxt_, *fm_);
+      cc_pi_ = make_calibrate_camera(ros_logger_inst_, cal_cxt_);
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
@@ -315,10 +324,12 @@ namespace fiducial_vlam
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
       RCLCPP_INFO(get_logger(), "To calibrate camera - set cal_cmd parameter.");
       RCLCPP_INFO(get_logger(), "  cal_cmd capture - Capture an image and add it to the set of calibration images.");
-      RCLCPP_INFO(get_logger(), "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.");
+      RCLCPP_INFO(get_logger(),
+                  "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.");
       RCLCPP_INFO(get_logger(), "  cal_cmd status - Report on the number of images in the set of calibration images.");
       RCLCPP_INFO(get_logger(), "  cal_cmd load_images - Load the set of calibration images from files.");
-      RCLCPP_INFO(get_logger(), "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.");
+      RCLCPP_INFO(get_logger(),
+                  "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.");
       RCLCPP_INFO(get_logger(), "vloc_node ready");
 
       (void) camera_info_sub_;
