@@ -38,7 +38,7 @@ vloc_args = [{
     # 'psl_camera_frame_id': 'camera_link' + suffix,
     # 'psl_base_odometry_pub_topic': 'filtered_odom',
     'psl_sub_camera_info_best_effort_not_reliable': 1,
-    'psl_publish_tfs_per_marker': 0,
+    'psl_publish_camera_tf_per_marker': 0,
     'psl_publish_image_marked': 1,
 }]
 

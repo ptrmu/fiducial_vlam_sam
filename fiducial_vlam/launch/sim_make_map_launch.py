@@ -27,7 +27,7 @@ vloc_args = [{
     'psl_stamp_msgs_with_current_time': 1,  # Stamp with now()
     'map_init_pose_z': 0,
     'psl_sub_camera_info_best_effort_not_reliable': 1,
-    'psl_publish_tfs_per_marker': 0,
+    'psl_publish_camera_tf_per_marker': 0,
     'psl_publish_image_marked': 1,
     'psl_camera_frame_id': 'forward_camera',
     'psl_publish_base_pose': 1,

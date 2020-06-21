@@ -454,7 +454,7 @@ namespace fiducial_vlam
           }
 
           // if requested, publish the camera tf as determined from each marker.
-          if (psl_cxt_.psl_publish_tfs_per_marker_) {
+          if (psl_cxt_.psl_publish_camera_tf_per_marker_) {
             auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
             auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
             if (!tf_message.transforms.empty()) {
