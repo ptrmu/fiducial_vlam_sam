@@ -48,6 +48,7 @@ namespace fiducial_vlam
   CXT_MACRO_MEMBER(psl_publish_base_pose, int, 1)               /* non-zero => publish the pose of the base at every frame  */\
   CXT_MACRO_MEMBER(psl_publish_tfs, int, 1)                     /* non-zero => publish the tf of the camera at every frame  */\
   CXT_MACRO_MEMBER(psl_publish_camera_tf_per_marker, int, 0)    /* non-zero => publish the camera tf/pose as determined by each visible marker  */\
+  CXT_MACRO_MEMBER(psl_publish_marker_tf_per_marker, int, 0)    /* non-zero => publish the marker tf/pose as determined by camera pose and observation  */\
   CXT_MACRO_MEMBER(psl_publish_camera_odom, int, 1)             /* non-zero => publish the odometry of the camera at every frame  */\
   CXT_MACRO_MEMBER(psl_publish_base_odom, int, 1)               /* non-zero => publish the odometry of the base at every frame  */\
   CXT_MACRO_MEMBER(psl_publish_image_marked, int, 1)            /* non-zero => publish the image_marked at every frame  */\
