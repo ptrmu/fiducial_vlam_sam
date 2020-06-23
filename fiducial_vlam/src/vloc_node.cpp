@@ -461,6 +461,15 @@ namespace fiducial_vlam
               tf_message_pub_->publish(tf_message);
             }
           }
+
+          // if requested, publish the marker tf as determined from the camera location and the observation.
+          if (psl_cxt_.psl_publish_marker_tf_per_marker_) {
+            auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
+            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
+            if (!tf_message.transforms.empty()) {
+              tf_message_pub_->publish(tf_message);
+            }
+          }
         }
       }
 
