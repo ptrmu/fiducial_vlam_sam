@@ -464,11 +464,12 @@ namespace fiducial_vlam
 
           // if requested, publish the marker tf as determined from the camera location and the observation.
           if (psl_cxt_.psl_publish_marker_tf_per_marker_) {
-            auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
-            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
-            if (!tf_message.transforms.empty()) {
-              tf_message_pub_->publish(tf_message);
-            }
+            auto t_map_markerss = markers_t_map_markers(observations, *camera_info,
+                                                        map_->marker_length(), t_map_camera);
+//            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
+//            if (!tf_message.transforms.empty()) {
+//              tf_message_pub_->publish(tf_message);
+//            }
           }
         }
       }
@@ -568,6 +569,22 @@ namespace fiducial_vlam
       }
 
       return t_map_cameras;
+    }
+
+    std::vector<TransformWithCovariance> markers_t_map_markers(
+      const Observations &observations,
+      const CameraInfoInterface &camera_info,
+      double marker_length,
+      const TransformWithCovariance &t_map_camera)
+    {
+      std::vector<TransformWithCovariance> t_map_markers;
+
+      for (const auto &observation : observations.observations()) {
+        auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, camera_info, marker_length);
+        t_map_markers.emplace_back(TransformWithCovariance(t_map_camera.transform() * t_camera_marker.transform()));
+      }
+
+      return t_map_markers;
     }
 
     void add_fixed_covariance(geometry_msgs::msg::PoseWithCovariance &pwc)
