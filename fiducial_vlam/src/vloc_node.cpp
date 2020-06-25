@@ -563,9 +563,7 @@ namespace fiducial_vlam
         Observations single_observation{};
         single_observation.add(observation);
         auto t_map_camera = pi().solve_t_map_camera(single_observation, camera_info, map);
-        if (t_map_camera.is_valid()) {
-          t_map_cameras.emplace_back(t_map_camera);
-        }
+        t_map_cameras.emplace_back(t_map_camera);
       }
 
       return t_map_cameras;
@@ -580,6 +578,7 @@ namespace fiducial_vlam
       std::vector<TransformWithCovariance> t_map_markers;
 
       for (const auto &observation : observations.observations()) {
+        // someday pay attention to the sam_not_cv flag. For now just use opencv.
         auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, camera_info, marker_length);
         t_map_markers.emplace_back(TransformWithCovariance(t_map_camera.transform() * t_camera_marker.transform()));
       }
