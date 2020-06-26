@@ -456,7 +456,7 @@ namespace fiducial_vlam
           // if requested, publish the camera tf as determined from each marker.
           if (psl_cxt_.psl_publish_camera_tf_per_marker_) {
             auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
-            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
+            auto tf_message = to_cameras_tf_message(stamp, observations, t_map_cameras);
             if (!tf_message.transforms.empty()) {
               tf_message_pub_->publish(tf_message);
             }
@@ -464,12 +464,12 @@ namespace fiducial_vlam
 
           // if requested, publish the marker tf as determined from the camera location and the observation.
           if (psl_cxt_.psl_publish_marker_tf_per_marker_) {
-            auto t_map_markerss = markers_t_map_markers(observations, *camera_info,
-                                                        map_->marker_length(), t_map_camera);
-//            auto tf_message = to_markers_tf_message(stamp, observations, t_map_cameras);
-//            if (!tf_message.transforms.empty()) {
-//              tf_message_pub_->publish(tf_message);
-//            }
+            auto t_map_markers = markers_t_map_markers(observations, *camera_info,
+                                                       map_->marker_length(), t_map_camera);
+            auto tf_message = to_markers_tf_message(stamp, observations, t_map_markers);
+            if (!tf_message.transforms.empty()) {
+              tf_message_pub_->publish(tf_message);
+            }
           }
         }
       }
@@ -521,7 +521,7 @@ namespace fiducial_vlam
       return tf_message;
     }
 
-    tf2_msgs::msg::TFMessage to_markers_tf_message(
+    tf2_msgs::msg::TFMessage to_cameras_tf_message(
       std_msgs::msg::Header::_stamp_type stamp,
       const Observations &observations,
       const std::vector<TransformWithCovariance> &t_map_cameras)
@@ -532,18 +532,49 @@ namespace fiducial_vlam
       msg.header.stamp = stamp;
       msg.header.frame_id = psl_cxt_.psl_map_frame_id_;
 
-      for (int i = 0; i < observations.size(); i += 1) {
-        auto &observation = observations.observations()[i];
-        auto &t_map_camera = t_map_cameras[i];
+      if (!psl_cxt_.psl_camera_frame_id_.empty()) {
 
-        if (t_map_camera.is_valid()) {
+        for (int i = 0; i < observations.size(); i += 1) {
+          auto &observation = observations.observations()[i];
+          auto &t_map_camera = t_map_cameras[i];
 
-          if (!psl_cxt_.psl_camera_frame_id_.empty()) {
+          if (t_map_camera.is_valid()) {
             std::ostringstream oss_child_frame_id;
             oss_child_frame_id << psl_cxt_.psl_camera_frame_id_ << "_m" << std::setfill('0') << std::setw(3)
                                << observation.id();
             msg.child_frame_id = oss_child_frame_id.str();
             msg.transform = tf2::toMsg(t_map_camera.transform());
+            tf_message.transforms.emplace_back(msg);
+          }
+        }
+      }
+
+      return tf_message;
+    }
+
+    tf2_msgs::msg::TFMessage to_markers_tf_message(
+      std_msgs::msg::Header::_stamp_type stamp,
+      const Observations &observations,
+      const std::vector<TransformWithCovariance> &t_map_markers)
+    {
+      tf2_msgs::msg::TFMessage tf_message;
+
+      geometry_msgs::msg::TransformStamped msg;
+      msg.header.stamp = stamp;
+      msg.header.frame_id = psl_cxt_.psl_map_frame_id_;
+
+      if (!psl_cxt_.psl_camera_frame_id_.empty()) {
+
+        for (int i = 0; i < observations.size(); i += 1) {
+          auto &observation = observations.observations()[i];
+          auto &t_map_marker = t_map_markers[i];
+
+          if (t_map_marker.is_valid()) {
+            std::ostringstream oss_child_frame_id;
+            oss_child_frame_id << "m_" << std::setfill('0') << std::setw(3)
+                               << observation.id() << psl_cxt_.psl_camera_frame_id_;
+            msg.child_frame_id = oss_child_frame_id.str();
+            msg.transform = tf2::toMsg(t_map_marker.transform());
             tf_message.transforms.emplace_back(msg);
           }
         }
