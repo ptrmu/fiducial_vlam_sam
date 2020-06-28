@@ -39,14 +39,14 @@ vloc_args = [{
     'loc_aruco_dictionary_id': 0,  # aruco marker dictionary
     'psl_stamp_msgs_with_current_time': 0,  # Stamp with now()
     'psl_sub_camera_info_best_effort_not_reliable': 0,
-    'psl_publish_camera_tf_per_marker': 0,
-    'psl_publish_marker_tf_per_marker' : 0,
+    'psl_publish_camera_tf_per_marker': 1,
+    'psl_publish_marker_tf_per_marker' : 1,
     'psl_publish_image_marked': 1,
     'psl_camera_frame_id': 'forward_camera',
     'psl_publish_base_pose': 1,
     'psl_publish_camera_odom': 1,
     'psl_publish_base_odom': 1,
-    'loc_cv4_corner_refinement_method': 2,
+    'loc_cv4_corner_refinement_method': 3,
     'loc_camera_sam_not_cv': 0,
 }]
 
