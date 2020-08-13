@@ -55,9 +55,11 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(ros2_shared REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(sim_fiducial REQUIRED)
+#find_package(sim_fiducial REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
 
@@ -68,11 +70,14 @@ include_directories(
   ${fiducial_vlam_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${MY_GTSAM_INCLUDES}
+  ${rclcpp_components_INCLUDE_DIRS}
   ${nav_msgs_INCLUDE_DIRS}
   ${ros2_shared_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
   ${std_msgs_INCLUDE_DIRS}
   ${tf2_msgs_INCLUDE_DIRS}
+  ${tf2_INCLUDE_DIRS}
+  ${tf2_geometry_msgs_INCLUDE_DIRS}
   ${visualization_msgs_INCLUDE_DIRS}
   ${yaml_cpp_vendor_INCLUDE_DIRS}
 )
