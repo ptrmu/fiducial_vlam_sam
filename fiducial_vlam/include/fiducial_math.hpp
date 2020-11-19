@@ -2,7 +2,7 @@
 #define FIDUCIAL_VLAM_FIDUCIAL_MATH_HPP
 
 #include "opencv2/core/types.hpp"
-#include "ros2_shared/context_macros.hpp"
+#include "ros2_shared/param_macros.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 
 namespace cv_bridge

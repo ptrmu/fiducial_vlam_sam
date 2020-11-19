@@ -3,7 +3,7 @@
 
 #include "calibrate_classes.hpp"
 #include "calibration_board_config.hpp"
-#include "camera_calibration_parsers/parse.h"
+#include "camera_calibration_parsers/parse.hpp"
 #include "cv_utils.hpp"
 #include "opencv2/calib3d.hpp"
 #include "opencv2/core/types.hpp"

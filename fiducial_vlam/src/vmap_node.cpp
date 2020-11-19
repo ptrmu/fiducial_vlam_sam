@@ -27,9 +27,9 @@ namespace fiducial_vlam
 
   struct PsmContext
   {
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
-    PSM_ALL_PARAMS
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
+    PAMA_PARAMS_DEFINE(PSM_ALL_PARAMS)
 
     int timer_period_milliseconds_;
   };
@@ -332,36 +332,36 @@ namespace fiducial_vlam
     void setup_parameters()
     {
       // Do Vmap parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(VMAP_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), cxt_, "", VMAP_ALL_PARAMS, validate_parameters)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VMAP_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+        PAMA_PARAMS_CHANGED((*this), cxt_, "", VMAP_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
       // Do PubSub Map parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), psm_cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(PSM_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), psm_cxt_, "", PSM_ALL_PARAMS, validate_parameters)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(psm_cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), PSM_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+        PAMA_PARAMS_CHANGED((*this), psm_cxt_, "", PSM_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
       // Display all the parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VmapNode Parameters", VMAP_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+      PAMA_PARAMS_LOG((*this), cxt_, "", VMAP_ALL_PARAMS, RCLCPP_INFO)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(psm_cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "PubSub Map Parameters", PSM_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+        PAMA_PARAMS_LOG((*this), psm_cxt_, "", PSM_ALL_PARAMS, RCLCPP_INFO)
 
       // Check that all command line parameters are defined
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VMAP_ALL_PARAMS PSM_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), "", VMAP_ALL_PARAMS PSM_ALL_PARAMS, RCLCPP_ERROR)
     }
 
     // Special "initialize map from camera location" mode
@@ -456,7 +456,7 @@ namespace fiducial_vlam
         std::string cmd{cxt_.map_cmd_};
 
         // Reset the cmd_string in preparation for the next command.
-        CXT_MACRO_SET_PARAMETER((*this), cxt_, map_cmd, "");
+        PAMA_SET_PARAM((*this), cxt_, "", map_cmd, "");
 
         auto ret_str = process_map_cmd(cmd);
         if (!ret_str.empty()) {

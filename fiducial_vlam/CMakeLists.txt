@@ -18,6 +18,8 @@ endif ()
 # Emulate colcon
 if ($ENV{CLION_IDE})
   message("Running inside CLion")
+  set(FastRTPS_INCLUDE_DIR "/opt/ros/foxy/include")
+  set(FastRTPS_LIBRARY_RELEASE "/opt/ros/foxy/lib/libfastrtps.so")
   set(fiducial_vlam_msgs_DIR "${PROJECT_SOURCE_DIR}/../../../install/fiducial_vlam_msgs/share/fiducial_vlam_msgs/cmake")
   set(ros2_shared_DIR "${PROJECT_SOURCE_DIR}/../../../install/ros2_shared/share/ros2_shared/cmake")
   set(sim_fiducial_DIR "${PROJECT_SOURCE_DIR}/../../../install/sim_fiducial/share/sim_fiducial/cmake")
@@ -105,7 +107,7 @@ set(VLOC_NODE_SOURCES
   src/map.cpp
   src/transform_with_covariance.cpp
   src/vloc_node.cpp
-  src/slam_task.cpp
+  src/gtsam_localize.cpp
   src/calibrate.cpp
   src/calibrate_capture_stationary.cpp
   src/smooth_observations.cpp

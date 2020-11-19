@@ -25,7 +25,7 @@ opencv_lifecam_params = [{
 }]
 
 vloc_args = [{
-    'loc_calibrate_not_loocalize' : 1,
+    'loc_calibrate_not_localize' : 1,
 }]
 
 def generate_launch_description():

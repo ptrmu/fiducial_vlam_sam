@@ -115,10 +115,10 @@ namespace fiducial_vlam
       return {x, y};
     }
 
-    SquareId junction_id_to_square_id(JunctionId junction_id) const
-    {
-
-    }
+//    SquareId junction_id_to_square_id(JunctionId junction_id) const
+//    {
+//        return SquareId();
+//    }
 
     PointFFacade junction_id_to_junction_location(JunctionId junction_id) const
     {
