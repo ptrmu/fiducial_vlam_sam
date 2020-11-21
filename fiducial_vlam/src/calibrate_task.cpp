@@ -331,6 +331,7 @@ namespace fiducial_vlam
     std::string create_one_calibration_report(const CalibrateCameraResult &res,
                                               const CalibrateCameraResult::CalibrationResult &cal)
     {
+      (void)res;
       std::string s{};
       s.append(ros2_shared::string_print::f("\nCamera calibration style %d, (%s)\n",
                                             cal.calibration_style_,
@@ -353,7 +354,7 @@ namespace fiducial_vlam
                                     cal.dist_coeffs_,
                                     cal.stdDeviationsIntrinsics_));
 
-      for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
+      for (int i = 0; i < cal.perViewErrors_.rows; i += 1) {
         auto image_index = cal.images_for_calibration_.empty() ? i : cal.images_for_calibration_[i];
         if (report_flags_ & REPORT_IMAGE_ERRORS) {
           s.append(ros2_shared::string_print::f(
@@ -388,7 +389,6 @@ namespace fiducial_vlam
       CalcStats<CalibrateCameraResult::ValueType, 1> re_stats{};
 
       int calibration_style{CalibrationStyles::unknown};
-      int flags{0};
       uint32_t set_size{0};
       uint32_t selection_size{0};
       uint32_t combinations_size{0};
@@ -400,7 +400,6 @@ namespace fiducial_vlam
 
           if (calibration_style == CalibrationStyles::unknown) {
             calibration_style = cal.calibration_style_;
-            flags = cal.flags_;
             selection_size = cal.images_for_calibration_.size();
             set_size = res.junctions_f_board_.size();
           }
@@ -479,7 +478,7 @@ namespace fiducial_vlam
           cal.calibration_style_,
           CalibrationStyles::name(cal.calibration_style_).c_str()));
 
-        for (size_t i = 0; i < cal.perViewErrors_.rows; i += 1) {
+        for (int i = 0; i < cal.perViewErrors_.rows; i += 1) {
           s.append(ros2_shared::string_print::f(
             "Image %d, %s - Reprojection error %5.3f\n",
             i, to_date_string(captured_images_->captured_images()[i]->time_stamp()).c_str(),
@@ -997,7 +996,7 @@ namespace fiducial_vlam
                 << "imageNames" << "[";
 
       auto captured_images = captured_images_->captured_images();
-      for (int i = 0; i < captured_images.size(); i += 1) {
+      for (size_t i = 0; i < captured_images.size(); i += 1) {
 
         auto image_file_name{get_captured_image_file_name(cal_cxt_, i)};
         auto marked_image_file_name{get_marked_image_file_name(cal_cxt_, i)};

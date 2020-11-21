@@ -40,6 +40,8 @@ namespace fiducial_vlam
     CvFiducialMathInterface &fm,
     const CameraInfoInterface &camera_info)
   {
+    (void) fm;
+
     // Annotate the image by drawing axes on each marker that was used for the location
     // calculation. This calculation uses the average t_map_camera and the t_map_markers
     // to figure out where the axes should be. This is different from the t_camera_marker
@@ -49,7 +51,7 @@ namespace fiducial_vlam
     auto tf_t_camera_map = t_map_camera.transform().inverse();
 
     // Loop through the ids of the markers visible in this image
-    for (int i = 0; i < t_map_markers.size(); i += 1) {
+    for (size_t i = 0; i < t_map_markers.size(); i += 1) {
       auto &t_map_marker = t_map_markers[i];
 
       if (t_map_marker.is_valid()) {
@@ -554,7 +556,7 @@ namespace fiducial_vlam
 
       if (!psl_cxt_.psl_camera_frame_id_.empty()) {
 
-        for (int i = 0; i < observations.size(); i += 1) {
+        for (size_t i = 0; i < observations.size(); i += 1) {
           auto &observation = observations.observations()[i];
           auto &t_map_camera = t_map_cameras[i];
 
@@ -585,7 +587,7 @@ namespace fiducial_vlam
 
       if (!psl_cxt_.psl_camera_frame_id_.empty()) {
 
-        for (int i = 0; i < observations.size(); i += 1) {
+        for (size_t i = 0; i < observations.size(); i += 1) {
           auto &observation = observations.observations()[i];
           auto &t_map_marker = t_map_markers[i];
 

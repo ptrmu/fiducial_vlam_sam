@@ -65,7 +65,7 @@ namespace fiducial_vlam
   Map::Map(const fiducial_vlam_msgs::msg::Map &msg) :
     map_style_{static_cast<Map::MapStyles>(msg.map_style)}, marker_length_{msg.marker_length}
   {
-    for (int i = 0; i < msg.ids.size(); i += 1) {
+    for (std::size_t i = 0; i < msg.ids.size(); i += 1) {
       Marker marker(msg.ids[i], to_TransformWithCovariance(msg.poses[i]));
       marker.set_is_fixed(msg.fixed_flags[i] != 0);
       add_marker(std::move(marker));

@@ -18,9 +18,9 @@ namespace fiducial_vlam
   using CornerPointsFImage = gtsam::Matrix24;
 
   using SquareAddress = Eigen::Vector2i;
-  using SquareId = std::uint64_t;
-  using JunctionId = std::uint64_t;
-  using ArucoId = std::uint64_t;
+  using SquareId = std::int32_t;
+  using JunctionId = std::int32_t;
+  using ArucoId = std::int32_t;
 
 // ==============================================================================
 // CheckerboardConfig class
@@ -28,27 +28,28 @@ namespace fiducial_vlam
 
   struct CheckerboardConfig
   {
-    const std::uint64_t squares_x_;
-    const std::uint64_t squares_y_;
+    const std::int32_t squares_x_;
+    const std::int32_t squares_y_;
     const double square_length_;
 
-    const std::uint64_t max_square_id_;
+    const std::int32_t max_square_id_;
     const double square_length_half_;
 
-    const std::uint64_t squares_x_m_1_;
-    const std::uint64_t squares_y_m_1_;
+    const std::int32_t squares_x_m_1_;
+    const std::int32_t squares_y_m_1_;
 
+    const std::int32_t max_junction_id_;
     const double board_width_half_;
     const double board_height_half_;
-    const std::uint64_t max_junction_id_;
 
-    CheckerboardConfig(std::uint64_t squares_x, std::uint64_t squares_y, double square_length) :
+    CheckerboardConfig(std::int32_t squares_x, std::int32_t squares_y, double square_length) :
       squares_x_{squares_x},
       squares_y_{squares_y},
       square_length_{square_length},
       max_square_id_{squares_x * squares_y},
       square_length_half_{square_length / 2},
-      squares_x_m_1_{squares_x_ - 1}, squares_y_m_1_{squares_y_ - 1},
+      squares_x_m_1_{squares_x_ - 1},
+      squares_y_m_1_{squares_y_ - 1},
       max_junction_id_{squares_x_m_1_ * squares_y_m_1_},
       board_width_half_{squares_x_ * square_length_ / 2.},
       board_height_half_{squares_y_ * square_length_ / 2.}
@@ -163,28 +164,28 @@ namespace fiducial_vlam
 
   struct CharucoboardConfig : public CheckerboardConfig
   {
-    const std::uint64_t upper_left_white_not_black_;
+    const std::int32_t upper_left_white_not_black_;
     const double marker_length_;
 
   private:
     const double offset_to_aruco_;
-    const std::uint64_t squares_x_odd_;
-    const std::uint64_t squares_y_odd_;
-    const std::uint64_t arucos_on_even_row_;
-    const std::uint64_t arucos_on_odd_row_;
+    const std::int32_t squares_x_odd_;
+    const std::int32_t squares_y_odd_;
+    const std::int32_t arucos_on_even_row_;
+    const std::int32_t arucos_on_odd_row_;
 
   public:
     const double marker_length_half_;
-    const std::uint64_t max_aruco_id_;
+    const std::int32_t max_aruco_id_;
 
-    CharucoboardConfig(std::uint64_t squares_x, std::uint64_t squares_y, double square_length,
+    CharucoboardConfig(std::int32_t squares_x, std::int32_t squares_y, double square_length,
                        bool upper_left_white_not_black, double marker_length) :
       CheckerboardConfig{squares_x, squares_y, square_length},
       upper_left_white_not_black_(upper_left_white_not_black ? 1U : 0),
       marker_length_{marker_length},
       offset_to_aruco_{(square_length - marker_length) / 2},
-      squares_x_odd_{squares_x & 1U},
-      squares_y_odd_{squares_y & 1U},
+      squares_x_odd_{squares_x & 1},
+      squares_y_odd_{squares_y & 1},
       arucos_on_even_row_{squares_x / 2 + (upper_left_white_not_black_ & squares_x_odd_)},
       arucos_on_odd_row_{squares_x - arucos_on_even_row_},
       marker_length_half_{marker_length / 2.0},
@@ -203,11 +204,11 @@ namespace fiducial_vlam
     PointFFacade to_aruco_location(ArucoId aruco_id) const
     {
       assert(aruco_id >= 0 && aruco_id < max_aruco_id_);
-      std::uint64_t x_group = aruco_id % squares_x_;
-      std::uint64_t y_group = aruco_id / squares_x_;
-      std::uint64_t odd_row = (x_group >= arucos_on_even_row_) ? 1U : 0U;
-      std::uint64_t ix = (x_group - (odd_row * arucos_on_even_row_)) * 2 + (1U ^ odd_row ^ upper_left_white_not_black_);
-      std::uint64_t iy = y_group * 2 + odd_row;
+      std::int32_t x_group = aruco_id % squares_x_;
+      std::int32_t y_group = aruco_id / squares_x_;
+      std::int32_t odd_row = (x_group >= arucos_on_even_row_) ? 1U : 0U;
+      std::int32_t ix = (x_group - (odd_row * arucos_on_even_row_)) * 2 + (1U ^ odd_row ^ upper_left_white_not_black_);
+      std::int32_t iy = y_group * 2 + odd_row;
       return to_square_point(SquareAddress(ix, iy)).array() + square_length_half_;
     }//
 

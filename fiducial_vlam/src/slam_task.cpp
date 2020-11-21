@@ -179,7 +179,7 @@ namespace fiducial_vlam
       gttic(process_observations);
       auto camera_key{GtsamUtil::camera_key(frames_processed_)};
       bool unknown_exist{false};
-      int update1, update2, update3, update4;
+//      int update1, update2, update3, update4;
 
       auto cal3ds2{GtsamUtil::make_cal3ds2(camera_info)};
 

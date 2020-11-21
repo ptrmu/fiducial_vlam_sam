@@ -15,6 +15,10 @@ if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif ()
 
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 # Emulate colcon
 if ($ENV{CLION_IDE})
   message("Running inside CLion")
@@ -266,7 +270,7 @@ ament_export_dependencies(class_loader yaml_cpp_vendor)
 
 ament_export_include_directories(include)
 
-ament_export_interfaces(export_vloc_node export_vmap_node)
+ament_export_targets(export_vloc_node export_vmap_node)
 
 ament_export_libraries(vloc_node vmap_node)
 

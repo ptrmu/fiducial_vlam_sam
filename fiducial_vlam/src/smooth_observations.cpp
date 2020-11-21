@@ -190,8 +190,10 @@ namespace fiducial_vlam
     auto &frames_skipped()
     { return frames_skipped_; } //
 
-    std::vector<cv::Point2f> predict_only(CVFType &cv, int id)
+    std::vector<cv::Point2f> predict_only(CVFType &cv,
+                                          int id)
     {
+      (void)id;
       std::vector<cv::Point2f> marker_corners{cv::Point2f{}, cv::Point2f{}, cv::Point2f{}, cv::Point2f{}};
       for_each(filter_states_, marker_corners,
                [&cv](CVFType::FilterState &filter_state, CVFType::ValueType &measurement) -> void

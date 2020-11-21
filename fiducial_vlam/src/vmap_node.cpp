@@ -158,7 +158,7 @@ namespace fiducial_vlam
       }
 
       std::array<double, 3> xyz_data{};
-      for (int i = 0; i < xyz_data.size(); i += 1) {
+      for (size_t i = 0; i < xyz_data.size(); i += 1) {
         auto i_node = xyz_node[i];
         if (!i_node.IsScalar()) {
           return yaml_error("marker.xyz[i] failed IsScalar()");
@@ -166,7 +166,7 @@ namespace fiducial_vlam
         xyz_data[i] = i_node.as<double>();
       }
       std::array<double, 3> rpy_data{};
-      for (int i = 0; i < rpy_data.size(); i += 1) {
+      for (size_t i = 0; i < rpy_data.size(); i += 1) {
         auto i_node = rpy_node[i];
         if (!i_node.IsScalar()) {
           return yaml_error("marker.rpy[i] failed IsScalar()");
@@ -191,7 +191,7 @@ namespace fiducial_vlam
         if (cov_node.size() != 36) {
           return yaml_error("marker.cov incorrect size");
         }
-        for (int i = 0; i < cov.size(); i += 1) {
+        for (size_t i = 0; i < cov.size(); i += 1) {
           auto i_node = cov_node[i];
           if (!i_node.IsScalar()) {
             return yaml_error("marker.cov[i] failed IsScalar()");

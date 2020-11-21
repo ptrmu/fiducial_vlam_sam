@@ -151,7 +151,7 @@ namespace fiducial_vlam
       std::vector<cv::Point2f> op{};
       std::vector<cv::Point2f> ip{};
 
-      for (int i = 0; i < aruco_ids_.size(); i += 1) {
+      for (size_t i = 0; i < aruco_ids_.size(); i += 1) {
         auto id = aruco_ids_[i];
         auto object_points = cbm.to_aruco_corners_f_facade(id);
         auto image_points = aruco_corners_[i];
@@ -267,6 +267,9 @@ namespace fiducial_vlam
                                                const CameraInfoInterface &camera_info,
                                                const Map &map) override
     {
+      (void)observations;
+      (void)camera_info;
+      (void)map;
       return TransformWithCovariance{};
     }
 
@@ -346,6 +349,8 @@ namespace fiducial_vlam
 
     std::string check_completion(const rclcpp::Time &now)
     {
+      (void)now;
+
       // If the results are valid, then the user has already been notified
       if (calibration_complete_) {
         return std::string{};
@@ -506,7 +511,7 @@ namespace fiducial_vlam
       }
 
       auto &cim = cct_->get_captured_images_marked();
-      if (cim.size() < 0) {
+      if (cim.size() == 0) {
         return;
       }
 
