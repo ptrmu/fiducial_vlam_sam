@@ -187,9 +187,9 @@ namespace fiducial_vlam
         return TransformWithCovariance{};
       }
 
-      if (tvec[0] < 0) { // specific tests for bad pose determination
-        int xxx = 9;
-      }
+//      if (tvec[0] < 0) { // specific tests for bad pose determination
+//        int xxx = 9;
+//      }
 
       // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
       // camera coordinate system". In this case the map frame is the model coordinate system.

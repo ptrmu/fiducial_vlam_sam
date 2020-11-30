@@ -40,17 +40,17 @@ namespace fiducial_vlam
     bool is_fixed_{false};
 
     // Count of updates
-    int update_count_{};
+    int update_count_{1};
 
   public:
     Marker() = default;
 
     Marker(int id, TransformWithCovariance t_map_marker) :
-      id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{}
+      id_(id), t_map_marker_(std::move(t_map_marker)), corners_f_map_{}
     {}
 
     Marker(int id, TransformWithCovariance t_map_marker, std::vector<Vector3WithCovariance> &corners_f_map) :
-      id_(id), t_map_marker_(std::move(t_map_marker)), update_count_(1), corners_f_map_{corners_f_map}
+      id_(id), t_map_marker_(std::move(t_map_marker)), corners_f_map_{corners_f_map}
     {}
 
     auto id() const

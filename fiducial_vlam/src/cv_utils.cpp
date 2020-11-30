@@ -48,11 +48,11 @@ namespace fiducial_vlam
   }
 
 
-   Observations CvUtils::to_observations(const std::vector<int> &ids,
-                                      const std::vector<std::vector<cv::Point2f>> &corners)
+  Observations CvUtils::to_observations(const std::vector<int> &ids,
+                                        const std::vector<std::vector<cv::Point2f>> &corners)
   {
     Observations observations;
-    for (int i = 0; i < ids.size(); i += 1) {
+    for (size_t i = 0; i < ids.size(); i += 1) {
       observations.add(Observation(ids[i],
                                    corners[i][0].x, corners[i][0].y,
                                    corners[i][1].x, corners[i][1].y,
@@ -103,6 +103,8 @@ namespace fiducial_vlam
                                              std::vector<int> aruco_ids,
                                              cv::Scalar borderColor)
   {
+    (void) aruco_ids;
+
     // calculate colors
     cv::Scalar textColor, cornerColor;
     textColor = cornerColor = borderColor;

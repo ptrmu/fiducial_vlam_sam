@@ -28,7 +28,7 @@ pi21_tello_driver_args = [{
 }]
 
 vloc_args = [{
-    'loc_calibrate_not_loocalize' : 1,
+    'loc_calibrate_not_localize' : 1,
 }]
 
 

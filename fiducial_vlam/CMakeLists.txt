@@ -15,9 +15,15 @@ if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif ()
 
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 # Emulate colcon
 if ($ENV{CLION_IDE})
   message("Running inside CLion")
+  set(FastRTPS_INCLUDE_DIR "/opt/ros/foxy/include")
+  set(FastRTPS_LIBRARY_RELEASE "/opt/ros/foxy/lib/libfastrtps.so")
   set(fiducial_vlam_msgs_DIR "${PROJECT_SOURCE_DIR}/../../../install/fiducial_vlam_msgs/share/fiducial_vlam_msgs/cmake")
   set(ros2_shared_DIR "${PROJECT_SOURCE_DIR}/../../../install/ros2_shared/share/ros2_shared/cmake")
   set(sim_fiducial_DIR "${PROJECT_SOURCE_DIR}/../../../install/sim_fiducial/share/sim_fiducial/cmake")
@@ -105,7 +111,7 @@ set(VLOC_NODE_SOURCES
   src/map.cpp
   src/transform_with_covariance.cpp
   src/vloc_node.cpp
-  src/slam_task.cpp
+  src/gtsam_localize.cpp
   src/calibrate.cpp
   src/calibrate_capture_stationary.cpp
   src/smooth_observations.cpp
@@ -264,7 +270,7 @@ ament_export_dependencies(class_loader yaml_cpp_vendor)
 
 ament_export_include_directories(include)
 
-ament_export_interfaces(export_vloc_node export_vmap_node)
+ament_export_targets(export_vloc_node export_vmap_node)
 
 ament_export_libraries(vloc_node vmap_node)
 

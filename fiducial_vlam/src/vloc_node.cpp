@@ -24,9 +24,9 @@ namespace fiducial_vlam
 
   struct PslContext
   {
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
-    PSL_ALL_PARAMS
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
+    PAMA_PARAMS_DEFINE(PSL_ALL_PARAMS)
   };
 
 // ==============================================================================
@@ -40,6 +40,8 @@ namespace fiducial_vlam
     CvFiducialMathInterface &fm,
     const CameraInfoInterface &camera_info)
   {
+    (void) fm;
+
     // Annotate the image by drawing axes on each marker that was used for the location
     // calculation. This calculation uses the average t_map_camera and the t_map_markers
     // to figure out where the axes should be. This is different from the t_camera_marker
@@ -49,7 +51,7 @@ namespace fiducial_vlam
     auto tf_t_camera_map = t_map_camera.transform().inverse();
 
     // Loop through the ids of the markers visible in this image
-    for (int i = 0; i < t_map_markers.size(); i += 1) {
+    for (size_t i = 0; i < t_map_markers.size(); i += 1) {
       auto &t_map_marker = t_map_markers[i];
 
       if (t_map_marker.is_valid()) {
@@ -149,7 +151,7 @@ namespace fiducial_vlam
         cxt_.loc_t_camera_base_roll_, cxt_.loc_t_camera_base_pitch_, cxt_.loc_t_camera_base_yaw_});
     }
 
-    void validate_fm_parameters()
+    void validate_psl_parameters()
     {}
 
     void validate_cal_parameters()
@@ -157,60 +159,80 @@ namespace fiducial_vlam
 
     void setup_parameters()
     {
-      // Do the vloc_node parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(VLOC_ALL_PARAMS, validate_parameters)
+      /*
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), cxt_, "vloc.", LOC_ALL_PARAMS, validate_parameters)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), VLOC_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+      PAMA_PARAMS_CHANGED((*this), cxt_, "vloc.", LOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
+
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+      PAMA_PARAMS_LOG((*this), cxt_, "vloc.", LOC_ALL_PARAMS, RCLCPP_INFO)
+
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), "vloc.", LOC_ALL_PARAMS, RCLCPP_ERROR)
+
+      PAMA_SET_PARAM((*this), cxt_, "vloc.", cv3_do_corner_refinement, 0);
+*/
+
+      // Do the vloc_node parameters
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), cxt_, "", VLOC_ALL_PARAMS, validate_parameters)
+
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+      PAMA_PARAMS_CHANGED((*this), cxt_, "", VLOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
       // Do the PubSub Loc parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), psl_cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(PSL_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), psl_cxt_, "", PSL_ALL_PARAMS, validate_psl_parameters)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(psl_cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), PSL_ALL_PARAMS, validate_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+      PAMA_PARAMS_CHANGED((*this), psl_cxt_, "", PSL_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
 
       // Do the calibrate  parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOAD_PARAMETER((*this), cal_cxt_, n, t, d)
-      CXT_MACRO_INIT_PARAMETERS(CAL_ALL_PARAMS, validate_cal_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
+      PAMA_PARAMS_INIT((*this), cal_cxt_, "", CAL_ALL_PARAMS, validate_cal_parameters)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_PARAMETER_CHANGED(cal_cxt_, n, t)
-      CXT_MACRO_REGISTER_PARAMETERS_CHANGED((*this), CAL_ALL_PARAMS, validate_cal_parameters)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
+      PAMA_PARAMS_CHANGED((*this), cal_cxt_, "", CAL_ALL_PARAMS, validate_cal_parameters, RCLCPP_INFO)
 
       // Display all the parameters
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "VlocNode Parameters", VLOC_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+      PAMA_PARAMS_LOG((*this), cxt_, "", VLOC_ALL_PARAMS, RCLCPP_INFO)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(psl_cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "PubSub Loc Parameters", PSL_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+      PAMA_PARAMS_LOG((*this), psl_cxt_, "", PSL_ALL_PARAMS, RCLCPP_INFO)
 
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_LOG_SORTED_PARAMETER(cal_cxt_, n, t, d)
-      CXT_MACRO_LOG_SORTED_PARAMETERS(RCLCPP_INFO, get_logger(), "Calibrate Parameters", CAL_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
+      PAMA_PARAMS_LOG((*this), cal_cxt_, "", CAL_ALL_PARAMS, RCLCPP_INFO)
 
       // Check that all command line parameters are registered
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_CHECK_CMDLINE_PARAMETER(n, t, d)
-      CXT_MACRO_CHECK_CMDLINE_PARAMETERS((*this), VLOC_ALL_PARAMS PSL_ALL_PARAMS CAL_ALL_PARAMS)
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), "", VLOC_ALL_PARAMS PSL_ALL_PARAMS CAL_ALL_PARAMS, RCLCPP_ERROR)
     }
 
     ProcessImageInterface &pi()
     {
-      return cxt_.loc_calibrate_not_loocalize_ ? *cc_pi_ : *lc_pi_;
+      return cxt_.loc_calibrate_not_localize_ ? *cc_pi_ : *lc_pi_;
     }
 
     bool publish_captured_image_marked()
     {
-      return cxt_.loc_calibrate_not_loocalize_ &&
+      return cxt_.loc_calibrate_not_localize_ &&
              cc_pi_->calibration_complete();
     }
 
@@ -534,7 +556,7 @@ namespace fiducial_vlam
 
       if (!psl_cxt_.psl_camera_frame_id_.empty()) {
 
-        for (int i = 0; i < observations.size(); i += 1) {
+        for (size_t i = 0; i < observations.size(); i += 1) {
           auto &observation = observations.observations()[i];
           auto &t_map_camera = t_map_cameras[i];
 
@@ -565,7 +587,7 @@ namespace fiducial_vlam
 
       if (!psl_cxt_.psl_camera_frame_id_.empty()) {
 
-        for (int i = 0; i < observations.size(); i += 1) {
+        for (size_t i = 0; i < observations.size(); i += 1) {
           auto &observation = observations.observations()[i];
           auto &t_map_marker = t_map_markers[i];
 
@@ -641,10 +663,10 @@ namespace fiducial_vlam
         std::string cmd{cal_cxt_.cal_cmd_};
 
         // Reset the cmd_string in preparation for the next command.
-        CXT_MACRO_SET_PARAMETER((*this), cal_cxt_, cal_cmd, "");
+        PAMA_SET_PARAM((*this), cal_cxt_, "", cal_cmd, "");
 
         // If we are not in calibrate mode, then don't send the command.
-        if (!cxt_.loc_calibrate_not_loocalize_) {
+        if (!cxt_.loc_calibrate_not_localize_) {
           RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
 
         } else {
@@ -656,7 +678,7 @@ namespace fiducial_vlam
       }
 
       // Give the camera calibrator process some background time
-      if (cxt_.loc_calibrate_not_loocalize_) {
+      if (cxt_.loc_calibrate_not_localize_) {
         auto ret_str = cc_pi_->on_timer(time_now);
         if (!ret_str.empty()) {
           RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());

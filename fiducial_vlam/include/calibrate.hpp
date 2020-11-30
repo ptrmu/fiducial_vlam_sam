@@ -2,7 +2,7 @@
 #ifndef VLAM_CALIBRATE_HPP
 #define VLAM_CALIBRATE_HPP
 
-#include "ros2_shared/context_macros.hpp"
+#include "ros2_shared/param_macros.hpp"
 #include "fiducial_math.hpp"
 
 namespace rclcpp
@@ -21,26 +21,26 @@ namespace fiducial_vlam
 // ==============================================================================
 
 #define CAL_ALL_PARAMS \
-  CXT_MACRO_MEMBER(cal_compute_on_thread, int, 1)                 /* Do heavy-duty computation on a thread. */\
-  CXT_MACRO_MEMBER(cal_calibration_style_to_save, int, 4)         /* The calibration style to save. */\
-  CXT_MACRO_MEMBER(cal_save_files_path, std::string, "cal_files") /* path to file to store calibration in. */\
-  CXT_MACRO_MEMBER(cal_camera_name, std::string, "Calibrated Camera") /* Name of the calibrated camera. */\
-  CXT_MACRO_MEMBER(cal_cmd, std::string, "")                      /* Calibrate command. */\
-  CXT_MACRO_MEMBER(cal_aruco_dictionary_id, int, 5)               /* dictionary id of aruco markers on the charuco calibration target  */ \
-  CXT_MACRO_MEMBER(cal_squares_x, int, 12)                        /* number of squares in the x direction on the charuco board  */ \
-  CXT_MACRO_MEMBER(cal_squares_y, int, 9)                         /* number of squares in the y direction on the charuco board  */ \
-  CXT_MACRO_MEMBER(cal_square_length, float, 0.060)               /* length of a square on the charuco board  */ \
-  CXT_MACRO_MEMBER(cal_upper_left_white_not_black, int, 0)        /* upper_left_white_not_black  */ \
-  CXT_MACRO_MEMBER(cal_marker_length, float, 0.0450)              /* length of a marker on the charuco board  */ \
-  CXT_MACRO_MEMBER(cal_stationary_capture_ms, int, 0)             /* Duration that calibration target needs to be stationary. 0 => infinite */ \
-  CXT_MACRO_MEMBER(cal_bootstrap_reserve_fraction, double, 0.2)   /* % of calibration images to reserve for bootstrap validation */ \
+  PAMA_PARAM(cal_compute_on_thread, int, 1)                 /* Do heavy-duty computation on a thread. */\
+  PAMA_PARAM(cal_calibration_style_to_save, int, 4)         /* The calibration style to save. */\
+  PAMA_PARAM(cal_save_files_path, std::string, "cal_files") /* path to file to store calibration in. */\
+  PAMA_PARAM(cal_camera_name, std::string, "Calibrated Camera") /* Name of the calibrated camera. */\
+  PAMA_PARAM(cal_cmd, std::string, "")                      /* Calibrate command. */\
+  PAMA_PARAM(cal_aruco_dictionary_id, int, 5)               /* dictionary id of aruco markers on the charuco calibration target  */ \
+  PAMA_PARAM(cal_squares_x, int, 12)                        /* number of squares in the x direction on the charuco board  */ \
+  PAMA_PARAM(cal_squares_y, int, 9)                         /* number of squares in the y direction on the charuco board  */ \
+  PAMA_PARAM(cal_square_length, float, 0.060)               /* length of a square on the charuco board  */ \
+  PAMA_PARAM(cal_upper_left_white_not_black, int, 0)        /* upper_left_white_not_black  */ \
+  PAMA_PARAM(cal_marker_length, float, 0.0450)              /* length of a marker on the charuco board  */ \
+  PAMA_PARAM(cal_stationary_capture_ms, int, 0)             /* Duration that calibration target needs to be stationary. 0 => infinite */ \
+  PAMA_PARAM(cal_bootstrap_reserve_fraction, double, 0.2)   /* % of calibration images to reserve for bootstrap validation */ \
  /* End of list */
 
   struct CalibrateContext
   {
-#undef CXT_MACRO_MEMBER
-#define CXT_MACRO_MEMBER(n, t, d) CXT_MACRO_DEFINE_MEMBER(n, t, d)
-    CAL_ALL_PARAMS
+#undef PAMA_PARAM
+#define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
+    PAMA_PARAMS_DEFINE(CAL_ALL_PARAMS)
   };
 
   std::string get_camera_info_file_name(const CalibrateContext &cal_cxt); //
