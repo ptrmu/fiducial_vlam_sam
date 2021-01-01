@@ -23,18 +23,19 @@ corner_measurement_sigma = 2.0
 
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
+    'loc_camera_sam_not_cv': 1,
+    'loc_cv4_corner_refinement_method': 2,
+    'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_publish_tfs': 1,  # Publish drone and camera /tf
     'psl_stamp_msgs_with_current_time': 1,  # Stamp with now()
-    'map_init_pose_z': 0,
     'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_sub_image_raw_best_effort_not_reliable': 1,
     'psl_publish_camera_tf_per_marker': 0,
     'psl_publish_image_marked': 1,
     'psl_camera_frame_id': 'forward_camera',
     'psl_publish_base_pose': 1,
     'psl_publish_camera_odom': 1,
     'psl_publish_base_odom': 1,
-    'cv4_corner_refinement_method': 2,
-    'loc_camera_sam_not_cv': 1,
 }]
 
 vmap_args = [{
@@ -63,14 +64,14 @@ def generate_launch_description():
         # Node(package='joy', node_executable='joy_node', output='screen'),
 
         # Add forward-facing camera to the simulation
+        # Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
+        #      arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
         Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
-             arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
-        # Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
-        #      arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
+             arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
-             parameters=vloc_args, node_namespace='forward_camera'),
-        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+             parameters=vloc_args, namespace='forward_camera'),
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]
 

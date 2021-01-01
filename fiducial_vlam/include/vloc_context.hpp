@@ -39,6 +39,7 @@ namespace fiducial_vlam
  /* Mssages for vLocnode options */\
   PAMA_PARAM(psl_stamp_msgs_with_current_time, int, 0)    /* non-zero => debug mode, helpful for dealing with rviz when playing bags.  */\
   PAMA_PARAM(psl_sub_camera_info_best_effort_not_reliable, int, 1) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */\
+  PAMA_PARAM(psl_sub_image_raw_best_effort_not_reliable, int, 1) /* subscribe to image_ros message with best_effort (gazebo camera) not reliable (tello_ros) */\
   /* Subscription topics */\
   PAMA_PARAM(psl_fiducial_map_sub_topic, std::string, "/fiducial_map")/* topic for subscription to fiducial_vlam_msgs::msg::Map  */\
   PAMA_PARAM(psl_camera_info_sub_topic, std::string, "camera_info")   /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  */\

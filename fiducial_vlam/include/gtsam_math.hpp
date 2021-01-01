@@ -157,7 +157,7 @@ namespace fiducial_vlam
       gtsam::Matrix23 d_point2_wrt_point3;
 
       // Transform the point from the Marker frame to the World frame
-      gtsam::Point3 point_f_world = marker_f_world.transform_from(
+      gtsam::Point3 point_f_world = marker_f_world.transformFrom(
         point_f_marker_,
         H1 ? gtsam::OptionalJacobian<3, 6>(d_point3_wrt_pose3) : boost::none);
 

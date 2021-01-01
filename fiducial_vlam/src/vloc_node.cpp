@@ -1,5 +1,7 @@
 
 #include <iomanip>
+#include <iostream>
+#include <fstream>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -110,6 +112,92 @@ namespace fiducial_vlam
                                                                             CvFiducialMathInterface &fm)
   {
     return std::make_unique<LocalizeCameraProcessImageImpl>(cxt, fm);
+  }
+
+
+  static void save_observations(const rclcpp::Time &time_stamp,
+                                const Observations &observations,
+                                const sensor_msgs::msg::CameraInfo &camera_info_msg)
+  {
+    double marker_length = 0.21;
+    auto k = camera_info_msg.k;
+    auto d = camera_info_msg.d;
+    auto camera_info{make_camera_info(camera_info_msg)};
+    std::stringstream ss{};
+    ss.precision(12);
+    ss << std::scientific
+       << "{ \"stamp\": " << int((time_stamp.seconds() - 1606886000.) * 1000) << ",\n"
+       << "\"camera_info\": {"
+       << "\"height\": " << int(camera_info_msg.height) << ","
+       << "\"width\": " << int(camera_info_msg.width) << ",\n"
+       << "  \"K\": [" << k[0] << "," << k[1] << "," << k[2] << "," << k[3] << "," << k[4]
+       << "," << k[5] << "," << k[6] << "," << k[7] << "," << k[8] << "],\n"
+       << "  \"D\": [" << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4] << "]},\n"
+       << "\"observations\": [\n";
+
+    bool first_record = true;
+    for (auto &observation : observations.observations()) {
+      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
+      auto mu = t_camera_marker.mu();
+      ss << (first_record ? "  {" : ", {")
+         << "\"id\": " << observation.id() << ",\n"
+         << "  \"corners_f_image\": ["
+         << "[" << observation.x0() << "," << observation.y0() << "],"
+         << "[" << observation.x1() << "," << observation.y1() << "],"
+         << "[" << observation.x2() << "," << observation.y2() << "],"
+         << "[" << observation.x3() << "," << observation.y3() << "]"
+         << "],\n"
+         << "  \"marker_f_camera\": [" << mu[0] << "," << mu[1] << ","
+         << mu[2] << "," << mu[3] << "," << mu[4] << "," << mu[5] << "]"
+         << "}\n";
+      first_record = false;
+    }
+
+    ss << "]}";
+
+//    std::cout << ss.str() << std::endl;
+
+//    cv::FileStorage fs("obs", cv::FileStorage::WRITE | cv::FileStorage::MEMORY | cv::FileStorage::FORMAT_JSON);
+//
+//    fs << "stamp" << int((time_stamp.seconds() - 1606886000.) * 1000)
+//       << "camera_info" << "{:"
+//       << "height" << int(camera_info_msg.height)
+//       << "width" << int(camera_info_msg.width)
+//       << "K" << "[" << k[0] << k[1] << k[2] << k[3] << k[4] << k[5] << k[6] << k[7] << k[8] << "]"
+//       << "D" << "[" << d[0] << d[1] << d[2] << d[3] << d[4] << "]"
+//       << "}"
+//       << "observations" << "[";
+//
+//    for (auto &observation : observations.observations()) {
+//      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
+//      auto mu = t_camera_marker.mu();
+//      fs << "{:"
+//         << "id" << observation.id()
+//         << "corners_f_image" << "["
+//         << "[" << observation.x0() << observation.y0() << "]"
+//         << "[" << observation.x1() << observation.y1() << "]"
+//         << "[" << observation.x2() << observation.y2() << "]"
+//         << "[" << observation.x3() << observation.y3() << "]"
+//         << "]"
+//         << "marker_f_camera" << "[" << mu[0] << mu[1] << mu[2] << mu[3] << mu[4] << mu[5] << "]"
+//         << "}";
+//    }
+//
+//    fs << "]";
+//    auto s = fs.releaseAndGetString();
+//    std::cout << s << std::endl;
+
+    static bool inited = false;
+    std::ofstream os("observations.json", std::ios::out | (inited ? std::ios::app : std::ios::trunc));
+    if (!inited) {
+      os << "{\"measurements\": [\n";
+    } else {
+      os << ",\n";
+    }
+    os << ss.str();
+    inited = true;
+
+    // Add "]}" to end of file to properly terminate the file.
   }
 
 // ==============================================================================
@@ -281,7 +369,7 @@ namespace fiducial_vlam
 
       // ROS subscriptions
       auto camera_info_qos = psl_cxt_.psl_sub_camera_info_best_effort_not_reliable_ ?
-                             rclcpp::QoS{rclcpp::SensorDataQoS()} :
+                             rclcpp::QoS{rclcpp::SensorDataQoS(rclcpp::KeepLast(1))} :
                              rclcpp::QoS{rclcpp::ServicesQoS()};
       camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
         psl_cxt_.psl_camera_info_sub_topic_,
@@ -293,9 +381,12 @@ namespace fiducial_vlam
           camera_info_msg_ = std::move(msg);
         });
 
+      auto image_raw_qos = psl_cxt_.psl_sub_image_raw_best_effort_not_reliable_ ?
+                           rclcpp::QoS{rclcpp::SensorDataQoS(rclcpp::KeepLast(1))} :
+                           rclcpp::QoS{rclcpp::ServicesQoS()};
       image_raw_sub_ = create_subscription<sensor_msgs::msg::Image>(
         psl_cxt_.psl_image_raw_sub_topic_,
-        rclcpp::ServicesQoS(rclcpp::KeepLast(1)),
+        image_raw_qos,
         [this](sensor_msgs::msg::Image::UniquePtr msg) -> void
         {
 #undef SHOW_ADDRESS
@@ -414,6 +505,8 @@ namespace fiducial_vlam
         auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg);
         observations_pub_->publish(observations_msg);
       }
+
+      save_observations(time_stamp, observations, *camera_info_msg);
 
       // Debugging hint: If the markers in color_marked are not outlined
       // in green, then they haven't been detected. If the markers in

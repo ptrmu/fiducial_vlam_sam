@@ -19,11 +19,11 @@ print ("rviz_config_filename: ", rviz_config_filename)
 
 
 tello_ros_args = [{
-    'drone_ip': '192.168.0.30',
-    'command_port': '11002',
-    'drone_port': '8889',
-    'data_port': '13002',
-    'video_port': '14002'
+    'drone_ip': '192.168.0.35',
+    'command_port': 38065,
+    'drone_port': 8889,
+    'data_port': 8890,
+    'video_port': 11111
 }]
 
 vloc_args = [{
@@ -52,12 +52,12 @@ def generate_launch_description():
     entities = [
         ExecuteProcess(cmd=['rviz2', '-d', rviz_config_filename], output='screen'),
 
-        Node(package='tello_driver', node_executable='tello_driver', output='screen',
+        Node(package='tello_driver', executable='tello_driver_main', output='screen',
              parameters=tello_ros_args),
 
-        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
              parameters=vloc_args),
-        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),
 
     ]

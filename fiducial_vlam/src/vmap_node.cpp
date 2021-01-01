@@ -1,10 +1,14 @@
 
 #include <chrono>
+#include <iostream>
+#include <iomanip>
+#include <fstream>
 
 #include "rclcpp/rclcpp.hpp"
 
 #include "cv_utils.hpp"
 #include "fiducial_math.hpp"
+#include "logger_ros2.hpp"
 #include "map.hpp"
 #include "observation.hpp"
 #include "vmap_context.hpp"
@@ -14,9 +18,6 @@
 #include "visualization_msgs/msg/marker_array.hpp"
 #include "yaml-cpp/yaml.h"
 
-#include <iostream>
-#include <iomanip>
-#include <fstream>
 
 namespace fiducial_vlam
 {
@@ -296,8 +297,11 @@ namespace fiducial_vlam
 
   class VmapNode : public rclcpp::Node
   {
+    LoggerRos2 logger_;
+
     VmapContext cxt_{};
     PsmContext psm_cxt_{};
+
     std::unique_ptr<BuildMarkerMapInterface> build_marker_map_{};
 
     std::unique_ptr<Map> map_{}; // Map that gets updated and published.
@@ -338,7 +342,7 @@ namespace fiducial_vlam
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
-        PAMA_PARAMS_CHANGED((*this), cxt_, "", VMAP_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), cxt_, "", VMAP_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
       // Do PubSub Map parameters
 #undef PAMA_PARAM
@@ -347,7 +351,7 @@ namespace fiducial_vlam
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
-        PAMA_PARAMS_CHANGED((*this), psm_cxt_, "", PSM_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), psm_cxt_, "", PSM_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
       // Display all the parameters
 #undef PAMA_PARAM
@@ -356,7 +360,7 @@ namespace fiducial_vlam
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
-        PAMA_PARAMS_LOG((*this), psm_cxt_, "", PSM_ALL_PARAMS, RCLCPP_INFO)
+      PAMA_PARAMS_LOG((*this), psm_cxt_, "", PSM_ALL_PARAMS, RCLCPP_INFO)
 
       // Check that all command line parameters are defined
 #undef PAMA_PARAM
@@ -392,6 +396,7 @@ namespace fiducial_vlam
   public:
     explicit VmapNode(const rclcpp::NodeOptions &options) :
       Node{"vmap_node", options},
+      logger_{*this},
       exit_build_map_time_{now()}
     {
       // Get parameters from the command line
@@ -423,12 +428,13 @@ namespace fiducial_vlam
 
       (void) observations_sub_;
       (void) map_pub_timer_;
-      RCLCPP_INFO(get_logger(), "To build a map of markers - set map_cmd parameter.");
-      RCLCPP_INFO(get_logger(), "  map_cmd start - Start capturing and incrementally processing images to build a map of markers.");
-      RCLCPP_INFO(get_logger(), "  map_cmd stop - Stop capturing images but continue processing images already captured.");
-      RCLCPP_INFO(get_logger(), "  map_cmd continue - Continue capturing images and processing them.");
-      RCLCPP_INFO(get_logger(), "  map_cmd done - Stop capturing and processing images. The last finished map is saved and the map building state is cleared.");
-      RCLCPP_INFO(get_logger(), "vmap_node ready");
+      logger_.info()
+        << "To build a map of markers - set map_cmd parameter." << std::endl
+        << "  map_cmd start - Start capturing and incrementally processing images to build a map of markers.\n"
+        << "  map_cmd stop - Stop capturing images but continue processing images already captured.\n"
+        << "  map_cmd continue - Continue capturing images and processing them.\n"
+        << "  map_cmd done - Stop capturing and processing images. The last finished map is saved and the map building state is cleared.";
+      logger_.info() << "vmap_node ready.";
     }
 
   private:

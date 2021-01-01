@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.15)
 project(fiducial_vlam)
 
 #=============
@@ -10,13 +10,13 @@ if (NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
 endif ()
 
-# Default to C++14
+# Default to C++17
 if (NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif ()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wpedantic  -Wno-unknown-pragmas)
 endif()
 
 # Emulate colcon
@@ -171,14 +171,19 @@ endif ()
 #=============
 
 set(VMAP_NODE_SOURCES
+  src/fvlam/build_marker_map_tmm.cpp
+  src/fvlam/conversions_cv.cpp
+  src/fvlam/conversions_gtsam.cpp
+  src/fvlam/to_string.cpp
+  src/fvlam/transform3_with_covariance.cpp
   src/convert_util.cpp
+  src/cv_utils.cpp
   src/fiducial_math.cpp
   src/map.cpp
+  src/slam_task.cpp
   src/transform_with_covariance.cpp
   src/vmap_main.cpp
   src/vmap_node.cpp
-  src/slam_task.cpp
-  src/cv_utils.cpp
   )
 
 set(VMAP_NODE_DEPS

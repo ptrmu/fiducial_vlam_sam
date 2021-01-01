@@ -13,18 +13,18 @@ package_cfg_directory = os.path.join(package_share_directory, 'cfg')
 
 pi30_tello_driver_args = [{
     'drone_ip': '192.168.0.30',
-    'command_port': '11002',
-    'drone_port': '8889',
-    'data_port': '13002',
-    'video_port': '14002'
+    'command_port': 11002,
+    'drone_port': 8889,
+    'data_port': 13002,
+    'video_port': 14002
 }]
 
-pi21_tello_driver_args = [{
-    'drone_ip': '192.168.0.21',
-    'command_port': '38065',
-    'drone_port': '8889',
-    'data_port': '8890',
-    'video_port': '11111'
+pi35_tello_driver_args = [{
+    'drone_ip': '192.168.0.35',
+    'command_port': 38065,
+    'drone_port': 8889,
+    'data_port': 8890,
+    'video_port': 11111
 }]
 
 vloc_args = [{
@@ -36,7 +36,7 @@ def generate_launch_description():
 
     entities = [
         Node(package='tello_driver', node_executable='tello_driver_main', output='screen',
-             parameters=pi21_tello_driver_args),
+             parameters=pi35_tello_driver_args),
 
         Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
              parameters=vloc_args),
