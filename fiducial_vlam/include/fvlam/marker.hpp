@@ -7,12 +7,14 @@
 #include <map>
 #include <vector>
 
+#include <Eigen/Geometry>
 #include "fvlam/observation.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
-#include <Eigen/Geometry>
 
 namespace fvlam
 {
+  class Logger;
+
 // ==============================================================================
 // Marker class
 // ==============================================================================
@@ -103,10 +105,13 @@ namespace fvlam
     { return t_world_marker_; }
 
     template<class T>
-    static Marker from(const T &other);
+    static Marker from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string(bool also_cov = false) const; //
     std::string to_id_string() const; //
@@ -172,10 +177,13 @@ namespace fvlam
     { return marker_length_; }
 
     template<class T>
-    static Translate3 from(const T &other);
+    static MarkerMap from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string(bool also_cov = false) const;
 
@@ -195,5 +203,8 @@ namespace fvlam
     {
       markers_.emplace(marker.id(), std::move(marker));
     }
+
+    void save(const std::string filename, Logger &logger) const; //
+    static MarkerMap load(const std::string filename, Logger &logger); //
   };
 }

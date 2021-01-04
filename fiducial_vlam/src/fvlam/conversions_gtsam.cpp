@@ -16,7 +16,7 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  Translate2 Translate2::from<gtsam::Vector2>(const gtsam::Vector2 &other)
+  Translate2 Translate2::from<gtsam::Vector2>(gtsam::Vector2 &other)
   {
     return Translate2{other};
   }
@@ -28,7 +28,13 @@ namespace fvlam
   }
 
   template<>
-  Translate3 Translate3::from<gtsam::Vector3>(const gtsam::Vector3 &other)
+  Translate3 Translate3::from<gtsam::Vector3>(gtsam::Vector3 &other)
+  {
+    return Translate3{other};
+  }
+
+  template<>
+  Translate3 Translate3::from<gtsam::Vector3 const>(gtsam::Vector3 const &other)
   {
     return Translate3{other};
   }
@@ -40,7 +46,13 @@ namespace fvlam
   }
 
   template<>
-  Rotate3 Rotate3::from<gtsam::Rot3>(const gtsam::Rot3 &other)
+  Rotate3 Rotate3::from<gtsam::Rot3>(gtsam::Rot3 &other)
+  {
+    return Rotate3{other.matrix()};
+  }
+
+  template<>
+  Rotate3 Rotate3::from<gtsam::Rot3 const>(gtsam::Rot3 const &other)
   {
     return Rotate3{other.matrix()};
   }
@@ -52,7 +64,13 @@ namespace fvlam
   }
 
   template<>
-  Transform3 Transform3::from<gtsam::Pose3>(const gtsam::Pose3 &other)
+  Transform3 Transform3::from<const gtsam::Pose3>(const gtsam::Pose3 &other)
+  {
+    return Transform3{Rotate3::from(other.rotation()), Translate3::from(other.translation())};
+  }
+
+  template<>
+  Transform3 Transform3::from<gtsam::Pose3>(gtsam::Pose3 &other)
   {
     return Transform3{Rotate3::from(other.rotation()), Translate3::from(other.translation())};
   }
@@ -67,8 +85,19 @@ namespace fvlam
 // from fvlam/camera_info.hpp
 // ==============================================================================
 
- template<>
-  CameraInfo CameraInfo::from<gtsam::Cal3DS2>(const gtsam::Cal3DS2 &other)
+  template<>
+  CameraInfo CameraInfo::from<const gtsam::Cal3DS2>(const gtsam::Cal3DS2 &other)
+  {
+    return CameraInfo{other.fx(), other.fy(),
+                      other.skew(),
+                      other.px(), other.py(),
+                      other.k1(), other.k2(),
+                      other.p1(), other.p2(),
+                      0.0};
+  }
+
+  template<>
+  CameraInfo CameraInfo::from<gtsam::Cal3DS2>(gtsam::Cal3DS2 &other)
   {
     return CameraInfo{other.fx(), other.fy(),
                       other.skew(),
@@ -154,7 +183,7 @@ namespace fvlam
           }
 
 
-          corners_f_image[i]= Translate2::from(corner_f_image);
+          corners_f_image[i] = Translate2::from(corner_f_image);
         }
 
           // If the point can't be projected, then don't save any of the points. This

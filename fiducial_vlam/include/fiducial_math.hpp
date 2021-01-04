@@ -22,8 +22,8 @@ namespace fiducial_vlam
   class Observations; //
   class TransformWithCovariance; //
   class Map; //
-  class VlocContext; //
-  class VmapContext; //
+  struct VlocContext; //
+  struct VmapContext; //
   class SmoothObservationsInterface; //
 
 // ==============================================================================

@@ -49,10 +49,13 @@ namespace fvlam
     { return t_; }
 
     template<class T>
-    static Translate2 from(const T &other);
+    static Translate2 from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const;
 
@@ -108,10 +111,13 @@ namespace fvlam
     { return t_; }
 
     template<class T>
-    static Translate3 from(const T &other);
+    static Translate3 from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const; //
     static std::string to_cov_string(const CovarianceMatrix &cov); //
@@ -180,10 +186,13 @@ namespace fvlam
     { return cov_; }
 
     template<class T>
-    static Translate3WithCovariance from(const T &other);
+    static Translate3WithCovariance from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const;
   };
@@ -247,10 +256,13 @@ namespace fvlam
     { return xyz(); }
 
     template<class T>
-    static Rotate3 from(const T &other);
+    static Rotate3 from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const;
 
@@ -360,13 +372,16 @@ namespace fvlam
     { return (MuVector() << r_.mu(), t_.mu()).finished(); }
 
     template<class T>
-    static Transform3 from(const T &other);
+    static Transform3 from(T &other);
 
     template<class T>
     T to() const;
 
     template<class T>
-    static CovarianceMatrix cov_from(const T &other);
+    void to(T &other) const;
+
+    template<class T>
+    static CovarianceMatrix cov_from(T &other);
 
     template<class T>
     static T cov_to(const CovarianceMatrix &cov);
@@ -458,10 +473,13 @@ namespace fvlam
     { return tf_.id(); }
 
     template<class T>
-    static Transform3WithCovariance from(const T &other);
+    static Transform3WithCovariance from(T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const;
   };

@@ -1,20 +1,20 @@
 #pragma ide diagnostic ignored "modernize-use-nodiscard"
 
 #include <memory>
-#include <fvlam/camera_info.hpp>
 
 #include "fvlam/build_marker_map_interface.hpp"
+#include "fvlam/camera_info.hpp"
 #include "fvlam/marker.hpp"
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/sfm/ShonanAveraging.h>
 #include <gtsam/slam/InitializePose3.h>
-#include "opencv2/calib3d/calib3d.hpp"
+#include <opencv2/calib3d/calib3d.hpp>
 
 namespace fvlam
 {
-  class BuildMarkerMapShonan : public BuildMarkerMapInterface
+  class BuildMarkerMapTmm : public BuildMarkerMapInterface
   {
     constexpr static std::uint64_t JointID_id0(std::uint64_t id)
     { return id / 1000000L; }; //
@@ -29,7 +29,7 @@ namespace fvlam
     const fvlam::Marker fixed_marker_;
 
     std::map<std::uint64_t, std::unique_ptr<SolveTMarker0Marker1Interface>> solve_tmm_map_;
-    BuildMarkerMapTmmContext::Error error_;
+    BuildMarkerMapTmmContext::BuildError error_;
 
     static fvlam::Marker find_fixed_marker(const MarkerMap &map)
     {
@@ -42,8 +42,8 @@ namespace fvlam
     }
 
     static Eigen::Vector3d minimum_sigma(Eigen::Vector3d sigmas,
-                                  double minimum,
-                                  bool isotropic)
+                                         double minimum,
+                                         bool isotropic)
     {
       if (isotropic) {
         auto sigma_max = sigmas.maxCoeff();
@@ -139,9 +139,7 @@ namespace fvlam
       gtsam::ShonanAveraging3 shonan(shonan_measurements);
       auto shonan_initial = shonan.initializeRandomly();
       auto shonan_result = shonan.run(shonan_initial);
-
-      error_.shonan_error = shonan_result.second;
-      logger_.info() << "error of Shonan Averaging " << shonan_result.second << std::endl;
+      error_.shonan_error_ = shonan_result.second;
 
       // Find the rotation that the shonan algorithm returned for the fixed
       // marker. Then figure out the delta rotation to rotate that shonan
@@ -155,7 +153,6 @@ namespace fvlam
           break;
         }
       }
-
 
       // Upgrade rotations in initial_poses
       for (const auto &key_value : shonan_result.first) {
@@ -225,16 +222,16 @@ namespace fvlam
         t_sum /= n;
       }
 
-      error_.r_remeasure_error = r_sum;
-      error_.t_remeasure_error = t_sum;
+      error_.r_remeasure_error_ = r_sum;
+      error_.t_remeasure_error_ = t_sum;
     }
 
   public:
-    BuildMarkerMapShonan() = delete;
+    BuildMarkerMapTmm() = delete;
 
-    BuildMarkerMapShonan(BuildMarkerMapTmmContext tmm_context,
-                         Logger &logger,
-                         const MarkerMap &map_initial) :
+    BuildMarkerMapTmm(BuildMarkerMapTmmContext tmm_context,
+                      Logger &logger,
+                      const MarkerMap &map_initial) :
       tmm_context_{std::move(tmm_context)},
       logger_{logger},
       marker_length_{map_initial.marker_length()},
@@ -292,11 +289,11 @@ namespace fvlam
 
       gtsam::GaussNewtonOptimizer optimizer(pose_graph, pose_initial, params);
       auto pose_result = optimizer.optimize();
-      error_.nonlinear_optimization_error = pose_graph.error(pose_result);
-      logger_.info() << "Non-linear optimization error = " << error_.nonlinear_optimization_error << std::endl;
+      error_.nonlinear_optimization_error_ = pose_graph.error(pose_result);
 
       auto built_map = load_map(pose_graph, pose_result);
       calc_remeasure_error(*built_map);
+      error_.valid_ = true; // Mark this error structure as having valid data.
       return built_map;
     }
 
@@ -310,16 +307,24 @@ namespace fvlam
     Logger &logger,
     const MarkerMap &map_initial)
   {
-    return std::make_unique<BuildMarkerMapShonan>(tmm_context, logger, map_initial);
+    return std::make_unique<BuildMarkerMapTmm>(tmm_context, logger, map_initial);
   }
 
-  BuildMarkerMapTmmContext::Error BuildMarkerMapTmmContext::get_error(
-    const BuildMarkerMapInterface &Bmm,
+  BuildMarkerMapTmmContext::BuildError BuildMarkerMapTmmContext::BuildError::from(
+    const BuildMarkerMapInterface &bmm_interface,
     const MarkerMap &built_map)
   {
     (void) built_map;
-    auto bmm_tmm = dynamic_cast<const BuildMarkerMapShonan *>(&Bmm);
-    return bmm_tmm != nullptr ? bmm_tmm->error() : BuildMarkerMapTmmContext::Error{};
+    auto bmm_tmm = dynamic_cast<const BuildMarkerMapTmm *>(&bmm_interface);
+    return bmm_tmm != nullptr ? bmm_tmm->error() : BuildMarkerMapTmmContext::BuildError{};
+  }
+
+  std::string BuildMarkerMapTmmContext::BuildError::to_string() const
+  {
+    return std::string{"shonan error:"} + std::to_string(shonan_error_) +
+           " non-linear error:" + std::to_string(nonlinear_optimization_error_) +
+           " remeasure error r:" + std::to_string(r_remeasure_error_) +
+           " t:" + std::to_string(t_remeasure_error_);
   }
 
 // ==============================================================================
@@ -350,7 +355,7 @@ namespace fvlam
       auto t_camera_marker0 = solve_t_camera_marker_function(observation0).t_world_marker().tf();
       auto t_camera_marker1 = solve_t_camera_marker_function(observation1).t_world_marker().tf();
       auto t_marker0_marker1 = t_camera_marker0.inverse() * t_camera_marker1;
-      if (solve_tmm_context_.average_on_space_not_manifold) {
+      if (solve_tmm_context_.average_on_space_not_manifold_) {
         emac_algebra_.accumulate(t_marker0_marker1);
       } else {
         emac_group_.accumulate(t_marker0_marker1.mu());
@@ -361,8 +366,8 @@ namespace fvlam
     Transform3WithCovariance t_marker0_marker1() override
     {
       return Transform3WithCovariance{
-        solve_tmm_context_.average_on_space_not_manifold ? emac_algebra_.mean() : Transform3(emac_group_.mean()),
-        solve_tmm_context_.average_on_space_not_manifold ? emac_algebra_.cov() : emac_group_.cov()};
+        solve_tmm_context_.average_on_space_not_manifold_ ? emac_algebra_.mean() : Transform3(emac_group_.mean()),
+        solve_tmm_context_.average_on_space_not_manifold_ ? emac_algebra_.cov() : emac_group_.cov()};
     }
   };
 

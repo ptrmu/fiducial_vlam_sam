@@ -174,9 +174,11 @@ set(VMAP_NODE_SOURCES
   src/fvlam/build_marker_map_tmm.cpp
   src/fvlam/conversions_cv.cpp
   src/fvlam/conversions_gtsam.cpp
+  src/fvlam/file_storage.cpp
   src/fvlam/to_string.cpp
   src/fvlam/transform3_with_covariance.cpp
   src/convert_util.cpp
+  src/conversions_ros2.cpp
   src/cv_utils.cpp
   src/fiducial_math.cpp
   src/map.cpp

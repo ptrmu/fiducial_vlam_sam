@@ -78,13 +78,16 @@ namespace fvlam
     { return corners_f_image_; }
 
     template<class T>
-    static Observation from(const T &other);
+    static Observation from(T &other);
 
     template<class T>
-    static Observation from(std::uint64_t id, const T &other);
+    static Observation from(std::uint64_t id, T &other);
 
     template<class T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     std::string to_string() const;
   };
@@ -112,10 +115,13 @@ namespace fvlam
     { return observations_.size(); }
 
     template<typename T>
-    static Observations from(const T &other);
+    static Observations from(T &other);
 
     template<typename T>
     T to() const;
+
+    template<class T>
+    void to(T &other) const;
 
     void add(const Observation &observation)
     {

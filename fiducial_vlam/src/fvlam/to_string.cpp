@@ -136,10 +136,12 @@ namespace fvlam
   std::string MarkerMap::to_string(bool also_cov) const
   {
     std::stringstream ss{};
+    bool first{true};
 
     // Assume a map keeps items sorted
     for (auto it = markers_.begin(); it != markers_.end(); ++it) {
-      ss << "marker id:" << it->second.to_string(also_cov) << std::endl;
+      ss << (first ? "" : "\n") << "marker id:" << it->second.to_string(also_cov);
+      first = false;
     }
 
     return ss.str();

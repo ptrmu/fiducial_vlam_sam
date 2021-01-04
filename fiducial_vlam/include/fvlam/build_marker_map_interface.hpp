@@ -77,18 +77,18 @@ namespace fvlam
       mm_between_factor_noise_fixed_sigma_t_{mm_between_factor_noise_fixed_sigma_t}
     {}
 
-    template<class T>
-    static Transform3 from(const T &other);
-
-    struct Error
+    struct BuildError
     {
-      double r_remeasure_error{0};
-      double t_remeasure_error{0};
-      double nonlinear_optimization_error{0};
-      double shonan_error{0};
-    };
+      bool valid_{false};
+      double r_remeasure_error_{0};
+      double t_remeasure_error_{0};
+      double nonlinear_optimization_error_{0};
+      double shonan_error_{0};
 
-    static Error get_error(const BuildMarkerMapInterface &Bmm, const MarkerMap &built_map);
+      static BuildError from(const BuildMarkerMapInterface &bmm_interface, const MarkerMap &built_map);
+
+      std::string to_string() const;
+    };
   };
 
 // ==============================================================================
@@ -124,7 +124,11 @@ namespace fvlam
   // on the SE3 manifold or the se3 tangent space
   struct SolveTmmContextCvSolvePnp
   {
-    bool average_on_space_not_manifold{true};
+    bool average_on_space_not_manifold_{true};
+
+    explicit SolveTmmContextCvSolvePnp(bool average_on_space_not_manifold) :
+      average_on_space_not_manifold_{average_on_space_not_manifold}
+    {}
   };
 
 // ==============================================================================

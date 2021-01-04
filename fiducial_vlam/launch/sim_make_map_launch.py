@@ -12,7 +12,7 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-world_name = "circle_of_markers"
+world_name = "dense_circle_of_markers"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
 existing_map_filename = os.path.join(worlds_directory, world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
@@ -23,7 +23,7 @@ corner_measurement_sigma = 2.0
 
 vloc_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'loc_camera_sam_not_cv': 1,
+    'loc_camera_sam_not_cv': 0,
     'loc_cv4_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_publish_tfs': 1,  # Publish drone and camera /tf
@@ -40,13 +40,12 @@ vloc_args = [{
 
 vmap_args = [{
     'use_sim_time': False,  # Don't use /clock
-    'psm_publish_tfs': 1,  # Publish marker /tf
     'map_marker_length': 0.1775,  # Marker length
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
     'map_skip_images': 3,
-    'map_cmd': 'none',
+    'map_cmd': '',
 }]
 
 
@@ -66,7 +65,7 @@ def generate_launch_description():
         # Add forward-facing camera to the simulation
         # Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
         #      arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
-        Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
+        Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
              arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
         Node(package='fiducial_vlam', executable='vloc_main', output='screen',
