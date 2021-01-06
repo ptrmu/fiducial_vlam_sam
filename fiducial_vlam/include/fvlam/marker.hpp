@@ -149,9 +149,9 @@ namespace fvlam
                                               const Transform3 &t_world_camera,
                                               double marker_length);
 
-    template<class TCameraCalibration>
-    static SolveMarkerMarkerFunction solve_t_marker0_marker1(const TCameraCalibration &camera_calibration,
-                                                             double marker_length);
+//    template<class TCameraCalibration>
+//    static SolveMarkerMarkerFunction solve_t_marker0_marker1(const TCameraCalibration &camera_calibration,
+//                                                             double marker_length);
   };
 
 // ==============================================================================

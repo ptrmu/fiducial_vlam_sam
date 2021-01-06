@@ -19,10 +19,18 @@ namespace fvlam
 // ==============================================================================
 
   template<>
+  Transform3 Transform3::from<tf2::Transform>(tf2::Transform &other)
+  {
+    auto q = other.getRotation();
+    auto t = other.getOrigin();
+    return Transform3{Rotate3{Rotate3::Derived{q.w(), q.x(), q.y(), q.z()}}, Translate3{t.x(), t.y(), t.x()}};
+  }
+
+  template<>
   tf2::Transform Transform3::to<tf2::Transform>() const
   {
     tf2::Quaternion q{r_.q().x(), r_.q().y(), r_.q().z(), r_.q().w()};
-    tf2::Vector3 t{t_.x(), t_.y(), t.z()};
+    tf2::Vector3 t{t_.x(), t_.y(), t_.z()};
     return tf2::Transform{q, t};
   }
 
@@ -30,6 +38,14 @@ namespace fvlam
   geometry_msgs::msg::Transform Transform3::to<geometry_msgs::msg::Transform>() const
   {
     return tf2::toMsg(to<tf2::Transform>());
+  }
+
+  template<>
+  Transform3 Transform3::from<geometry_msgs::msg::Pose>(geometry_msgs::msg::Pose &other)
+  {
+    tf2::Transform tf;
+    tf2::fromMsg(other, tf);
+    return Transform3::from(tf);
   }
 
   template<>

@@ -164,8 +164,7 @@ namespace fvlam
       (const Marker &marker) -> Observation
     {
       auto gtsam_t_world_camera = t_world_camera.to<gtsam::Pose3>();
-      auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{gtsam_t_world_camera,
-                                                         camera_calibration};
+      auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{gtsam_t_world_camera, camera_calibration};
 
       Observation::Array corners_f_image;
       auto corners_f_world = marker.to_corners_f_world<std::vector<gtsam::Point3>>(marker_length);
@@ -181,7 +180,6 @@ namespace fvlam
               corner_f_image.y() < 0 || corner_f_image.y() >= 2 * camera_calibration.py()) {
             return Observation{marker.id()};
           }
-
 
           corners_f_image[i] = Translate2::from(corner_f_image);
         }

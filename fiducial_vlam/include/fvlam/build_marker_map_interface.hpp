@@ -48,7 +48,7 @@ namespace fvlam
 // ==============================================================================
 
   class SolveTMarker0Marker1Interface; //
-  using SolveTMarker0Marker1Factory = std::function<std::unique_ptr<SolveTMarker0Marker1Interface>()>;
+  using SolveTMarker0Marker1Factory = std::function<std::unique_ptr<SolveTMarker0Marker1Interface>(void)>;
 
   struct BuildMarkerMapTmmContext
   {

@@ -208,9 +208,9 @@ namespace fvlam
     using TangentVector = Eigen::Matrix<double, 3, 1>;
     using RotationMatrix = Eigen::Matrix<double, 3, 3>;
     using CovarianceMatrix = Eigen::Matrix<double, MuVector::MaxSizeAtCompileTime, MuVector::MaxSizeAtCompileTime>;
+    using Derived = Eigen::Quaterniond;
 
   private:
-    using Derived = Eigen::Quaterniond;
     Derived q_{Derived::Identity()};
     RotationMatrix debug_r_{RotationMatrix::Zero()};
 

@@ -177,13 +177,7 @@ set(VMAP_NODE_SOURCES
   src/fvlam/file_storage.cpp
   src/fvlam/to_string.cpp
   src/fvlam/transform3_with_covariance.cpp
-  src/convert_util.cpp
   src/conversions_ros2.cpp
-  src/cv_utils.cpp
-  src/fiducial_math.cpp
-  src/map.cpp
-  src/slam_task.cpp
-  src/transform_with_covariance.cpp
   src/vmap_main.cpp
   src/vmap_node.cpp
   )

@@ -14,21 +14,212 @@
 
 namespace fvlam
 {
+  template<class SolveTmm>
+  class MarkerMarkerGraph
+  {
+  public:
+    class IdIxList
+    {
+      std::vector<std::uint64_t> to_id_{};
+      std::map<std::uint64_t, std::size_t> to_ix_{};
+
+    public:
+      constexpr static std::uint64_t bad_id = UINT64_MAX;
+      constexpr static std::uint64_t bad_ix = SIZE_MAX;
+
+      std::uint64_t to_id(std::size_t ix) const
+      {
+        return ix >= to_id_.size() ? bad_id : to_id_[ix];
+      }
+
+      std::size_t to_ix(std::uint64_t id) const
+      {
+        auto it = to_ix_.find(id);
+        return it == to_ix_.end() ? bad_ix : it->second;
+      }
+
+      std::size_t add(std::uint64_t id)
+      {
+        auto ix = to_id_.size();
+        to_id_.emplace_back(id);
+        to_ix_.emplace(id, ix);
+        return ix;
+      }
+
+      std::size_t size() const
+      {
+        return to_id_.size();
+      }
+    };
+
+  private:
+    std::map<std::uint64_t, fvlam::Marker> fixed_markers_{};
+    std::map<std::uint64_t, std::map<std::uint64_t, SolveTmm>> solve_tmm_map_{};
+    std::map<std::uint64_t, std::set<std::uint64_t>> back_links_{};
+
+  public:
+    MarkerMarkerGraph(const MarkerMap &map_initial)
+    {
+      for (auto &marker : map_initial.markers()) {
+        if (marker.second.is_fixed()) {
+          fixed_markers_.emplace(marker);
+        }
+      }
+    }
+
+    auto &fixed_markers() const
+    { return fixed_markers_; }
+
+    // This search order has the benefit of assigning indices in the same order as id values which
+    // could be easier for debugging.
+    void depth_first(std::uint64_t id, IdIxList &visited)
+    {
+      // If this id has been evaluated or is in the process of being evaluated, then ignore it.
+      if (visited.to_ix(id) != IdIxList::bad_ix) {
+        return;
+      }
+
+      // Mark this id as having been visited and that it is linked to a fixed marker
+      visited.add(id);
+
+      // Follow the forward links
+      auto f_links = solve_tmm_map_.find(id);
+      if (f_links != solve_tmm_map_.end()) {
+        for (auto &f_link : f_links->second) {
+          depth_first(f_link.first, visited);
+        }
+      }
+
+      // follow the backward links
+      auto b_links = back_links_.find(id);
+      if (b_links != back_links_.end()) {
+        for (auto &b_link : b_links->second) {
+          depth_first(b_link, visited);
+        }
+      }
+    }
+
+    IdIxList find_linked_nodes()
+    {
+      IdIxList visited{};
+
+#if 1 // breadth first search
+      std::vector<std::uint64_t> work_list{};
+
+      // Add any fixed markers to the work list
+      for (auto &id_marker_pair : fixed_markers_) {
+        work_list.emplace_back(id_marker_pair.first);
+      }
+
+      // Follow links from each entry in the work list.
+      for (std::size_t i = 0; i < work_list.size(); i += 1) {
+        auto id = work_list[i];
+
+        // Skip following links if we have already visited this node
+        if (visited.to_ix(id) != IdIxList::bad_ix) {
+          continue;
+        }
+
+        // Mark this id as having been visited and that it is linked to a fixed marker
+        visited.add(id);
+
+        // Follow the forward links
+        auto f_links = solve_tmm_map_.find(id);
+        if (f_links != solve_tmm_map_.end()) {
+          for (auto &f_link : f_links->second) {
+            if (visited.to_ix(f_link.first) == IdIxList::bad_ix) {
+              work_list.emplace_back(f_link.first);
+            }
+          }
+        }
+
+        // follow the backward links
+        auto b_links = back_links_.find(id);
+        if (b_links != back_links_.end()) {
+          for (auto &b_link : b_links->second) {
+            if (visited.to_ix(b_link) == IdIxList::bad_ix) {
+              work_list.emplace_back(b_link);
+            }
+          }
+        }
+      }
+#else // depth first
+      // Start with any fixed markers:
+      for (auto &id_marker_pair : fixed_markers_) {
+        depth_first(id_marker_pair.first, visited);
+      }
+
+#endif
+      return visited;
+    }
+
+    SolveTmm *lookup(std::uint64_t id0, std::uint64_t id1)
+    {
+      if (id0 > id1) {
+        std::swap(id0, id1);
+      }
+
+      auto f_links = solve_tmm_map_.find(id0);
+      if (f_links == solve_tmm_map_.end()) {
+        return nullptr;
+      }
+
+      auto f_link = f_links->second.find(id1);
+      if (f_link == f_links->second.end()) {
+        return nullptr;
+      }
+
+      return &f_link->second;
+    }
+
+    SolveTmm &add_or_lookup(std::uint64_t id0, std::uint64_t id1, std::function<SolveTmm(void)> solve_tmm_factory)
+    {
+      if (id0 > id1) {
+        std::swap(id0, id1);
+      }
+
+      // Look for thee forward link
+      auto f_links = solve_tmm_map_.find(id0);
+      if (f_links == solve_tmm_map_.end()) {
+        solve_tmm_map_.emplace(id0, std::map<std::uint64_t, SolveTmm>{});
+        f_links = solve_tmm_map_.find(id0);
+      }
+
+      auto f_link = f_links->second.find(id1);
+      if (f_link != f_links->second.end()) {
+        return f_link->second;
+      }
+
+      // Insert a forward link
+      f_links->second.emplace(id1, solve_tmm_factory());
+      f_link = f_links->second.find(id1);
+
+      // Insert a back link
+      auto b_links = back_links_.find(id1);
+      if (b_links == back_links_.end()) {
+        back_links_.emplace(id1, std::set<std::uint64_t>{});
+        b_links = back_links_.find(id1);
+      }
+
+      auto b_link = b_links->second.find(id0);
+      if (b_link == b_links->second.end()) {
+        b_links->second.emplace(id0);
+      }
+
+      return f_link->second;
+    }
+  };
+
   class BuildMarkerMapTmm : public BuildMarkerMapInterface
   {
-    constexpr static std::uint64_t JointID_id0(std::uint64_t id)
-    { return id / 1000000L; }; //
-    constexpr static std::uint64_t JointID_id1(std::uint64_t id)
-    { return id % 1000000L; }; //
-    constexpr static std::uint64_t JointID(std::uint64_t id0, std::uint64_t id1)
-    { return id0 * 1000000L + id1; }; //
+
+    using SolveTmmGraph = MarkerMarkerGraph<std::unique_ptr<SolveTMarker0Marker1Interface>>;
 
     const BuildMarkerMapTmmContext tmm_context_;
     Logger &logger_;
-    const double marker_length_;
-    const fvlam::Marker fixed_marker_;
+    MarkerMap map_initial_;
 
-    std::map<std::uint64_t, std::unique_ptr<SolveTMarker0Marker1Interface>> solve_tmm_map_;
+    SolveTmmGraph solve_tmm_graph_;
     BuildMarkerMapTmmContext::BuildError error_;
 
     static fvlam::Marker find_fixed_marker(const MarkerMap &map)
@@ -85,27 +276,41 @@ namespace fvlam
       }
     }
 
-    gtsam::NonlinearFactorGraph load_pose_graph()
+    gtsam::NonlinearFactorGraph load_pose_graph(const SolveTmmGraph::IdIxList &idix_list)
     {
       gtsam::NonlinearFactorGraph pose_graph{};
 
-      for (auto &solve_tmm : solve_tmm_map_) {
-        std::uint64_t id0 = JointID_id0(solve_tmm.first);
-        std::uint64_t id1 = JointID_id1(solve_tmm.first);
+      for (std::size_t ix0 = 0; ix0 < idix_list.size(); ix0 += 1)
+        for (std::size_t ix1 = ix0 + 1; ix1 < idix_list.size(); ix1 += 1) {
+          auto solve_tmm = solve_tmm_graph_.lookup(idix_list.to_id(ix0), idix_list.to_id(ix1));
+          if (solve_tmm) {
+            auto t_marker0_marker1 = (*solve_tmm)->t_marker0_marker1();
 
-        auto t_marker0_marker1 = solve_tmm.second->t_marker0_marker1();
-        auto noise_model = determine_between_factor_noise_model(t_marker0_marker1,
-                                                                tmm_context_.try_shonan_initialization_);
+            // The t_marker0_marker1 measurements are always recorded with the marker with the
+            // lower id first - as the "world" marker and the higher id is the "body" marker. If
+            // when we reassign ids, the higher id ends up as the "world" marker, then the
+            // measurement has to be inverted. TODO: rotate the covariance!
+            if (idix_list.to_id(ix0) > idix_list.to_id(ix1)) {
+              t_marker0_marker1 = Transform3WithCovariance{t_marker0_marker1.tf().inverse(),
+                                                           t_marker0_marker1.cov()};
+            }
 
-        pose_graph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
-          id0, id1, t_marker0_marker1.tf().to<gtsam::Pose3>(),
-          noise_model);
+            auto noise_model = determine_between_factor_noise_model(t_marker0_marker1,
+                                                                    tmm_context_.try_shonan_initialization_);
+
+            pose_graph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
+              ix0, ix1, t_marker0_marker1.tf().to<gtsam::Pose3>(),
+              noise_model);
+          }
+        }
+
+      // Add the prior for the fixed nodes.
+      for (auto &id_marker_pair : solve_tmm_graph_.fixed_markers()) {
+        pose_graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
+          idix_list.to_ix(id_marker_pair.first),
+          id_marker_pair.second.t_world_marker().tf().to<gtsam::Pose3>(),
+          gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Pose3::TangentVector::Zero()));
       }
-
-      // Add the prior for the fixed node.
-      pose_graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
-        fixed_marker_.id(), fixed_marker_.t_world_marker().tf().to<gtsam::Pose3>(),
-        gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Pose3::TangentVector::Zero()));
 
       return pose_graph;
     }
@@ -131,7 +336,8 @@ namespace fvlam
     // Given the relative marker measurements, find the shonan rotations that optimally solve the
     // system. Then merge these rotations into the initialization that has already been done
     // by the chordal method.
-    void get_shonan_rotations(const gtsam::NonlinearFactorGraph &pose_graph,
+    void get_shonan_rotations(const SolveTmmGraph::IdIxList &idix_list,
+                              const gtsam::NonlinearFactorGraph &pose_graph,
                               gtsam::Values &initial_poses)
     {
       // Optimize rotations.
@@ -146,10 +352,12 @@ namespace fvlam
       // rotation to the fixed rotation. Then apply this rotation to all
       // shonan rotations as we are entering them in the initial values.
       auto r_world_shonan{gtsam::Rot3::identity()};
+      auto fixed_marker_ix = idix_list.to_ix(solve_tmm_graph_.fixed_markers().begin()->first);
       for (const auto &key_value : shonan_result.first) {
-        if (key_value.key == fixed_marker_.id()) {
-          r_world_shonan = fixed_marker_.t_world_marker().tf().r().to<gtsam::Rot3>() *
-                           shonan_result.first.at<typename gtsam::Pose3::Rotation>(key_value.key).inverse();
+        if (key_value.key == fixed_marker_ix) {
+          r_world_shonan =
+            solve_tmm_graph_.fixed_markers().begin()->second.t_world_marker().tf().r().to<gtsam::Rot3>() *
+            shonan_result.first.at<typename gtsam::Pose3::Rotation>(key_value.key).inverse();
           break;
         }
       }
@@ -159,40 +367,48 @@ namespace fvlam
         gtsam::Key key = key_value.key;
         const auto &rot = shonan_result.first.at<gtsam::Rot3>(key);
         auto rot_f_world = r_world_shonan * rot;
-        logger_.debug() << key << " " << fvlam::Rotate3::from(rot_f_world).to_string() << std::endl;
+        logger_.debug() << key << " " << fvlam::Rotate3::from(rot_f_world).to_string();
         auto initializedPose = gtsam::Pose3{rot_f_world, initial_poses.at<gtsam::Pose3>(key).translation()};
         initial_poses.update(key, initializedPose);
       }
     }
 
-    gtsam::Values load_pose_initial(const gtsam::NonlinearFactorGraph &pose_graph)
+    gtsam::Values load_pose_initial(const SolveTmmGraph::IdIxList &idix_list,
+                                    const gtsam::NonlinearFactorGraph &pose_graph)
     {
       // initialize poses by the chordal method
       auto initial_poses = gtsam::InitializePose3::initialize(pose_graph);
 
       if (tmm_context_.try_shonan_initialization_) {
-        get_shonan_rotations(pose_graph, initial_poses);
+        get_shonan_rotations(idix_list, pose_graph, initial_poses);
       }
       return initial_poses;
     }
 
-    std::unique_ptr<MarkerMap> load_map(const gtsam::NonlinearFactorGraph &pose_graph,
+    std::unique_ptr<MarkerMap> load_map(const SolveTmmGraph::IdIxList &idix_list,
+                                        const gtsam::NonlinearFactorGraph &pose_graph,
                                         const gtsam::Values &pose_result)
     {
-      auto map = std::make_unique<MarkerMap>(marker_length_);
+      auto map = std::make_unique<MarkerMap>(map_initial_.marker_length());
       gtsam::Marginals marginals(pose_graph, pose_result);
 
       for (const auto &key_value : pose_result) {
         gtsam::Key key = key_value.key;
-        if (key == fixed_marker_.id()) {
-          map->add_marker(fixed_marker_);
-        } else {
-          const auto &pose = pose_result.at<gtsam::Pose3>(key);
-          auto cov = marginals.marginalCovariance(key);
+        auto id = idix_list.to_id(key);
 
-          map->add_marker(Marker{key,
-                                 Transform3WithCovariance{Transform3::from(pose), cov}});
+        // Check to see if this is a fixed marker
+        auto fixed = solve_tmm_graph_.fixed_markers().find(id);
+        if (fixed != solve_tmm_graph_.fixed_markers().end()) {
+          map->add_marker(fixed->second);
+          continue;
         }
+
+        // Otherwise add it as a regular marker.
+        const auto &pose = pose_result.at<gtsam::Pose3>(key);
+        auto cov = marginals.marginalCovariance(key);
+
+        map->add_marker(Marker{id,
+                               Transform3WithCovariance{Transform3::from(pose), cov}});
       }
 
       return map;
@@ -206,9 +422,9 @@ namespace fvlam
 
       for (auto it0 = map.markers().begin(); it0 != map.markers().end(); ++it0)
         for (auto it1 = map.markers().upper_bound(it0->first); it1 != map.markers().end(); ++it1) {
-          auto it_tmm = solve_tmm_map_.find(JointID(it0->first, it1->first));
-          if (it_tmm != solve_tmm_map_.end()) {
-            auto tmm_meas = it_tmm->second->t_marker0_marker1().tf();
+          auto solve_tmm = solve_tmm_graph_.lookup(it0->first, it1->first);
+          if (solve_tmm != nullptr) {
+            auto tmm_meas = (*solve_tmm)->t_marker0_marker1().tf();
             auto tmm_calc = it0->second.t_world_marker().tf().inverse() *
                             it1->second.t_world_marker().tf();
             r_sum += tmm_calc.r().q().angularDistance(tmm_meas.r().q());
@@ -234,9 +450,8 @@ namespace fvlam
                       const MarkerMap &map_initial) :
       tmm_context_{std::move(tmm_context)},
       logger_{logger},
-      marker_length_{map_initial.marker_length()},
-      fixed_marker_{find_fixed_marker(map_initial)},
-      solve_tmm_map_{},
+      map_initial_{map_initial},
+      solve_tmm_graph_{map_initial},
       error_{}
     {}
 
@@ -258,26 +473,28 @@ namespace fvlam
           }
 
           // Find the appropriate SolveTmmInterface
-          std::uint64_t joint_id = JointID(obs[m0r].id(), obs[m1r].id());
-          auto it = solve_tmm_map_.find(joint_id);
-          if (it == solve_tmm_map_.end()) {
-            auto res = solve_tmm_map_.emplace(joint_id, tmm_context_.solve_tmm_factory_());
-            assert(res.second);
-            it = res.first;
-          }
-          it->second->accumulate(obs[m0r], obs[m1r], camera_info);
+          auto &solve_tmm = solve_tmm_graph_.add_or_lookup(obs[m0r].id(), obs[m1r].id(),
+                                                           tmm_context_.solve_tmm_factory_);
+          solve_tmm->accumulate(obs[m0r], obs[m1r], camera_info);
         }
     }
 
     std::unique_ptr<MarkerMap> build() override
     {
+      auto idix_list = solve_tmm_graph_.find_linked_nodes();
+
+      // Make sure there are some markers linked to the fixed markers.
+      if (idix_list.size() == map_initial_.markers().size()) {
+        return std::make_unique<MarkerMap>(map_initial_);
+      }
+
       // Prepare for full Pose optimization
-      auto pose_graph = load_pose_graph();
+      auto pose_graph = load_pose_graph(idix_list);
       if (logger_.output_debug()) {
         pose_graph.print("pose_graph\n");
       }
 
-      auto pose_initial = load_pose_initial(pose_graph);
+      auto pose_initial = load_pose_initial(idix_list, pose_graph);
       if (logger_.output_debug()) {
         pose_initial.print("pose_initial");
       }
@@ -291,7 +508,7 @@ namespace fvlam
       auto pose_result = optimizer.optimize();
       error_.nonlinear_optimization_error_ = pose_graph.error(pose_result);
 
-      auto built_map = load_map(pose_graph, pose_result);
+      auto built_map = load_map(idix_list, pose_graph, pose_result);
       calc_remeasure_error(*built_map);
       error_.valid_ = true; // Mark this error structure as having valid data.
       return built_map;

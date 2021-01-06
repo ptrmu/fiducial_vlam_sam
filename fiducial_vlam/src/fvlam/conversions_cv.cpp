@@ -208,28 +208,28 @@ namespace fvlam
     };
   }
 
-  template<>
-  Marker::SolveMarkerMarkerFunction Marker::solve_t_marker0_marker1<CvCameraCalibration>(
-    const CvCameraCalibration &camera_calibration,
-    double marker_length)
-  {
-    auto solve_t_camera_marker_function = solve_t_camera_marker<CvCameraCalibration>(camera_calibration,
-                                                                                     marker_length);
-    return [
-      solve_t_camera_marker_function]
-      (const Observation &observation0,
-       const Observation &observation1) -> Transform3WithCovariance
-    {
-      auto t_camera_marker0 = solve_t_camera_marker_function(observation0).t_world_marker().tf();
-      auto t_camera_marker1 = solve_t_camera_marker_function(observation1).t_world_marker().tf();
-      auto t_marker0_marker1 = t_camera_marker0.inverse() * t_camera_marker1;
-
-      // NOTE: using an arbitrary uncertainty. Someday do this better - combine uncertainties from measurements.
-      return Transform3WithCovariance{
-        Transform3{
-          observation0.id() * 1000000L + observation1.id(), t_marker0_marker1},
-        (Transform3::MuVector::Ones() * std::pow(0.1, 2)).asDiagonal()};
-    };
-  }
+//  template<>
+//  Marker::SolveMarkerMarkerFunction Marker::solve_t_marker0_marker1<CvCameraCalibration>(
+//    const CvCameraCalibration &camera_calibration,
+//    double marker_length)
+//  {
+//    auto solve_t_camera_marker_function = solve_t_camera_marker<CvCameraCalibration>(camera_calibration,
+//                                                                                     marker_length);
+//    return [
+//      solve_t_camera_marker_function]
+//      (const Observation &observation0,
+//       const Observation &observation1) -> Transform3WithCovariance
+//    {
+//      auto t_camera_marker0 = solve_t_camera_marker_function(observation0).t_world_marker().tf();
+//      auto t_camera_marker1 = solve_t_camera_marker_function(observation1).t_world_marker().tf();
+//      auto t_marker0_marker1 = t_camera_marker0.inverse() * t_camera_marker1;
+//
+//      // NOTE: using an arbitrary uncertainty. Someday do this better - combine uncertainties from measurements.
+//      return Transform3WithCovariance{
+//        Transform3{
+//          observation0.id() * 1000000L + observation1.id(), t_marker0_marker1},
+//        (Transform3::MuVector::Ones() * std::pow(0.1, 2)).asDiagonal()};
+//    };
+//  }
 }
 
