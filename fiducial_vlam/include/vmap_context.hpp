@@ -87,6 +87,24 @@ namespace fiducial_vlam
 
     TransformWithCovariance map_init_transform_;
   };
+
+  struct VmapDiagnostics
+  {
+    std::uint64_t sub_observations_count_{0};
+    std::uint64_t process_observations_count_{0};
+    std::uint64_t build_count{0};
+    std::uint64_t pub_map_count_{0};
+    std::uint64_t pub_visuals_count_{0};
+    std::uint64_t pub_tf_count_{0};
+    rclcpp::Time start_time_;
+
+    VmapDiagnostics(rclcpp::Time start_time) :
+      start_time_{start_time}
+    {}
+
+    template<class T>
+    void report(rclcpp::Time end_time, T &other) const;
+  };
 }
 
 #endif //FIDUCIAL_VLAM_VMAP_CONTEXT_HPP

@@ -1,4 +1,6 @@
 #pragma once
+#pragma ide diagnostic ignored "modernize-use-nodiscard"
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 
 #include <iostream>
 #include <memory>

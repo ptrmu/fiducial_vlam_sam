@@ -172,6 +172,7 @@ endif ()
 
 set(VMAP_NODE_SOURCES
   src/fvlam/build_marker_map_tmm.cpp
+  src/fvlam/build_marker_map_recorder.cpp
   src/fvlam/conversions_cv.cpp
   src/fvlam/conversions_gtsam.cpp
   src/fvlam/file_storage.cpp

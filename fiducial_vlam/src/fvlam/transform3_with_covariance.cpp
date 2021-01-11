@@ -153,16 +153,16 @@ namespace fvlam
     }
   }
 
-   Transform3 Transform3::ChartAtOrigin::retract(const Transform3::TangentVector &v)
-   {
-     Rotate3 R = Rotate3::ChartAtOrigin::retract(v.head<3>());
-     return Transform3(R, Translate3(v.tail<3>()));
-   }
+  Transform3 Transform3::ChartAtOrigin::retract(const Transform3::TangentVector &v)
+  {
+    Rotate3 R = Rotate3::ChartAtOrigin::retract(v.head<3>());
+    return Transform3(R, Translate3(v.tail<3>()));
+  }
 
   Transform3::TangentVector Transform3::ChartAtOrigin::local(const Transform3 &pose)
-   {
-     auto omega = Rotate3::ChartAtOrigin::local(pose.r());
-     return (Transform3::TangentVector{} << omega, pose.t().t()).finished();
-   }
+  {
+    auto omega = Rotate3::ChartAtOrigin::local(pose.r());
+    return (Transform3::TangentVector{} << omega, pose.t().t()).finished();
+  }
 
 }

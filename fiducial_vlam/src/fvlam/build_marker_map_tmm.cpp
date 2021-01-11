@@ -520,11 +520,11 @@ namespace fvlam
 
   template<>
   std::unique_ptr<BuildMarkerMapInterface> make_build_marker_map<BuildMarkerMapTmmContext>(
-    const BuildMarkerMapTmmContext &tmm_context,
+    const BuildMarkerMapTmmContext &bmm_context,
     Logger &logger,
     const MarkerMap &map_initial)
   {
-    return std::make_unique<BuildMarkerMapTmm>(tmm_context, logger, map_initial);
+    return std::make_unique<BuildMarkerMapTmm>(bmm_context, logger, map_initial);
   }
 
   BuildMarkerMapTmmContext::BuildError BuildMarkerMapTmmContext::BuildError::from(

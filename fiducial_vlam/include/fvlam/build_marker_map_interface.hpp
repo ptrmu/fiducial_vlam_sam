@@ -39,9 +39,17 @@ namespace fvlam
   };
 
   template<class TBmmContext>
-  std::unique_ptr<BuildMarkerMapInterface> make_build_marker_map(const TBmmContext &tmm_context,
+  std::unique_ptr<BuildMarkerMapInterface> make_build_marker_map(const TBmmContext &bmm_context,
                                                                  Logger &logger,
                                                                  const MarkerMap &map_initial);
+
+// ==============================================================================
+// BuildMarkerMapRecorderContext class
+// ==============================================================================
+
+  struct BuildMarkerMapRecorderContext
+  {
+  };
 
 // ==============================================================================
 // BuildMarkerMapTmmContext class

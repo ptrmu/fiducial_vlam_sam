@@ -57,11 +57,18 @@ namespace fiducial_vlam
   {
     rclcpp::Node &node_;
     fvlam::Logger &logger_;
+    VmapDiagnostics &diagnostics_;
     BmmContext bmm_cxt_;
     std::unique_ptr<fvlam::MarkerMap> map_initial_;
     std::unique_ptr<fvlam::BuildMarkerMapInterface> bmm_interface_{};
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
     bool pause_capture_{false};
+
+    std::unique_ptr<fvlam::BuildMarkerMapInterface> make_bmm_recorder()
+    {
+      fvlam::BuildMarkerMapRecorderContext recorder_context{};
+      return make_build_marker_map(recorder_context, logger_, *map_initial_);
+    }
 
     std::unique_ptr<fvlam::BuildMarkerMapInterface> make_bmm_tmm()
     {
@@ -80,10 +87,10 @@ namespace fiducial_vlam
     }
 
   public:
-    BuildMarkerMapController(rclcpp::Node &node, fvlam::Logger &logger,
+    BuildMarkerMapController(rclcpp::Node &node, fvlam::Logger &logger, VmapDiagnostics &diagnostics,
                              BmmContext bmm_cxt, const PsmContext &psm_cxt,
                              std::unique_ptr<fvlam::MarkerMap> map_initial) :
-      node_{node}, logger_{logger},
+      node_{node}, logger_{logger}, diagnostics_{diagnostics},
       bmm_cxt_{std::move(bmm_cxt)},
       map_initial_{std::move(map_initial)}
     {
@@ -91,6 +98,7 @@ namespace fiducial_vlam
       switch (bmm_cxt_.bmm_algorithm_) {
         default:
         case 0: // record observations to file
+          bmm_interface_ = make_bmm_recorder();
           break;
 
         case 1: // t_marker0_marker1 techniques
@@ -111,7 +119,10 @@ namespace fiducial_vlam
         rclcpp::QoS{rclcpp::ServicesQoS()},
         [this](fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
         {
+          diagnostics_.sub_observations_count_ += 1;
           if (bmm_interface_ && !pause_capture_) {
+            diagnostics_.process_observations_count_ += 1;
+
             // From the observations message, pick out the CameraInfo and Observations
             auto camera_info = fvlam::CameraInfo::from(*msg);
             auto observations = fvlam::Observations::from(*msg);
@@ -128,6 +139,7 @@ namespace fiducial_vlam
       if (!bmm_interface_) {
         return std::unique_ptr<fvlam::MarkerMap>{};
       }
+      diagnostics_.build_count += 1;
       auto map = bmm_interface_->build();
       if (!map) {
         return std::unique_ptr<fvlam::MarkerMap>{};
@@ -171,6 +183,7 @@ namespace fiducial_vlam
   class VmapNode : public rclcpp::Node
   {
     LoggerRos2 logger_;
+    VmapDiagnostics diagnostics_;
 
     VmapContext cxt_{};
     PsmContext psm_cxt_{};
@@ -233,6 +246,7 @@ namespace fiducial_vlam
     explicit VmapNode(const rclcpp::NodeOptions &options) :
       Node{"vmap_node", options},
       logger_{*this},
+      diagnostics_{now()},
       exit_build_map_time_{now()}
     {
       // Get parameters from the command line
@@ -328,6 +342,7 @@ namespace fiducial_vlam
 
     void publish_marker_map_and_visualization(const rclcpp::Time &stamp)
     {
+      diagnostics_.pub_map_count_ += 1;
       auto header = std_msgs::msg::Header{}
         .set__stamp(stamp)
         .set__frame_id(psm_cxt_.psm_pub_map_frame_id_);
@@ -340,6 +355,7 @@ namespace fiducial_vlam
 
       // Create and publish the marker visualization
       if (psm_cxt_.psm_pub_visuals_enable_) {
+        diagnostics_.pub_visuals_count_ += 1;
         visualization_msgs::msg::MarkerArray visuals_msg;
         for (auto &id_marker_pair: marker_map_->markers()) {
           visualization_msgs::msg::Marker visual_msg;
@@ -352,6 +368,7 @@ namespace fiducial_vlam
 
       // Create and publish the marker transform tree
       if (psm_cxt_.psm_pub_tfs_enable_) {
+        diagnostics_.pub_tf_count_ += 1;
         tf2_msgs::msg::TFMessage tfs_msg;
         for (auto &id_marker_pair: marker_map_->markers()) {
           auto &t_world_marker = id_marker_pair.second.t_world_marker().tf();
@@ -386,7 +403,7 @@ namespace fiducial_vlam
           bmm_controller_.reset(nullptr);
         }
         bmm_controller_ = std::make_unique<BuildMarkerMapController>(
-          *this, logger_, bmm_cxt_, psm_cxt_,
+          *this, logger_, diagnostics_, bmm_cxt_, psm_cxt_,
           make_initial_marker_map(true));
 
       } else if (cmd == "stop") {

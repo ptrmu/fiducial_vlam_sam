@@ -9,7 +9,6 @@
 
 namespace fvlam
 {
-
 // ==============================================================================
 // Translate2 class
 // ==============================================================================
@@ -57,7 +56,19 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
-    std::string to_string() const;
+    template<class T>
+    static CovarianceMatrix cov_from(T &other); //
+    template<class T>
+    static T cov_to(const CovarianceMatrix &cov); //
+    template<class T>
+    static void cov_to(const CovarianceMatrix &cov, T &other); //
+
+    std::string to_string() const; //
+    static std::string cov_to_string(const CovarianceMatrix &cov); //
+
+    bool equals(const Translate2 &other, double tol = 1.0e-9, bool check_relative_also = true) const; //
+    static bool cov_equals(const CovarianceMatrix &own, const CovarianceMatrix &other,
+                           double tol = 1.0e-9, bool check_relative_also = true);
 
     Translate2 operator+(const Translate2 &other) const
     {
@@ -119,8 +130,19 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
+    template<class T>
+    static CovarianceMatrix cov_from(T &other); //
+    template<class T>
+    static T cov_to(const CovarianceMatrix &cov); //
+    template<class T>
+    static void cov_to(const CovarianceMatrix &cov, T &other); //
+
     std::string to_string() const; //
-    static std::string to_cov_string(const CovarianceMatrix &cov); //
+    static std::string cov_to_string(const CovarianceMatrix &cov); //
+
+    bool equals(const Translate3 &other, double tol = 1.0e-9, bool check_relative_also = true) const; //
+    static bool cov_equals(const CovarianceMatrix &own, const CovarianceMatrix &other,
+                           double tol = 1.0e-9, bool check_relative_also = true);
 
     /// Exponential map at identity - create a translation from canonical coordinates \f$ [T_x,T_y,T_z] \f$
     static Translate3 Expmap(const TangentVector &x)
@@ -131,7 +153,9 @@ namespace fvlam
     { return translate3.t_; }
 
     Translate3 cross(const Translate3 &v) const
-    { return Translate3{t_.cross(v.t_)}; }
+    {
+      return Translate3{t_.cross(v.t_)};
+    }
 
     Translate3 operator+(const Translate3 &other) const
     {
@@ -195,6 +219,12 @@ namespace fvlam
     void to(T &other) const;
 
     std::string to_string() const;
+
+    bool equals(const Translate3WithCovariance &other, double tol = 1.0e-9, bool check_relative_also = true) const
+    {
+      return t_.equals(other.t_, tol, check_relative_also) &&
+             Translate3::cov_equals(cov_, other.cov_, tol, check_relative_also);
+    }
   };
 
 // ==============================================================================
@@ -264,7 +294,19 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
-    std::string to_string() const;
+    template<class T>
+    static CovarianceMatrix cov_from(T &other); //
+    template<class T>
+    static T cov_to(const CovarianceMatrix &cov); //
+    template<class T>
+    static void cov_to(const CovarianceMatrix &cov, T &other); //
+
+    std::string to_string() const; //
+    static std::string cov_to_string(const CovarianceMatrix &cov); //
+
+    bool equals(const Rotate3 &other, double tol = 1.0e-9, bool check_relative_also = true) const; //
+    static bool cov_equals(const CovarianceMatrix &own, const CovarianceMatrix &other,
+                           double tol = 1.0e-9, bool check_relative_also = true);
 
     Rotate3 inverse() const
     {
@@ -381,13 +423,18 @@ namespace fvlam
     void to(T &other) const;
 
     template<class T>
-    static CovarianceMatrix cov_from(T &other);
-
+    static CovarianceMatrix cov_from(T &other); //
     template<class T>
-    static T cov_to(const CovarianceMatrix &cov);
+    static T cov_to(const CovarianceMatrix &cov); //
+    template<class T>
+    static void cov_to(const CovarianceMatrix &cov, T &other); //
 
     std::string to_string(bool also_id = false) const; //
-    static std::string to_cov_string(const CovarianceMatrix &cov); //
+    static std::string cov_to_string(const CovarianceMatrix &cov); //
+
+    bool equals(const Transform3 &other, double tol = 1.0e-9, bool check_relative_also = true) const; //
+    static bool cov_equals(const CovarianceMatrix &own, const CovarianceMatrix &other,
+                           double tol = 1.0e-9, bool check_relative_also = true);
 
     Transform3 inverse() const
     {
@@ -482,6 +529,8 @@ namespace fvlam
     void to(T &other) const;
 
     std::string to_string() const;
+
+    bool equals(const Transform3WithCovariance &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 }
 

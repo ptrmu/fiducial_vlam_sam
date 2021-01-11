@@ -76,6 +76,8 @@ namespace fvlam
     void to(T &other) const;
 
     std::string to_string() const;
+
+    bool equals(const CameraInfo &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 
 // Used for specializing the from/to methods on CameraInfo

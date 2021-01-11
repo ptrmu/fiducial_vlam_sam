@@ -90,6 +90,8 @@ namespace fvlam
     void to(T &other) const;
 
     std::string to_string() const;
+
+    bool equals(const Observation &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 
 // ==============================================================================
@@ -122,6 +124,10 @@ namespace fvlam
 
     template<class T>
     void to(T &other) const;
+
+    std::string to_string() const;
+
+    bool equals(const Observations &other, double tol = 1.0e-9, bool check_relative_also = true) const;
 
     void add(const Observation &observation)
     {
