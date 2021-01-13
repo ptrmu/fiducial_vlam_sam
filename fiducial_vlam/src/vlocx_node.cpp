@@ -5,7 +5,6 @@
 
 #include "cv_bridge/cv_bridge.h"
 #include "fvlam/camera_info.hpp"
-#include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
@@ -19,7 +18,7 @@
 #include "fiducial_math.hpp"
 #include "map.hpp"
 #include "observation.hpp"
-#include "vloc_context.hpp"
+#include "vlocx_context.hpp"
 
 
 namespace fiducial_vlam
@@ -205,10 +204,10 @@ namespace fiducial_vlam
   }
 
 // ==============================================================================
-// VlocNode class
+// VlocxNode class
 // ==============================================================================
 
-  class VlocNode : public rclcpp::Node
+  class VlocxNode : public rclcpp::Node
   {
     rclcpp::Logger ros_logger_inst_;
     VlocContext cxt_{};
@@ -276,16 +275,17 @@ namespace fiducial_vlam
 
     ProcessImageInterface &pi()
     {
-      return *lc_pi_;
+      return cxt_.loc_calibrate_not_localize_ ? *cc_pi_ : *lc_pi_;
     }
 
     bool publish_captured_image_marked()
     {
-      return false;
+      return cxt_.loc_calibrate_not_localize_ &&
+             cc_pi_->calibration_complete();
     }
 
   public:
-    VlocNode(const rclcpp::NodeOptions &options) :
+    VlocxNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
       ros_logger_inst_{get_logger()}
     {
@@ -293,8 +293,10 @@ namespace fiducial_vlam
       setup_parameters();
 
       // Initialize work objects after parameters have been loaded.
+      so_ = make_smooth_observations(cxt_);
       fm_ = make_cv_fiducial_math(cxt_, *so_);
       lc_pi_ = make_localize_camera_process_image(cxt_, *fm_);
+      cc_pi_ = make_calibrate_camera(ros_logger_inst_, cal_cxt_);
 
       // ROS publishers. Initialize after parameters have been loaded.
       observations_pub_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
@@ -717,7 +719,7 @@ namespace fiducial_vlam
         PAMA_SET_PARAM((*this), cal_cxt_, "", cal_cmd, "");
 
         // If we are not in calibrate mode, then don't send the command.
-        if (true) {
+        if (!cxt_.loc_calibrate_not_localize_) {
           RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
 
         } else {
@@ -729,7 +731,7 @@ namespace fiducial_vlam
       }
 
       // Give the camera calibrator process some background time
-      if (false) {
+      if (cxt_.loc_calibrate_not_localize_) {
         auto ret_str = cc_pi_->on_timer(time_now);
         if (!ret_str.empty()) {
           RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());
@@ -755,12 +757,12 @@ namespace fiducial_vlam
 
   };
 
-  std::shared_ptr<rclcpp::Node> vloc_node_factory(const rclcpp::NodeOptions &options)
+  std::shared_ptr<rclcpp::Node> vlocx_node_factory(const rclcpp::NodeOptions &options)
   {
-    return std::shared_ptr<rclcpp::Node>(new VlocNode(options));
+    return std::shared_ptr<rclcpp::Node>(new VlocxNode(options));
   }
 }
 
 #include "rclcpp_components/register_node_macro.hpp"
 
-RCLCPP_COMPONENTS_REGISTER_NODE(fiducial_vlam::VlocNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(fiducial_vlam::VlocxNode)

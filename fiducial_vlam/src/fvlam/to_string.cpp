@@ -178,6 +178,7 @@ namespace fvlam
 
   std::string ObservationsBundles::to_string(bool also_cov) const
   {
+    (void)also_cov;
     std::stringstream ss{};
     NumFmt nf(9, 3);
 

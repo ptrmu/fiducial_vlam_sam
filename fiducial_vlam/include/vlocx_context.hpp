@@ -13,15 +13,20 @@ namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
+  PAMA_PARAM(loc_calibrate_not_localize, int, 0)          /* calibrate camera instead of localize camera */ \
   PAMA_PARAM(loc_camera_sam_not_cv, int, 0)               /* use gtsam not opencv for localizing the camera */\
   PAMA_PARAM(loc_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
    /* Camera frame -> baselink frame transform */\
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_y, double, 0.)             /* camera=>baselink transform component */\
-  PAMA_PARAM(loc_t_camera_base_z, double, 0)              /* camera=>baselink transform component */\
+  PAMA_PARAM(loc_t_camera_base_z, double, -0.035)         /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
+  /* Corner Kalman Filters */\
+  PAMA_PARAM(loc_corner_filter_process_std, float, 0.)    /* Process Noise Std Dev for Kalman filtering corners */\
+  PAMA_PARAM(loc_corner_filter_measure_std, float, 0.)    /* Measurement Noise Std Dev for Kalman filtering corners */\
+  PAMA_PARAM(loc_corner_filter_max_skipped, int, 3)       /* Max number of frames that to predict_only corner locations */\
   /* Aruco markers */\
   PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers  */ \
   PAMA_PARAM(loc_cv3_do_corner_refinement, int, 1)        /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */\

@@ -6,7 +6,7 @@
 
 #include <vector>
 
-#include "fvlam/transform3_with_covariance.hpp"
+#include "transform3_with_covariance.hpp"
 
 namespace fvlam
 {

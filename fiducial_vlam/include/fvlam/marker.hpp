@@ -9,8 +9,8 @@
 #include <vector>
 
 #include <Eigen/Geometry>
-#include "fvlam/observation.hpp"
-#include "fvlam/transform3_with_covariance.hpp"
+#include "observation.hpp"
+#include "transform3_with_covariance.hpp"
 
 namespace fvlam
 {

@@ -2,8 +2,9 @@
 #include <chrono>
 #include <iostream>
 #include <iomanip>
-#include <fstream>
 
+#include "fiducial_vlam_msgs/msg/map.hpp"
+#include "fiducial_vlam_msgs/msg/observations.hpp"
 #include "fvlam/build_marker_map_interface.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/logger.hpp"
@@ -11,20 +12,14 @@
 #include "fvlam/observation.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "tf2_msgs/msg/tf_message.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
-#include "yaml-cpp/yaml.h"
-#include "cv_utils.hpp"
-#include "fiducial_math.hpp"
 #include "logger_ros2.hpp"
-#include "map.hpp"
-#include "observation.hpp"
 #include "vmap_context.hpp"
+
 
 namespace fiducial_vlam
 {
-
 // ==============================================================================
 // PsmContext class
 // ==============================================================================
@@ -48,7 +43,44 @@ namespace fiducial_vlam
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
     PAMA_PARAMS_DEFINE(BMM_ALL_PARAMS)
   };
+}
 
+namespace fvlam
+{
+// ==============================================================================
+// BuildMarkerMapRecorderContext from method
+// ==============================================================================
+
+  template<>
+  BuildMarkerMapRecorderContext BuildMarkerMapRecorderContext::from<fiducial_vlam::BmmContext>(
+    fiducial_vlam::BmmContext &other)
+  {
+    return BuildMarkerMapRecorderContext{other.bmm_recorded_observations_name_};
+  }
+
+// ==============================================================================
+// BuildMarkerMapTmmContext from method
+// ==============================================================================
+
+  template<>
+  BuildMarkerMapTmmContext BuildMarkerMapTmmContext::from<fiducial_vlam::BmmContext>(
+    fiducial_vlam::BmmContext &other, const MarkerMap &map_initial)
+  {
+    auto solve_tmm_factory = make_solve_tmm_factory(
+      fvlam::SolveTmmContextCvSolvePnp{other.average_on_space_not_manifold_},
+      map_initial.marker_length());
+
+    return BuildMarkerMapTmmContext{
+      solve_tmm_factory,
+      other.bmm_tmm_try_shonan_,
+      static_cast<fvlam::BuildMarkerMapTmmContext::NoiseStrategy>(other.bmm_tmm_noise_strategy_),
+      other.bmm_tmm_fixed_sigma_r_,
+      other.bmm_tmm_fixed_sigma_t_};
+  }
+}
+
+namespace fiducial_vlam
+{
 // ==============================================================================
 // BuildMarkerMapController class
 // ==============================================================================
@@ -59,53 +91,35 @@ namespace fiducial_vlam
     fvlam::Logger &logger_;
     VmapDiagnostics &diagnostics_;
     BmmContext bmm_cxt_;
+    int bmm_use_every_n_msg_;
+    int bmm_cnt_every_n_msg_{0};
     std::unique_ptr<fvlam::MarkerMap> map_initial_;
     std::unique_ptr<fvlam::BuildMarkerMapInterface> bmm_interface_{};
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
     bool pause_capture_{false};
-
-    std::unique_ptr<fvlam::BuildMarkerMapInterface> make_bmm_recorder()
-    {
-      fvlam::BuildMarkerMapRecorderContext recorder_context{};
-      return make_build_marker_map(recorder_context, logger_, *map_initial_);
-    }
-
-    std::unique_ptr<fvlam::BuildMarkerMapInterface> make_bmm_tmm()
-    {
-      auto solve_tmm_factory = fvlam::make_solve_tmm_factory(
-        fvlam::SolveTmmContextCvSolvePnp{bmm_cxt_.average_on_space_not_manifold_},
-        map_initial_->marker_length());
-
-      auto tmm_context = fvlam::BuildMarkerMapTmmContext{
-        solve_tmm_factory,
-        bmm_cxt_.bmm_tmm_try_shonan_,
-        static_cast<fvlam::BuildMarkerMapTmmContext::NoiseStrategy>(bmm_cxt_.bmm_tmm_noise_strategy_),
-        bmm_cxt_.bmm_tmm_fixed_sigma_r_,
-        bmm_cxt_.bmm_tmm_fixed_sigma_t_};
-
-      return make_build_marker_map(tmm_context, logger_, *map_initial_);
-    }
 
   public:
     BuildMarkerMapController(rclcpp::Node &node, fvlam::Logger &logger, VmapDiagnostics &diagnostics,
                              BmmContext bmm_cxt, const PsmContext &psm_cxt,
                              std::unique_ptr<fvlam::MarkerMap> map_initial) :
       node_{node}, logger_{logger}, diagnostics_{diagnostics},
-      bmm_cxt_{std::move(bmm_cxt)},
+      bmm_cxt_{std::move(bmm_cxt)}, bmm_use_every_n_msg_{std::max(1, bmm_cxt.bmm_use_every_n_msg_)},
       map_initial_{std::move(map_initial)}
     {
       // Instantiate a BuildMarkerMap class based on the parameter settings.
       switch (bmm_cxt_.bmm_algorithm_) {
         default:
         case 0: // record observations to file
-          bmm_interface_ = make_bmm_recorder();
+          bmm_interface_ = make_build_marker_map(fvlam::BuildMarkerMapRecorderContext::from(bmm_cxt_),
+                                                 logger_, *map_initial_);
           break;
 
         case 1: // t_marker0_marker1 techniques
-          bmm_interface_ = make_bmm_tmm();
+          bmm_interface_ = make_build_marker_map(fvlam::BuildMarkerMapTmmContext::from(bmm_cxt_, *map_initial_),
+                                                 logger_, *map_initial_);
           break;
 
-        case 2: // isam_betweenfactor techniques
+        case 2: // isam_betweenfactor technique
           break;
       }
 
@@ -114,14 +128,18 @@ namespace fiducial_vlam
       }
 
       // Set up a subscriber for observations messages
+      (void) observations_sub_;
       observations_sub_ = node_.create_subscription<fiducial_vlam_msgs::msg::Observations>(
         psm_cxt.psm_sub_observations_topic_,
         rclcpp::QoS{rclcpp::ServicesQoS()},
         [this](fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
         {
           diagnostics_.sub_observations_count_ += 1;
-          if (bmm_interface_ && !pause_capture_) {
+          bmm_cnt_every_n_msg_ += 1;
+
+          if (bmm_interface_ && !pause_capture_ && bmm_cnt_every_n_msg_ >= bmm_use_every_n_msg_) {
             diagnostics_.process_observations_count_ += 1;
+            bmm_cnt_every_n_msg_ = 0;
 
             // From the observations message, pick out the CameraInfo and Observations
             auto camera_info = fvlam::CameraInfo::from(*msg);
@@ -154,7 +172,7 @@ namespace fiducial_vlam
       return map;
     }
 
-    void stop()
+    void pause()
     {
       if (bmm_interface_) {
         pause_capture_ = true;
@@ -191,7 +209,6 @@ namespace fiducial_vlam
 
     std::unique_ptr<BuildMarkerMapController> bmm_controller_{};
     std::unique_ptr<fvlam::MarkerMap> marker_map_{}; // Map that gets updated and published.
-    std::uint64_t map_skip_images_count_{0};
     rclcpp::Time exit_build_map_time_;
 
     // ROS publishers
@@ -208,12 +225,6 @@ namespace fiducial_vlam
         psm_cxt_.psm_pub_map_frequency_hz_ = 30. / 60.;
       }
       psm_cxt_.timer_period_milliseconds_ = static_cast<int>(1000. / psm_cxt_.psm_pub_map_frequency_hz_);
-
-      cxt_.map_init_transform_ = TransformWithCovariance(TransformWithCovariance::mu_type{
-        cxt_.map_init_pose_x_, cxt_.map_init_pose_y_, cxt_.map_init_pose_z_,
-        cxt_.map_init_pose_roll_, cxt_.map_init_pose_pitch_, cxt_.map_init_pose_yaw_});
-
-      cxt_.map_skip_images_ = std::max(1, cxt_.map_skip_images_);
     }
 
     void setup_parameters()
@@ -281,9 +292,10 @@ namespace fiducial_vlam
       logger_.info()
         << "To build a map of markers - set the map_cmd parameter." << std::endl
         << "  map_cmd start - Start capturing and incrementally processing images to build a map of markers.\n"
-        << "  map_cmd stop - Stop capturing images but continue processing images already captured.\n"
+        << "  map_cmd pause - Stop capturing images but continue processing images already captured.\n"
         << "  map_cmd resume - Continue capturing images and processing them.\n"
-        << "  map_cmd finish - Stop capturing and processing images. The last finished map is saved and the map building state is cleared.";
+        << "  map_cmd finish - Stop capturing and processing images. The last finished map is saved and the map building state is cleared.\n"
+        << "  map_cmd diagnostics - Log diagnostics about the operation of vmap_node.";
       logger_.info() << "vmap_node ready.";
     }
 
@@ -406,9 +418,9 @@ namespace fiducial_vlam
           *this, logger_, diagnostics_, bmm_cxt_, psm_cxt_,
           make_initial_marker_map(true));
 
-      } else if (cmd == "stop") {
+      } else if (cmd == "pause") {
         if (bmm_controller_) {
-          bmm_controller_->stop();
+          bmm_controller_->pause();
         }
 
       } else if (cmd == "resume") {
@@ -416,13 +428,14 @@ namespace fiducial_vlam
           bmm_controller_->resume();
         }
 
-
       } else if (cmd == "finish") {
         if (bmm_controller_) {
           bmm_controller_->finish();
           bmm_controller_.reset(nullptr);
         }
 
+      } else if (cmd == "diagnostics") {
+        diagnostics_.report(logger_, now());
 
       } else {
         logger_.warn() << "Invalid command: " << cmd;
@@ -502,6 +515,31 @@ namespace fiducial_vlam
   std::shared_ptr<rclcpp::Node> vmap_node_factory(const rclcpp::NodeOptions &options)
   {
     return std::shared_ptr<rclcpp::Node>(new VmapNode(options));
+  }
+
+  void VmapDiagnostics::report(fvlam::Logger &logger, const rclcpp::Time &end_time)
+  {
+    double per_sec = 1.0 / (end_time - start_time_).seconds();
+    logger.info() << "Received Observations: " << sub_observations_count_
+                  << " (" << per_sec * sub_observations_count_ << " /sec)";
+    logger.info() << "Processed Observations: " << process_observations_count_
+                  << " (" << per_sec * process_observations_count_ << " /sec)";
+    logger.info() << "Builds: " << build_count
+                  << " (" << per_sec * build_count << " /sec)";
+    logger.info() << "Published Maps: " << pub_map_count_
+                  << " (" << per_sec * pub_map_count_ << " /sec)";
+    logger.info() << "Published Visuals: " << pub_visuals_count_
+                  << " (" << per_sec * pub_visuals_count_ << " /sec)";
+    logger.info() << "Published Tfs: " << pub_tf_count_
+                  << " (" << per_sec * pub_tf_count_ << " /sec)";
+
+    sub_observations_count_ = 0;
+    process_observations_count_ = 0;
+    build_count = 0;
+    pub_map_count_ = 0;
+    pub_visuals_count_ = 0;
+    pub_tf_count_ = 0;
+    start_time_ = end_time;
   }
 }
 

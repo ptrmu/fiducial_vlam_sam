@@ -1,12 +1,15 @@
-#ifndef FIDUCIAL_VLAM_VMAP_CONTEXT_HPP
-#define FIDUCIAL_VLAM_VMAP_CONTEXT_HPP
+#pragma once
 
 #include "ros2_shared/param_macros.hpp"
-#include "transform_with_covariance.hpp"
 
 namespace rclcpp
 {
   class Node;
+}
+
+namespace fvlam
+{
+  class Logger;
 }
 
 namespace fiducial_vlam
@@ -19,13 +22,12 @@ namespace fiducial_vlam
   PAMA_PARAM(map_init_pose_x, double, 2.)                 /* pose component for map initialization */\
   PAMA_PARAM(map_init_pose_y,double, 0.)                  /* pose component for map initialization */\
   PAMA_PARAM(map_init_pose_z, double, 0.)                 /* pose component for map initialization */\
-  PAMA_PARAM(map_init_pose_roll, double, TF2SIMD_HALF_PI) /* pose component for map initialization */\
+  PAMA_PARAM(map_init_pose_roll, double, M_PI_2)          /* pose component for map initialization */\
   PAMA_PARAM(map_init_pose_pitch, double, 0.)             /* pose component for map initialization */\
-  PAMA_PARAM(map_init_pose_yaw, double, -TF2SIMD_HALF_PI) /* pose component for map initialization */\
+  PAMA_PARAM(map_init_pose_yaw, double, -M_PI_2)          /* pose component for map initialization */\
   PAMA_PARAM(map_marker_length, double, 0.2100)           /* length of a side of a marker in meters */\
   \
-  PAMA_PARAM(map_cmd, std::string, "")                    /* commands to the build_marker_map system  */\
-  PAMA_PARAM(map_skip_images, int, 5)                     /* image frames to skip when creating map. 1=>use all frames, 2=>use every other frame, ...  */\
+  PAMA_PARAM(map_cmd, std::string, )                      /* commands to the build_marker_map system  */\
   PAMA_PARAM(map_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
   PAMA_PARAM(map_compute_on_thread, int, 1)               /* Do heavy-duty computation on a thread. */\
   /* End of list */
@@ -67,9 +69,10 @@ namespace fiducial_vlam
   /* End of list */
 
 
-  // The following parameters control how marker maps are built from observations
+  // The following parameters control how marker maps are built from observations.
 #define BMM_ALL_PARAMS \
   PAMA_PARAM(bmm_algorithm, int, 1)                       /* 0->record observations to file, 1->t_marker0_marker1, 2->isam_betweenfactor  */\
+  PAMA_PARAM(bmm_use_every_n_msg, int, 1)                 /* 1=>use all frames, 2=>use every other frame, ...   */\
   PAMA_PARAM(bmm_recorded_observations_name, std::string, "observations.yaml") /* topic for publishing map of markers  */                   \
   PAMA_PARAM(bmm_solve_tmm_algorithm, int, 1)             /* 0->cv-SolvePnp+EstimateMAC  */\
   PAMA_PARAM(average_on_space_not_manifold, bool, true)   /* Estimate t_marker0_marker1 in TangentSpace or Manifold space  */\
@@ -84,8 +87,6 @@ namespace fiducial_vlam
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
     PAMA_PARAMS_DEFINE(VMAP_ALL_PARAMS)
-
-    TransformWithCovariance map_init_transform_;
   };
 
   struct VmapDiagnostics
@@ -98,13 +99,10 @@ namespace fiducial_vlam
     std::uint64_t pub_tf_count_{0};
     rclcpp::Time start_time_;
 
-    VmapDiagnostics(rclcpp::Time start_time) :
+    explicit VmapDiagnostics(const rclcpp::Time &start_time) :
       start_time_{start_time}
     {}
 
-    template<class T>
-    void report(rclcpp::Time end_time, T &other) const;
+    void report(fvlam::Logger &logger, const rclcpp::Time &end_time);
   };
 }
-
-#endif //FIDUCIAL_VLAM_VMAP_CONTEXT_HPP

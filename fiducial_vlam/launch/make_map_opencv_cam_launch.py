@@ -57,7 +57,6 @@ vmap_args = [{
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
-    'map_skip_images': 5,
     'map_cmd': 'none',
 }]
 

@@ -290,6 +290,22 @@ namespace fvlam
     int id = other()["id"];
     int fixed = other()["f"];
 
+    // There are two formats for the serialization of markers. The original format does
+    // not write the data in a hierarchical format. Look for that format here:
+    auto xyz_node = other()["xyz"];
+    if (!xyz_node.empty()) {
+      auto t_node = other()["xyz"];
+      auto t_context = other.make(t_node);
+      auto t = Translate3::from(t_context);
+
+      auto r_node = other()["rpy"];
+      auto r_context = other.make(r_node);
+      auto r = Rotate3::from(r_context);
+
+      return Marker{std::uint64_t(id), Transform3WithCovariance{Transform3{r, t}}, fixed != 0};
+    }
+
+    // Otherwise use the hierarchical format
     auto twc_node = other()["t_world_marker"];
     auto twc_context = other.make(twc_node);
     auto twc = Transform3WithCovariance::from(twc_context);
@@ -499,8 +515,9 @@ namespace fvlam
 
     FileStorageContext context{logger};
     auto root_node = context.make(fs.root());
+    auto marker_map_node = root_node.make(root_node()["marker_map"]);
 
-    auto map = MarkerMap::from(root_node);
+    auto map = MarkerMap::from(marker_map_node().empty() ? root_node : marker_map_node);
     return context.success() ? map : MarkerMap{0.0};
   }
 

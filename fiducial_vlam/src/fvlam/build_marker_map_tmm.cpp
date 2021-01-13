@@ -4,6 +4,7 @@
 
 #include "fvlam/build_marker_map_interface.hpp"
 #include "fvlam/camera_info.hpp"
+#include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>

@@ -3,14 +3,7 @@
 #include <memory>
 
 #include "fvlam/build_marker_map_interface.hpp"
-#include "fvlam/camera_info.hpp"
-#include "fvlam/marker.hpp"
-#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
-#include <gtsam/nonlinear/Marginals.h>
-#include <gtsam/nonlinear/NonlinearFactorGraph.h>
-#include <gtsam/sfm/ShonanAveraging.h>
-#include <gtsam/slam/InitializePose3.h>
-#include <opencv2/calib3d/calib3d.hpp>
+#include "fvlam/observations_bundle.hpp"
 
 namespace fvlam
 {
@@ -23,27 +16,34 @@ namespace fvlam
   {
     BuildMarkerMapRecorderContext recorder_context_;
     Logger &logger_;
-    MarkerMap map_initial_;
+    std::unique_ptr<fvlam::MarkerMap> map_initial_;
+    ObservationsBundles observations_bundles_;
 
   public:
     BuildMarkerMapRecorder(const BuildMarkerMapRecorderContext &recorder_context,
                            Logger &logger,
                            MarkerMap map_initial) :
-      recorder_context_{recorder_context}, logger_{logger}, map_initial_{map_initial}
+      recorder_context_{recorder_context}, logger_{logger},
+      map_initial_{std::make_unique<fvlam::MarkerMap>(map_initial)}, observations_bundles_{map_initial}
     {}
+
+    ~BuildMarkerMapRecorder() // virtual destructor
+    {
+      observations_bundles_.save(recorder_context_.bmm_recorded_observations_name_, logger_);
+    }
 
     // Take the location of markers in one image and add them to the marker map
     // building algorithm.
-    virtual void process(const fvlam::Observations &observations,
-                         const fvlam::CameraInfo &camera_info)
+    void process(const fvlam::Observations &observations,
+                 const fvlam::CameraInfo &camera_info) override
     {
-
+      observations_bundles_.add_bundle(ObservationsBundle{camera_info, observations});
     }
 
     // Given the observations that have been added so far, create and return a marker_map.
-    virtual std::unique_ptr<fvlam::MarkerMap> build()
+    std::unique_ptr<fvlam::MarkerMap> build() override
     {
-      return std::unique_ptr<fvlam::MarkerMap>{};
+      return std::make_unique<fvlam::MarkerMap>(*map_initial_);
     }
   };
 

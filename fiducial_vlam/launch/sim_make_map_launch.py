@@ -22,16 +22,12 @@ elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vloc_args = [{
-    'use_sim_time': False,  # Don't use /clock
     'loc_camera_sam_not_cv': 0,
     'loc_cv4_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_publish_tfs': 1,  # Publish drone and camera /tf
-    'psl_stamp_msgs_with_current_time': 1,  # Stamp with now()
     'psl_sub_camera_info_best_effort_not_reliable': 1,
     'psl_sub_image_raw_best_effort_not_reliable': 1,
-    'psl_publish_camera_tf_per_marker': 0,
-    'psl_publish_image_marked': 1,
     'psl_camera_frame_id': 'forward_camera',
     'psl_publish_base_pose': 1,
     'psl_publish_camera_odom': 1,
@@ -39,13 +35,13 @@ vloc_args = [{
 }]
 
 vmap_args = [{
-    'use_sim_time': False,  # Don't use /clock
     'map_marker_length': 0.1775,  # Marker length
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
-    'map_skip_images': 3,
     'map_cmd': 'start',
+    'bmm_algorithm': 1,
+    'bmm_recorded_observations_name': 'recorded_observations.yaml'
 }]
 
 

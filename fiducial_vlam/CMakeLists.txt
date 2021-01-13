@@ -112,11 +112,7 @@ set(VLOC_NODE_SOURCES
   src/transform_with_covariance.cpp
   src/vloc_node.cpp
   src/gtsam_localize.cpp
-  src/calibrate.cpp
-  src/calibrate_capture_stationary.cpp
-  src/smooth_observations.cpp
   src/cv_utils.cpp
-  src/calibrate_task.cpp
   )
 
 set(VLOC_NODE_DEPS
@@ -162,6 +158,71 @@ if (GTSAM_FOUND)
 
   # ?? Why can't I put this in ament_target_dependencies
   target_link_libraries(vloc_main
+    gtsam
+    )
+endif ()
+
+#=============
+# vlocx node
+#=============
+
+set(VLOCX_NODE_SOURCES
+  src/calibrate.cpp
+  src/calibrate_capture_stationary.cpp
+  src/calibrate_task.cpp
+  src/convert_util.cpp
+  src/cv_utils.cpp
+  src/fiducial_math.cpp
+  src/gtsam_localize.cpp
+  src/map.cpp
+  src/smooth_observations.cpp
+  src/transform_with_covariance.cpp
+  src/vlocx_node.cpp
+  )
+
+set(VLOCX_NODE_DEPS
+  camera_calibration_parsers
+  class_loader
+  cv_bridge
+  fiducial_vlam_msgs
+  ${MY_GTSAM_LIB}
+  nav_msgs
+  OpenCV
+  rclcpp
+  ros2_shared
+  sensor_msgs
+  std_msgs
+  tf2_msgs
+  )
+
+add_library(vlocx_node SHARED
+  ${VLOC_NODE_SOURCES})
+
+target_compile_definitions(vlocx_node
+  PRIVATE "COMPOSITION_BUILDING_DLL")
+
+ament_target_dependencies(vlocx_node
+  ${VLOCX_NODE_DEPS})
+
+rclcpp_components_register_nodes(vlocx_node "fiducial_vlam::VlocxNode")
+set(node_plugins "${node_plugins}fiducial_vlam::VlocxNode;$<TARGET_FILE:vlocx_node>\n")
+
+add_executable(vlocx_main
+  src/vlocx_main.cpp
+  ${VLOCX_NODE_SOURCES}
+  )
+
+ament_target_dependencies(vlocx_main
+  ${VLOCX_NODE_DEPS})
+
+if (GTSAM_FOUND)
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vlocx_node
+    gtsam
+    )
+
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vlocx_main
     gtsam
     )
 endif ()

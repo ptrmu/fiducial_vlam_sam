@@ -5,7 +5,7 @@
 #include "observation.hpp"
 #include "opencv2/core.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "vloc_context.hpp"
+#include "vlocx_context.hpp"
 
 namespace fiducial_vlam
 {
