@@ -106,6 +106,10 @@ set(node_plugins "")
 #=============
 
 set(VLOC_NODE_SOURCES
+  src/fvlam/conversions_cv.cpp
+  src/fvlam/conversions_gtsam.cpp
+  src/fvlam/localize_camera_cv.cpp
+  src/fvlam/localize_camera_gtsam.cpp
   src/convert_util.cpp
   src/fiducial_math.cpp
   src/map.cpp

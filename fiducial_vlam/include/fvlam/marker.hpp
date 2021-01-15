@@ -114,17 +114,20 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
-    std::string to_string(bool also_cov = false) const; //
-    std::string to_id_string() const; //
-    std::string to_corners_f_world_string(double marker_length) const; //
-
-    bool equals(const Marker &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+    template<class T>
+    static T to_corners_f_marker(double marker_length);
 
     template<class T>
     T to_corners_f_world(double marker_length) const;
 
     template<class T>
-    static T to_corners_f_marker(double marker_length);
+    void to_corners_f_world(double marker_length, T &other) const;
+
+    std::string to_string(bool also_cov = false) const; //
+    std::string to_id_string() const; //
+    std::string to_corners_f_world_string(double marker_length) const; //
+
+    bool equals(const Marker &other, double tol = 1.0e-9, bool check_relative_also = true) const;
 
     using ProjectFunction = std::function<Observation(const Marker &marker)>;
     using SolveFunction = std::function<Marker(const Observation &observation)>;

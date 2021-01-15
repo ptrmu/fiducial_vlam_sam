@@ -25,13 +25,13 @@ vloc_args = [{
     'loc_camera_sam_not_cv': 0,
     'loc_cv4_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
-    'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
-    'psl_sub_camera_info_best_effort_not_reliable': True,
-    'psl_sub_image_raw_best_effort_not_reliable': True,
-    'psl_pub_tf_camera_child_frame_id': 'forward_camera',
-    'psl_pub_camera_odom_enable': True,
-    'psl_pub_base_pose_enable': True,
-    'psl_pub_base_odom_enable': True,
+    'psl_publish_tfs': 1,  # Publish drone and camera /tf
+    'psl_sub_camera_info_best_effort_not_reliable': 1,
+    'psl_sub_image_raw_best_effort_not_reliable': 1,
+    'psl_camera_frame_id': 'forward_camera',
+    'psl_publish_base_pose': 1,
+    'psl_publish_camera_odom': 1,
+    'psl_publish_base_odom': 1,
 }]
 
 vmap_args = [{
@@ -64,7 +64,7 @@ def generate_launch_description():
         Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
              arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+        Node(package='fiducial_vlam', executable='vlocx_main', output='screen',
              parameters=vloc_args, namespace='forward_camera'),
         Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),

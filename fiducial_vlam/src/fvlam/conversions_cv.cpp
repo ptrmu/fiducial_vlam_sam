@@ -15,6 +15,12 @@ namespace fvlam
 // ==============================================================================
 
   template<>
+  cv::Point2d Translate2::to<cv::Point2d>() const
+  {
+    return cv::Point2d{t_(0), t_(1)};
+  }
+
+  template<>
   Translate3 Translate3::from<cv::Vec3d>(cv::Vec3d &other)
   {
     return Translate3{other[0], other[1], other[2]};
@@ -83,10 +89,10 @@ namespace fvlam
   {
     auto corners_f_marker = calc_corners3_f_marker(marker_length);
     return std::vector<cv::Point3d>{
-      cv::Point3d{corners_f_marker[0].t()(0), corners_f_marker[0].t()(1), corners_f_marker[2].t()(2)},
-      cv::Point3d{corners_f_marker[1].t()(0), corners_f_marker[1].t()(1), corners_f_marker[2].t()(2)},
+      cv::Point3d{corners_f_marker[0].t()(0), corners_f_marker[0].t()(1), corners_f_marker[0].t()(2)},
+      cv::Point3d{corners_f_marker[1].t()(0), corners_f_marker[1].t()(1), corners_f_marker[1].t()(2)},
       cv::Point3d{corners_f_marker[2].t()(0), corners_f_marker[2].t()(1), corners_f_marker[2].t()(2)},
-      cv::Point3d{corners_f_marker[3].t()(0), corners_f_marker[3].t()(1), corners_f_marker[2].t()(2)}
+      cv::Point3d{corners_f_marker[3].t()(0), corners_f_marker[3].t()(1), corners_f_marker[3].t()(2)}
     };
   }
 
@@ -95,11 +101,21 @@ namespace fvlam
   {
     auto corners_f_world = calc_corners3_f_world(marker_length);
     return std::vector<cv::Point3d>{
-      cv::Point3d{corners_f_world[0].t()(0), corners_f_world[0].t()(1), corners_f_world[2].t()(2)},
-      cv::Point3d{corners_f_world[1].t()(0), corners_f_world[1].t()(1), corners_f_world[2].t()(2)},
+      cv::Point3d{corners_f_world[0].t()(0), corners_f_world[0].t()(1), corners_f_world[0].t()(2)},
+      cv::Point3d{corners_f_world[1].t()(0), corners_f_world[1].t()(1), corners_f_world[1].t()(2)},
       cv::Point3d{corners_f_world[2].t()(0), corners_f_world[2].t()(1), corners_f_world[2].t()(2)},
-      cv::Point3d{corners_f_world[3].t()(0), corners_f_world[3].t()(1), corners_f_world[2].t()(2)}
+      cv::Point3d{corners_f_world[3].t()(0), corners_f_world[3].t()(1), corners_f_world[3].t()(2)}
     };
+  }
+
+  template<>
+  void Marker::to_corners_f_world<std::vector<cv::Point3d>>(double marker_length, std::vector<cv::Point3d> &other) const
+  {
+    auto corners_f_world = calc_corners3_f_world(marker_length);
+    other.emplace_back(cv::Point3d{corners_f_world[0].t()(0), corners_f_world[0].t()(1), corners_f_world[0].t()(2)});
+    other.emplace_back(cv::Point3d{corners_f_world[1].t()(0), corners_f_world[1].t()(1), corners_f_world[1].t()(2)});
+    other.emplace_back(cv::Point3d{corners_f_world[2].t()(0), corners_f_world[2].t()(1), corners_f_world[2].t()(2)});
+    other.emplace_back(cv::Point3d{corners_f_world[3].t()(0), corners_f_world[3].t()(1), corners_f_world[3].t()(2)});
   }
 
 // ==============================================================================
@@ -118,6 +134,15 @@ namespace fvlam
   }
 
   template<>
+  void Observation::to<std::vector<cv::Point2d>>(std::vector<cv::Point2d> &other) const
+  {
+    other.emplace_back(cv::Point2d{corners_f_image_[0].x(), corners_f_image_[0].y()});
+    other.emplace_back(cv::Point2d{corners_f_image_[1].x(), corners_f_image_[1].y()});
+    other.emplace_back(cv::Point2d{corners_f_image_[2].x(), corners_f_image_[2].y()});
+    other.emplace_back(cv::Point2d{corners_f_image_[3].x(), corners_f_image_[3].y()});
+  }
+
+  template<>
   Observation Observation::from<std::vector<cv::Point2d>>(
     std::uint64_t id, std::vector<cv::Point2d> &other)
   {
@@ -127,6 +152,24 @@ namespace fvlam
       Observation::Element{other[2].x, other[2].y},
       Observation::Element{other[3].x, other[3].y}
     });
+  }
+
+  template<>
+  Observations Observations::from<std::pair<std::vector<int>, std::vector<std::vector<cv::Point2d>>>>(
+    std::pair<std::vector<int>, std::vector<std::vector<cv::Point2d>>> &other)
+  {
+    auto &ids = other.first;
+    auto &corners = other.second;
+
+    Observations observations;
+    for (size_t i = 0; i < ids.size(); i += 1) {
+      observations.add(Observation(ids[i],
+                                   corners[i][0].x, corners[i][0].y,
+                                   corners[i][1].x, corners[i][1].y,
+                                   corners[i][2].x, corners[i][2].y,
+                                   corners[i][3].x, corners[i][3].y));
+    }
+    return observations;
   }
 
 // ==============================================================================

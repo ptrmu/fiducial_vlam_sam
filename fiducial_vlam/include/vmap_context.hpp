@@ -43,6 +43,7 @@ namespace fiducial_vlam
   //    message: fiducial_vlam_msgs::msg::Map
   //    topic parameter: psm_pub_map_topic ("fiducial_map")
   //    frame_id parameter: psm_pub_map_frame_id ("map")
+  //    publish frequency parameter: psm_pub_map_frequency_hz (0.5)
   //  Marker Visualizations - message with flattened cubes for rviz to visualize the marker locations.
   //    message: visualization_msgs::msg::MarkerArray
   //    enable parameter: psm_pub_visuals_enable (true)
@@ -50,21 +51,23 @@ namespace fiducial_vlam
   //    frame_id: same as Marker Map
   //  Marker Transformations - publish the transformations to each of the markers
   //    message: tf2_msgs::msg::TFMessage
-  //    enable parameter: psm_pub_tfs_enable (true)
+  //    enable parameter: psm_pub_tf_marker_enable (true)
   //    topic: "tf"
   //    frame_id: same as Marker Map
-  //    child_frame_id parameter: psm_pub_tfs_child_frame_id ("marker_")
+  //    child_frame_id parameter: psl_pub_tf_marker_child_frame_id ("marker_")
   //
 #define PSM_ALL_PARAMS \
   PAMA_PARAM(psm_sub_observations_topic, std::string, "/fiducial_observations") /* topic for subscription to fiducial_vlam_msgs::msg::Observations  */\
+  \
+  PAMA_PARAM(psm_pub_visuals_enable, bool, true)          /* Enable publishing of the marker visualizations */\
+  PAMA_PARAM(psm_pub_tf_marker_enable, bool, true)        /* Enable publishing of marker tfs */\
+  \
   PAMA_PARAM(psm_pub_map_topic, std::string, "/fiducial_map") /* topic for publishing map of markers  */\
   PAMA_PARAM(psm_pub_visuals_topic, std::string, "fiducial_visuals") /* topic for publishing rviz visualizations of markers  */\
   \
   PAMA_PARAM(psm_pub_map_frame_id, std::string, "map")    /* frame_id for marker and tf messages - normally "map"  */\
-  PAMA_PARAM(psm_pub_tfs_child_frame_id, std::string, "marker_") /* frame_id prefix for each marker in the tf message  */\
+  PAMA_PARAM(psm_pub_tf_marker_child_frame_id, std::string, "marker_") /* frame_id prefix for each marker in the tf message  */\
   \
-  PAMA_PARAM(psm_pub_visuals_enable, bool, true)          /* Enable publishing of the marker visualizations */\
-  PAMA_PARAM(psm_pub_tfs_enable, bool, true)              /* Enable publishing of marker tfs */\
   PAMA_PARAM(psm_pub_map_frequency_hz, double, 0.)        /* Hz => rate at which the marker map is published */\
   /* End of list */
 

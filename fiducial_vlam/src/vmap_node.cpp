@@ -212,11 +212,12 @@ namespace fiducial_vlam
     rclcpp::Time exit_build_map_time_;
 
     // ROS publishers
-    rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr fiducial_map_pub_{};
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr fiducial_markers_pub_{};
-    rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf_message_pub_{};
+    rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr pub_map_{};
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_visuals_{};
+    rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr pub_tf_{};
 
-    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
+    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr sub_observations_{};
+
     rclcpp::TimerBase::SharedPtr map_pub_timer_{};
 
     void validate_parameters()
@@ -267,16 +268,16 @@ namespace fiducial_vlam
       marker_map_ = make_initial_marker_map(false);
 
       // ROS publishers.
-      fiducial_map_pub_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
+      pub_map_ = create_publisher<fiducial_vlam_msgs::msg::Map>(
         psm_cxt_.psm_pub_map_topic_, 16);
 
       if (psm_cxt_.psm_pub_visuals_enable_) {
-        fiducial_markers_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
+        pub_visuals_ = create_publisher<visualization_msgs::msg::MarkerArray>(
           psm_cxt_.psm_pub_visuals_topic_, 16);
       }
 
-      if (psm_cxt_.psm_pub_tfs_enable_) {
-        tf_message_pub_ = create_publisher<tf2_msgs::msg::TFMessage>("tf", 16);
+      if (psm_cxt_.psm_pub_tf_marker_enable_) {
+        pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>("tf", 16);
       }
 
       // Timer for publishing map info
@@ -287,7 +288,7 @@ namespace fiducial_vlam
           timer_msg_callback();
         });
 
-      (void) observations_sub_;
+      (void) sub_observations_;
       (void) map_pub_timer_;
       logger_.info()
         << "To build a map of markers - set the map_cmd parameter." << std::endl
@@ -363,7 +364,7 @@ namespace fiducial_vlam
       fiducial_vlam_msgs::msg::Map map_msg;
       marker_map_->to(map_msg);
       map_msg.header = header;
-      fiducial_map_pub_->publish(map_msg);
+      pub_map_->publish(map_msg);
 
       // Create and publish the marker visualization
       if (psm_cxt_.psm_pub_visuals_enable_) {
@@ -375,11 +376,11 @@ namespace fiducial_vlam
           visual_msg.header = header;
           visuals_msg.markers.emplace_back(visual_msg);
         }
-        fiducial_markers_pub_->publish(visuals_msg);
+        pub_visuals_->publish(visuals_msg);
       }
 
       // Create and publish the marker transform tree
-      if (psm_cxt_.psm_pub_tfs_enable_) {
+      if (psm_cxt_.psm_pub_tf_marker_enable_) {
         diagnostics_.pub_tf_count_ += 1;
         tf2_msgs::msg::TFMessage tfs_msg;
         for (auto &id_marker_pair: marker_map_->markers()) {
@@ -387,7 +388,7 @@ namespace fiducial_vlam
           auto transform_msg{t_world_marker.to<geometry_msgs::msg::Transform>()};
 
           std::ostringstream oss_child_frame_id;
-          oss_child_frame_id << psm_cxt_.psm_pub_tfs_child_frame_id_
+          oss_child_frame_id << psm_cxt_.psm_pub_tf_marker_child_frame_id_
                              << std::setfill('0') << std::setw(3)
                              << id_marker_pair.first;
 
@@ -398,7 +399,7 @@ namespace fiducial_vlam
 
           tfs_msg.transforms.emplace_back(tf_stamped_msg);
         }
-        tf_message_pub_->publish(tfs_msg);
+        pub_tf_->publish(tfs_msg);
       }
     }
 
