@@ -140,11 +140,11 @@ namespace fvlam
 
       // Detect markers
       std::vector<int> ids;
-      std::vector<std::vector<cv::Point2d>> corners;
+      std::vector<std::vector<cv::Point2f>> corners;
       cv::aruco::detectMarkers(gray_image, localization_aruco_dictionary_, corners, ids, detectorParameters);
 
       // return the corners as an observations structure.
-      std::pair<std::vector<int>, std::vector<std::vector<cv::Point2d>>> args{ids, corners};
+      std::pair<std::vector<int>, std::vector<std::vector<cv::Point2f>>> args{ids, corners};
       return fvlam::Observations::from(args);
     }
 

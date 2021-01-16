@@ -17,6 +17,7 @@
 #include "calibrate.hpp"
 #include "cv_utils.hpp"
 #include "fiducial_math.hpp"
+#include "logger_ros2.hpp"
 #include "map.hpp"
 #include "observation.hpp"
 #include "vloc_context.hpp"
@@ -39,34 +40,34 @@ namespace fiducial_vlam
 // annotate_image_with_marker_axes routine
 // ==============================================================================
 
-  static void annotate_image_with_marker_axes(
-    cv_bridge::CvImage &color_marked,
-    const TransformWithCovariance &t_map_camera,
-    const std::vector<TransformWithCovariance> &t_map_markers,
-    CvFiducialMathInterface &fm,
-    const CameraInfoInterface &camera_info)
-  {
-    (void) fm;
-
-    // Annotate the image by drawing axes on each marker that was used for the location
-    // calculation. This calculation uses the average t_map_camera and the t_map_markers
-    // to figure out where the axes should be. This is different from the t_camera_marker
-    // that was solved for above.
-
-    // Cache a transform.
-    auto tf_t_camera_map = t_map_camera.transform().inverse();
-
-    // Loop through the ids of the markers visible in this image
-    for (size_t i = 0; i < t_map_markers.size(); i += 1) {
-      auto &t_map_marker = t_map_markers[i];
-
-      if (t_map_marker.is_valid()) {
-        // Calculalte t_camera_marker and draw the axis.
-        auto t_camera_marker = TransformWithCovariance(tf_t_camera_map * t_map_marker.transform());
-        AnnotateImages::with_marker_axis(color_marked.image, t_camera_marker, camera_info);
-      }
-    }
-  }
+//  static void annotate_image_with_marker_axes(
+//    cv_bridge::CvImage &color_marked,
+//    const TransformWithCovariance &t_map_camera,
+//    const std::vector<TransformWithCovariance> &t_map_markers,
+//    CvFiducialMathInterface &fm,
+//    const CameraInfoInterface &camera_info)
+//  {
+//    (void) fm;
+//
+//    // Annotate the image by drawing axes on each marker that was used for the location
+//    // calculation. This calculation uses the average t_map_camera and the t_map_markers
+//    // to figure out where the axes should be. This is different from the t_camera_marker
+//    // that was solved for above.
+//
+//    // Cache a transform.
+//    auto tf_t_camera_map = t_map_camera.transform().inverse();
+//
+//    // Loop through the ids of the markers visible in this image
+//    for (size_t i = 0; i < t_map_markers.size(); i += 1) {
+//      auto &t_map_marker = t_map_markers[i];
+//
+//      if (t_map_marker.is_valid()) {
+//        // Calculalte t_camera_marker and draw the axis.
+//        auto t_camera_marker = TransformWithCovariance(tf_t_camera_map * t_map_marker.transform());
+//        AnnotateImages::with_marker_axis(color_marked.image, t_camera_marker, camera_info);
+//      }
+//    }
+//  }
 
 // ==============================================================================
 // LocalizeCameraProcessImageImpl class
@@ -119,90 +120,90 @@ namespace fiducial_vlam
   }
 
 
-  static void save_observations(const rclcpp::Time &time_stamp,
-                                const Observations &observations,
-                                const sensor_msgs::msg::CameraInfo &camera_info_msg)
-  {
-    double marker_length = 0.21;
-    auto k = camera_info_msg.k;
-    auto d = camera_info_msg.d;
-    auto camera_info{make_camera_info(camera_info_msg)};
-    std::stringstream ss{};
-    ss.precision(12);
-    ss << std::scientific
-       << "{ \"stamp\": " << int((time_stamp.seconds() - 1606886000.) * 1000) << ",\n"
-       << "\"camera_info\": {"
-       << "\"height\": " << int(camera_info_msg.height) << ","
-       << "\"width\": " << int(camera_info_msg.width) << ",\n"
-       << "  \"K\": [" << k[0] << "," << k[1] << "," << k[2] << "," << k[3] << "," << k[4]
-       << "," << k[5] << "," << k[6] << "," << k[7] << "," << k[8] << "],\n"
-       << "  \"D\": [" << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4] << "]},\n"
-       << "\"observations\": [\n";
-
-    bool first_record = true;
-    for (auto &observation : observations.observations()) {
-      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
-      auto mu = t_camera_marker.mu();
-      ss << (first_record ? "  {" : ", {")
-         << "\"id\": " << observation.id() << ",\n"
-         << "  \"corners_f_image\": ["
-         << "[" << observation.x0() << "," << observation.y0() << "],"
-         << "[" << observation.x1() << "," << observation.y1() << "],"
-         << "[" << observation.x2() << "," << observation.y2() << "],"
-         << "[" << observation.x3() << "," << observation.y3() << "]"
-         << "],\n"
-         << "  \"marker_f_camera\": [" << mu[0] << "," << mu[1] << ","
-         << mu[2] << "," << mu[3] << "," << mu[4] << "," << mu[5] << "]"
-         << "}\n";
-      first_record = false;
-    }
-
-    ss << "]}";
-
-//    std::cout << ss.str() << std::endl;
-
-//    cv::FileStorage fs("obs", cv::FileStorage::WRITE | cv::FileStorage::MEMORY | cv::FileStorage::FORMAT_JSON);
+//  static void save_observations(const rclcpp::Time &time_stamp,
+//                                const Observations &observations,
+//                                const sensor_msgs::msg::CameraInfo &camera_info_msg)
+//  {
+//    double marker_length = 0.21;
+//    auto k = camera_info_msg.k;
+//    auto d = camera_info_msg.d;
+//    auto camera_info{make_camera_info(camera_info_msg)};
+//    std::stringstream ss{};
+//    ss.precision(12);
+//    ss << std::scientific
+//       << "{ \"stamp\": " << int((time_stamp.seconds() - 1606886000.) * 1000) << ",\n"
+//       << "\"camera_info\": {"
+//       << "\"height\": " << int(camera_info_msg.height) << ","
+//       << "\"width\": " << int(camera_info_msg.width) << ",\n"
+//       << "  \"K\": [" << k[0] << "," << k[1] << "," << k[2] << "," << k[3] << "," << k[4]
+//       << "," << k[5] << "," << k[6] << "," << k[7] << "," << k[8] << "],\n"
+//       << "  \"D\": [" << d[0] << "," << d[1] << "," << d[2] << "," << d[3] << "," << d[4] << "]},\n"
+//       << "\"observations\": [\n";
 //
-//    fs << "stamp" << int((time_stamp.seconds() - 1606886000.) * 1000)
-//       << "camera_info" << "{:"
-//       << "height" << int(camera_info_msg.height)
-//       << "width" << int(camera_info_msg.width)
-//       << "K" << "[" << k[0] << k[1] << k[2] << k[3] << k[4] << k[5] << k[6] << k[7] << k[8] << "]"
-//       << "D" << "[" << d[0] << d[1] << d[2] << d[3] << d[4] << "]"
-//       << "}"
-//       << "observations" << "[";
-//
+//    bool first_record = true;
 //    for (auto &observation : observations.observations()) {
 //      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
 //      auto mu = t_camera_marker.mu();
-//      fs << "{:"
-//         << "id" << observation.id()
-//         << "corners_f_image" << "["
-//         << "[" << observation.x0() << observation.y0() << "]"
-//         << "[" << observation.x1() << observation.y1() << "]"
-//         << "[" << observation.x2() << observation.y2() << "]"
-//         << "[" << observation.x3() << observation.y3() << "]"
-//         << "]"
-//         << "marker_f_camera" << "[" << mu[0] << mu[1] << mu[2] << mu[3] << mu[4] << mu[5] << "]"
-//         << "}";
+//      ss << (first_record ? "  {" : ", {")
+//         << "\"id\": " << observation.id() << ",\n"
+//         << "  \"corners_f_image\": ["
+//         << "[" << observation.x0() << "," << observation.y0() << "],"
+//         << "[" << observation.x1() << "," << observation.y1() << "],"
+//         << "[" << observation.x2() << "," << observation.y2() << "],"
+//         << "[" << observation.x3() << "," << observation.y3() << "]"
+//         << "],\n"
+//         << "  \"marker_f_camera\": [" << mu[0] << "," << mu[1] << ","
+//         << mu[2] << "," << mu[3] << "," << mu[4] << "," << mu[5] << "]"
+//         << "}\n";
+//      first_record = false;
 //    }
 //
-//    fs << "]";
-//    auto s = fs.releaseAndGetString();
-//    std::cout << s << std::endl;
-
-    static bool inited = false;
-    std::ofstream os("observations.json", std::ios::out | (inited ? std::ios::app : std::ios::trunc));
-    if (!inited) {
-      os << "{\"measurements\": [\n";
-    } else {
-      os << ",\n";
-    }
-    os << ss.str();
-    inited = true;
-
-    // Add "]}" to end of file to properly terminate the file.
-  }
+//    ss << "]}";
+//
+////    std::cout << ss.str() << std::endl;
+//
+////    cv::FileStorage fs("obs", cv::FileStorage::WRITE | cv::FileStorage::MEMORY | cv::FileStorage::FORMAT_JSON);
+////
+////    fs << "stamp" << int((time_stamp.seconds() - 1606886000.) * 1000)
+////       << "camera_info" << "{:"
+////       << "height" << int(camera_info_msg.height)
+////       << "width" << int(camera_info_msg.width)
+////       << "K" << "[" << k[0] << k[1] << k[2] << k[3] << k[4] << k[5] << k[6] << k[7] << k[8] << "]"
+////       << "D" << "[" << d[0] << d[1] << d[2] << d[3] << d[4] << "]"
+////       << "}"
+////       << "observations" << "[";
+////
+////    for (auto &observation : observations.observations()) {
+////      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
+////      auto mu = t_camera_marker.mu();
+////      fs << "{:"
+////         << "id" << observation.id()
+////         << "corners_f_image" << "["
+////         << "[" << observation.x0() << observation.y0() << "]"
+////         << "[" << observation.x1() << observation.y1() << "]"
+////         << "[" << observation.x2() << observation.y2() << "]"
+////         << "[" << observation.x3() << observation.y3() << "]"
+////         << "]"
+////         << "marker_f_camera" << "[" << mu[0] << mu[1] << mu[2] << mu[3] << mu[4] << mu[5] << "]"
+////         << "}";
+////    }
+////
+////    fs << "]";
+////    auto s = fs.releaseAndGetString();
+////    std::cout << s << std::endl;
+//
+//    static bool inited = false;
+//    std::ofstream os("observations.json", std::ios::out | (inited ? std::ios::app : std::ios::trunc));
+//    if (!inited) {
+//      os << "{\"measurements\": [\n";
+//    } else {
+//      os << ",\n";
+//    }
+//    os << ss.str();
+//    inited = true;
+//
+//    // Add "]}" to end of file to properly terminate the file.
+//  }
 
 // ==============================================================================
 // VlocNode class
@@ -211,8 +212,13 @@ namespace fiducial_vlam
   class VlocNode : public rclcpp::Node
   {
     rclcpp::Logger ros_logger_inst_;
+    LoggerRos2 logger_;
     VlocContext cxt_{};
     PslContext psl_cxt_{};
+    std::unique_ptr<fvlam::LocalizeCameraInterface> localize_camera_{};
+    std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
+    fvlam::MarkerMap marker_map_{1.0};
+
     CalibrateContext cal_cxt_{};
     std::unique_ptr<SmoothObservationsInterface> so_{};
     std::unique_ptr<CvFiducialMathInterface> fm_{};
@@ -280,20 +286,23 @@ namespace fiducial_vlam
       return *lc_pi_;
     }
 
-    bool publish_captured_image_marked()
-    {
-      return false;
-    }
-
+    std::unique_ptr<fvlam::LocalizeCameraInterface>
   public:
     VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
-      ros_logger_inst_{get_logger()}
+      ros_logger_inst_{get_logger()},
+      logger_{*this}
     {
       // Get parameters from the command line
       setup_parameters();
 
       // Initialize work objects after parameters have been loaded.
+      auto fiducial_marker_context = fvlam::FiducialMarkerCvContext();
+      fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, logger_);
+
+      auto localize_camera_context = fvlam::LocalizeCameraCvContext();
+      localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+
       fm_ = make_cv_fiducial_math(cxt_, *so_);
       lc_pi_ = make_localize_camera_process_image(cxt_, *fm_);
 
@@ -369,12 +378,12 @@ namespace fiducial_vlam
 
             // If we have just done a calibration and want to publish the marked captured
             // images then there is nothing to do with this image so ignore it.
-          } else if (!publish_captured_image_marked()) {
+          } else {
 
             // rviz doesn't like it when time goes backward when a bag is played again.
             // The stamp_msgs_with_current_time_ parameter can help this by replacing the
             // image message time with the current time.
-            process_image(std::move(msg), std::move(camera_info_msg_), stamp);
+            process_image(std::move(msg), std::move(camera_info_msg_));
           }
 
           last_image_stamp_ = stamp;
@@ -415,9 +424,9 @@ namespace fiducial_vlam
 
   private:
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
-                       std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg,
-                       const std_msgs::msg::Header::_stamp_type &stamp)
+                       sensor_msgs::msg::CameraInfo::UniquePtr camera_info_msg)
     {
+      auto stamp = image_msg->header.stamp;
       rclcpp::Time time_stamp{stamp};
 
       // Convert ROS to OpenCV
@@ -429,8 +438,6 @@ namespace fiducial_vlam
       // that the pointer is valid before drawing into it.
       cv_bridge::CvImage color_marked;
 
-//      if (cxt_.psl_publish_image_marked_ &&
-//          count_subscribers(cxt_.psl_image_marked_pub_topic_) > 0) {
       if (psl_cxt_.psl_pub_image_marked_enable_) {
 
         // The toCvShare only makes ConstCvImage because they don't want
@@ -460,16 +467,17 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = pi().process_image(gray, time_stamp, color_marked.image);
+      auto observations = fiducial_marker_->detect_markers(gray->image);
 
       // Publish the observations.
       if (psl_cxt_.psl_pub_observations_enable_ &&
           !observations.observations().empty()) {
-        auto observations_msg = observations.to_msg(stamp, image_msg->header.frame_id, *camera_info_msg);
-        pub_observations_->publish(observations_msg);
+        auto msg = fiducial_vlam_msgs::msg::Observations{}
+          .set__header(image_msg->header)
+          .set__camera_info(*camera_info_msg)
+          .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
+        pub_observations_->publish(msg);
       }
-
-      save_observations(time_stamp, observations, *camera_info_msg);
 
       // Debugging hint: If the markers in color_marked are not outlined
       // in green, then they haven't been detected. If the markers in
@@ -479,77 +487,133 @@ namespace fiducial_vlam
       // We need a map and observations before we can publish camera
       // localization information.
       if (map_ && !observations.observations().empty()) {
-        auto camera_info{make_camera_info(*camera_info_msg)};
+        auto camera_info = fvlam::CameraInfo::from(*camera_info_msg);
 
         // Find the camera pose from the observations.
-        auto t_map_camera{pi().solve_t_map_camera(observations, *camera_info, *map_)};
+        auto t_map_camera = localize_camera_->solve_t_map_camera(observations, camera_info, marker_map_);
 
         if (t_map_camera.is_valid()) {
 
           // If annotated images have been requested, then add the annotations now.
           if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
-            auto t_map_markers = map_->find_t_map_markers(observations);
-            annotate_image_with_marker_axes(color_marked, t_map_camera, t_map_markers, *fm_, *camera_info);
+            fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
+            for (auto &observation : observations.observations()) {
+              auto marker = marker_map_.find_marker(observation.id());
+              if (marker != nullptr) {
+                auto t_camera_marker = t_map_camera.tf().inverse() * marker->t_world_marker().tf();
+                fiducial_marker_->annotate_image_with_marker_axis(color_marked.image, t_camera_marker, camera_info);
+              }
+            }
           }
 
           // Find the transform from the base of the robot to the map. Also include the covariance.
           // Note: the covariance values are with respect to the map frame so both t_map_camera and
           // t_map_base have the same covariance.
-          TransformWithCovariance t_map_base{
-            t_map_camera.transform() * cxt_.loc_t_camera_base_.transform(),
+          auto t_map_base = fvlam::Transform3WithCovariance{
+            t_map_camera.tf() * fvlam::Transform3{
+              fvlam::Rotate3::RzRyRx(cxt_.loc_t_camera_base_yaw_,
+                                     cxt_.loc_t_camera_base_pitch_,
+                                     cxt_.loc_t_camera_base_roll_),
+              fvlam::Translate3{cxt_.loc_t_camera_base_x_,
+                                cxt_.loc_t_camera_base_y_,
+                                cxt_.loc_t_camera_base_z_}},
             t_map_camera.cov()};
+
+          // Header to use with pose, odometry, and tf messages
+          auto po_header = image_msg->header;
+          po_header.frame_id = psl_cxt_.psl_pub_map_frame_id_;
 
           // Publish the camera pose/odometry in the map frame
           if (psl_cxt_.psl_pub_camera_pose_enable_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_camera, stamp, psl_cxt_.psl_pub_map_frame_id_);
-            // add some fixed variance for now.
-            add_fixed_covariance(pose_msg.pose);
-            pub_camera_pose_->publish(pose_msg);
+            auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
+              .set__header(po_header)
+              .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+            add_fixed_covariance(msg.pose);
+            pub_camera_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_camera_odom_enable_) {
-            auto odom_msg = to_odom_message(stamp, psl_cxt_.psl_pub_tf_camera_child_frame_id_, t_map_camera);
-            add_fixed_covariance(odom_msg.pose);
-            pub_camera_odom_->publish(odom_msg);
+            auto msg = nav_msgs::msg::Odometry{}
+              .set__header(po_header)
+              .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
+              .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+            add_fixed_covariance(msg.pose);
+            pub_camera_odom_->publish(msg);
           }
 
           // Publish the base pose/odometry in the map frame
           if (psl_cxt_.psl_pub_base_pose_enable_) {
-            auto pose_msg = to_PoseWithCovarianceStamped_msg(t_map_base, stamp, psl_cxt_.psl_pub_map_frame_id_);
-            // add some fixed variance for now.
-            add_fixed_covariance(pose_msg.pose);
-            pub_base_pose_->publish(pose_msg);
+            auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
+              .set__header(po_header)
+              .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+            add_fixed_covariance(msg.pose);
+            pub_camera_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_base_odom_enable_) {
-            auto odom_msg = to_odom_message(stamp, psl_cxt_.psl_pub_tf_base_child_frame_id_, t_map_base);
-            add_fixed_covariance(odom_msg.pose);
-            pub_base_odom_->publish(odom_msg);
+            auto msg = nav_msgs::msg::Odometry{}
+              .set__header(po_header)
+              .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
+              .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+            add_fixed_covariance(msg.pose);
+            pub_camera_odom_->publish(msg);
           }
 
-          // Also publish the camera's tf
+          // Publish all tfs in one message
+          tf2_msgs::msg::TFMessage tfs_msg;
+
+          // Publish the camera's tf
           if (psl_cxt_.psl_pub_tf_camera_enable_) {
-            auto tf_message = to_tf_message(stamp, t_map_camera, t_map_base);
-            pub_tf_->publish(tf_message);
+            auto msg = geometry_msgs::msg::TransformStamped{}
+              .set__header(po_header)
+              .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
+              .set__transform(t_map_camera.tf().to<geometry_msgs::msg::Transform>());
+            tfs_msg.transforms.emplace_back(msg);
           }
 
-          // TODO: publish base tf
+          // Publish the base's tf
+          if (psl_cxt_.psl_pub_tf_base_enable_) {
+            auto msg = geometry_msgs::msg::TransformStamped{}
+              .set__header(po_header)
+              .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
+              .set__transform(t_map_base.tf().to<geometry_msgs::msg::Transform>());
+            tfs_msg.transforms.emplace_back(msg);
+          }
 
-          // if requested, publish the camera tf as determined from each marker.
+          // if requested, publish the camera tf as determined from each marker in world/map coordinates.
           if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {
-            auto t_map_cameras = markers_t_map_cameras(observations, *camera_info, *map_);
-            auto tf_message = to_cameras_tf_message(stamp, observations, t_map_cameras);
-            if (!tf_message.transforms.empty()) {
-              pub_tf_->publish(tf_message);
+            for (auto &observation : observations.observations()) {
+              auto t_marker_camera = localize_camera_->solve_t_camera_marker(
+                observation, camera_info, marker_map_.marker_length()).tf().inverse();
+              auto marker = marker_map_.find_marker(observation.id());
+              if (marker != nullptr) {
+                auto t_map_camera_n = marker->t_world_marker().tf() * t_marker_camera;
+                auto msg = geometry_msgs::msg::TransformStamped{}
+                  .set__header(po_header)
+                  .set__child_frame_id(compose_frame_id(psl_cxt_.psl_pub_tf_camera_per_marker_child_frame_id_,
+                                                        observation.id()))
+                  .set__transform(t_map_camera_n.to<geometry_msgs::msg::Transform>());
+                tfs_msg.transforms.emplace_back(msg);
+              }
             }
           }
 
           // if requested, publish the marker tf as determined from the camera location and the observation.
           if (psl_cxt_.psl_pub_tf_marker_per_marker_enable_) {
-            auto t_map_markers = markers_t_map_markers(observations, *camera_info,
-                                                       map_->marker_length(), t_map_camera);
-            auto tf_message = to_markers_tf_message(stamp, observations, t_map_markers);
-            if (!tf_message.transforms.empty()) {
-              pub_tf_->publish(tf_message);
+            for (auto &observation : observations.observations()) {
+              auto t_camera_marker = localize_camera_->solve_t_camera_marker(
+                observation, camera_info, marker_map_.marker_length()).tf();
+              auto t_map_marker_n = t_map_camera.tf() * t_camera_marker;
+              auto msg = geometry_msgs::msg::TransformStamped{}
+                .set__header(po_header)
+                .set__child_frame_id(compose_frame_id(psl_cxt_.psl_pub_tf_marker_per_marker_child_frame_id_,
+                                                      observation.id()))
+                .set__transform(t_map_marker_n.to<geometry_msgs::msg::Transform>());
+              tfs_msg.transforms.emplace_back(msg);
             }
+          }
+
+          // If there are any transforms to publish, then publish them.
+          if (!tfs_msg.transforms.empty()) {
+            pub_tf_->publish(tfs_msg);
           }
         }
       }
@@ -560,6 +624,15 @@ namespace fiducial_vlam
         // Republish it now.
         pub_image_marked_->publish(std::move(image_msg));
       }
+    }
+
+    std::string compose_frame_id(std::string &prefix, uint64_t id)
+    {
+      std::ostringstream oss;
+      oss << prefix
+          << std::setfill('0') << std::setw(3)
+          << id;
+      return oss.str();
     }
 
     nav_msgs::msg::Odometry to_odom_message(std_msgs::msg::Header::_stamp_type stamp,
@@ -747,19 +820,19 @@ namespace fiducial_vlam
 
       // If we have just done a calibration and want to publish the marked captured
       // images then do it.
-      if (publish_captured_image_marked()) {
-        cv::Mat captured_image_marked;
-        cc_pi_->get_captured_image_marked(time_now, captured_image_marked);
-        if (captured_image_marked.dims != 0) {
-
-          // build up an image message and publish it.
-          std_msgs::msg::Header header;
-          header.stamp = time_now;
-          header.frame_id = "captured_image_marked";
-          cv_bridge::CvImage cv_image{header, "bgr8", captured_image_marked};
-          pub_image_marked_->publish(*cv_image.toImageMsg());
-        }
-      }
+//      if (publish_captured_image_marked()) {
+//        cv::Mat captured_image_marked;
+//        cc_pi_->get_captured_image_marked(time_now, captured_image_marked);
+//        if (captured_image_marked.dims != 0) {
+//
+//          // build up an image message and publish it.
+//          std_msgs::msg::Header header;
+//          header.stamp = time_now;
+//          header.frame_id = "captured_image_marked";
+//          cv_bridge::CvImage cv_image{header, "bgr8", captured_image_marked};
+//          pub_image_marked_->publish(*cv_image.toImageMsg());
+//        }
+//      }
     }
 
   };

@@ -155,8 +155,8 @@ namespace fvlam
   }
 
   template<>
-  Observations Observations::from<std::pair<std::vector<int>, std::vector<std::vector<cv::Point2d>>>>(
-    std::pair<std::vector<int>, std::vector<std::vector<cv::Point2d>>> &other)
+  Observations Observations::from<std::pair<std::vector<int>, std::vector<std::vector<cv::Point2f>>>>(
+    std::pair<std::vector<int>, std::vector<std::vector<cv::Point2f>>> &other)
   {
     auto &ids = other.first;
     auto &corners = other.second;

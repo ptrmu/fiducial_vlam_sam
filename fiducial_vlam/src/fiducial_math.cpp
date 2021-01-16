@@ -103,7 +103,7 @@ namespace fiducial_vlam
       std::vector<std::vector<cv::Point2f>> corners;
       cv::aruco::detectMarkers(gray.image, localization_aruco_dictionary_, corners, ids, detectorParameters);
 
-      so_.smooth_observations(corners, ids, time_stamp);
+//      so_.smooth_observations(corners, ids, time_stamp);
 
       // Annotate the markers
       if (color_marked.dims != 0) {

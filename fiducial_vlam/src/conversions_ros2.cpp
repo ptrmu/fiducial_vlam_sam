@@ -83,9 +83,9 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  CameraInfo CameraInfo::from<fiducial_vlam_msgs::msg::Observations>(fiducial_vlam_msgs::msg::Observations &other)
+  CameraInfo CameraInfo::from<sensor_msgs::msg::CameraInfo>(sensor_msgs::msg::CameraInfo &other)
   {
-    auto &m = other.camera_info;
+    auto &m = other;
     return CameraInfo{m.k[0], m.k[4],
                       0,
                       m.k[2], m.k[5],
@@ -146,4 +146,27 @@ namespace fvlam
     }
     return observations;
   }
+
+
+  template<>
+  std::vector<fiducial_vlam_msgs::msg::Observation> Observations::to
+    <std::vector<fiducial_vlam_msgs::msg::Observation>>() const
+  {
+    std::vector<fiducial_vlam_msgs::msg::Observation> msgs;
+    for (auto observation: observations_) {
+      fiducial_vlam_msgs::msg::Observation msg;
+      msg.id = observation.id();
+      msg.x0 = observation.corners_f_image_[0].x();
+      msg.x1 = observation.corners_f_image_[1].x();;
+      msg.x2 = observation.corners_f_image_[2].x();;
+      msg.x3 = observation.corners_f_image_[3].x();;
+      msg.y0 = observation.corners_f_image_[0].y();;
+      msg.y1 = observation.corners_f_image_[1].y();;
+      msg.y2 = observation.corners_f_image_[2].y();;
+      msg.y3 = observation.corners_f_image_[3].y();;
+      msgs.emplace_back(msg);
+    }
+    return msgs;
+  }
+
 }

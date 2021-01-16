@@ -142,7 +142,7 @@ namespace fiducial_vlam
             bmm_cnt_every_n_msg_ = 0;
 
             // From the observations message, pick out the CameraInfo and Observations
-            auto camera_info = fvlam::CameraInfo::from(*msg);
+            auto camera_info = fvlam::CameraInfo::from(msg->camera_info);
             auto observations = fvlam::Observations::from(*msg);
 
             // Send these observations off for processing

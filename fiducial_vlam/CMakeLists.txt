@@ -110,6 +110,7 @@ set(VLOC_NODE_SOURCES
   src/fvlam/conversions_gtsam.cpp
   src/fvlam/localize_camera_cv.cpp
   src/fvlam/localize_camera_gtsam.cpp
+  src/conversions_ros2.cpp
   src/convert_util.cpp
   src/fiducial_math.cpp
   src/map.cpp
@@ -200,7 +201,7 @@ set(VLOCX_NODE_DEPS
   )
 
 add_library(vlocx_node SHARED
-  ${VLOC_NODE_SOURCES})
+  ${VLOCX_NODE_SOURCES})
 
 target_compile_definitions(vlocx_node
   PRIVATE "COMPOSITION_BUILDING_DLL")
@@ -315,6 +316,7 @@ install(TARGETS
 # Install executables
 install(TARGETS
   vloc_main
+  vlocx_main
   vmap_main
   DESTINATION lib/fiducial_vlam
   )
