@@ -13,7 +13,7 @@ namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
-  PAMA_PARAM(loc_camera_sam_not_cv, int, 0)               /* use gtsam not opencv for localizing the camera */\
+  PAMA_PARAM(loc_camera_sam_not_cv, bool, false)          /* use gtsam not opencv for localizing the camera */\
   PAMA_PARAM(loc_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
    /* Camera frame -> baselink frame transform */\
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
@@ -24,8 +24,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
   /* Aruco markers */\
   PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers  */ \
-  PAMA_PARAM(loc_cv3_do_corner_refinement, int, 1)        /* OpenCV 3.x argument to detect corners. 0 = false, 1 = true */\
-  PAMA_PARAM(loc_cv4_corner_refinement_method, int, 2)    /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
+  PAMA_PARAM(loc_corner_refinement_method, int, 2)    /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* End of list */
 
   // The following parameters control how vloc_node publishes messages and subscribes to messages

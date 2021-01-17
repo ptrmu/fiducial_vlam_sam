@@ -361,20 +361,18 @@ namespace fiducial_vlam
         .set__frame_id(psm_cxt_.psm_pub_map_frame_id_);
 
       // Create the map message and publish it. (always)
-      fiducial_vlam_msgs::msg::Map map_msg;
-      marker_map_->to(map_msg);
-      map_msg.header = header;
-      pub_map_->publish(map_msg);
+      auto msg = marker_map_->to<fiducial_vlam_msgs::msg::Map>()
+        .set__header(header); // set header after setting map - TODO change Map msg to be stamped and have vector
+      pub_map_->publish(msg);
 
       // Create and publish the marker visualization
       if (psm_cxt_.psm_pub_visuals_enable_) {
         diagnostics_.pub_visuals_count_ += 1;
-        visualization_msgs::msg::MarkerArray visuals_msg;
+        auto visuals_msg = visualization_msgs::msg::MarkerArray{};
         for (auto &id_marker_pair: marker_map_->markers()) {
-          visualization_msgs::msg::Marker visual_msg;
-          id_marker_pair.second.to(visual_msg);
-          visual_msg.header = header;
-          visuals_msg.markers.emplace_back(visual_msg);
+          auto marker_msg = id_marker_pair.second.to<visualization_msgs::msg::Marker>()
+            .set__header(header); // set header after setting marker.
+          visuals_msg.markers.emplace_back(marker_msg);
         }
         pub_visuals_->publish(visuals_msg);
       }
@@ -385,17 +383,16 @@ namespace fiducial_vlam
         tf2_msgs::msg::TFMessage tfs_msg;
         for (auto &id_marker_pair: marker_map_->markers()) {
           auto &t_world_marker = id_marker_pair.second.t_world_marker().tf();
-          auto transform_msg{t_world_marker.to<geometry_msgs::msg::Transform>()};
 
           std::ostringstream oss_child_frame_id;
           oss_child_frame_id << psm_cxt_.psm_pub_tf_marker_child_frame_id_
                              << std::setfill('0') << std::setw(3)
                              << id_marker_pair.first;
 
-          geometry_msgs::msg::TransformStamped tf_stamped_msg;
-          tf_stamped_msg.header = header;
-          tf_stamped_msg.child_frame_id = oss_child_frame_id.str();
-          tf_stamped_msg.transform = transform_msg;
+          auto tf_stamped_msg = geometry_msgs::msg::TransformStamped{}
+            .set__header(header)
+            .set__child_frame_id(oss_child_frame_id.str())
+            .set__transform(t_world_marker.to<geometry_msgs::msg::Transform>());
 
           tfs_msg.transforms.emplace_back(tf_stamped_msg);
         }

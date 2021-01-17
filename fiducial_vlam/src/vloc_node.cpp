@@ -1,27 +1,44 @@
 
 #include <iomanip>
 #include <iostream>
-#include <fstream>
 
 #include "cv_bridge/cv_bridge.h"
+#include "fiducial_vlam_msgs/msg/map.hpp"
+#include "fiducial_vlam_msgs/msg/observations.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
+#include "geometry_msgs/msg/pose_with_covariance.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "tf2_msgs/msg/tf_message.hpp"
-#include "calibrate.hpp"
-#include "cv_utils.hpp"
-#include "fiducial_math.hpp"
 #include "logger_ros2.hpp"
-#include "map.hpp"
-#include "observation.hpp"
 #include "vloc_context.hpp"
 
+namespace fvlam
+{
+// ==============================================================================
+// FiducialMarkerCvContext from method
+// ==============================================================================
+
+  template<>
+  FiducialMarkerCvContext FiducialMarkerCvContext::from<fiducial_vlam::VlocContext>(
+    fiducial_vlam::VlocContext &other)
+  {
+    FiducialMarkerCvContext cxt{};
+    cxt.border_color_red_ = 0;
+    cxt.border_color_green_ = 1.0;
+    cxt.border_color_blue_ = 0.;
+    cxt.aruco_dictionary_id_ = other.loc_aruco_dictionary_id_;
+    cxt.cv4_corner_refinement_method_ = other.loc_corner_refinement_method_;
+    return cxt;
+  }
+}
 
 namespace fiducial_vlam
 {
@@ -73,6 +90,7 @@ namespace fiducial_vlam
 // LocalizeCameraProcessImageImpl class
 // ==============================================================================
 
+#if 0
   class LocalizeCameraProcessImageImpl : public ProcessImageInterface
   {
     const VlocContext &cxt_;
@@ -118,7 +136,7 @@ namespace fiducial_vlam
   {
     return std::make_unique<LocalizeCameraProcessImageImpl>(cxt, fm);
   }
-
+#endif
 
 //  static void save_observations(const rclcpp::Time &time_stamp,
 //                                const Observations &observations,
@@ -211,7 +229,6 @@ namespace fiducial_vlam
 
   class VlocNode : public rclcpp::Node
   {
-    rclcpp::Logger ros_logger_inst_;
     LoggerRos2 logger_;
     VlocContext cxt_{};
     PslContext psl_cxt_{};
@@ -219,13 +236,8 @@ namespace fiducial_vlam
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
     fvlam::MarkerMap marker_map_{1.0};
 
-    CalibrateContext cal_cxt_{};
-    std::unique_ptr<SmoothObservationsInterface> so_{};
-    std::unique_ptr<CvFiducialMathInterface> fm_{};
-    std::unique_ptr<ProcessImageInterface> lc_pi_{};
-    std::unique_ptr<CalibrateCameraInterface> cc_pi_{};
+    bool current_camera_sam_not_cv_{};
 
-    std::unique_ptr<Map> map_{};
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};
 
@@ -241,8 +253,6 @@ namespace fiducial_vlam
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr sub_camera_info_;
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Map>::SharedPtr sub_map_;
 
-    rclcpp::TimerBase::SharedPtr calibrate_timer_{};
-
     void validate_parameters()
     {
       cxt_.loc_t_camera_base_ = TransformWithCovariance(TransformWithCovariance::mu_type{
@@ -253,58 +263,55 @@ namespace fiducial_vlam
     void validate_psl_parameters()
     {}
 
-    void validate_cal_parameters()
-    {}
-
     void setup_parameters()
     {
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
-      PAMA_PARAMS_INIT((*this), cxt_, "", VLOC_ALL_PARAMS, validate_parameters)
-      PAMA_PARAMS_INIT((*this), psl_cxt_, "", PSL_ALL_PARAMS, validate_psl_parameters)
-      PAMA_PARAMS_INIT((*this), cal_cxt_, "", CAL_ALL_PARAMS, validate_cal_parameters)
+      PAMA_PARAMS_INIT((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters)
+      PAMA_PARAMS_INIT((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
-      PAMA_PARAMS_CHANGED((*this), cxt_, "", VLOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
-      PAMA_PARAMS_CHANGED((*this), psl_cxt_, "", PSL_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
-      PAMA_PARAMS_CHANGED((*this), cal_cxt_, "", CAL_ALL_PARAMS, validate_cal_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
-      PAMA_PARAMS_LOG((*this), cxt_, "", VLOC_ALL_PARAMS, RCLCPP_INFO)
-      PAMA_PARAMS_LOG((*this), psl_cxt_, "", PSL_ALL_PARAMS, RCLCPP_INFO)
-      PAMA_PARAMS_LOG((*this), cal_cxt_, "", CAL_ALL_PARAMS, RCLCPP_INFO)
+      PAMA_PARAMS_LOG((*this), cxt_, , VLOC_ALL_PARAMS, RCLCPP_INFO)
+      PAMA_PARAMS_LOG((*this), psl_cxt_, , PSL_ALL_PARAMS, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
-      PAMA_PARAMS_CHECK_CMDLINE((*this), "", VLOC_ALL_PARAMS PSL_ALL_PARAMS CAL_ALL_PARAMS, RCLCPP_ERROR)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS PSL_ALL_PARAMS, RCLCPP_ERROR)
     }
 
-    ProcessImageInterface &pi()
+    // Solve t_map_camera. Create a LocalizeCameraInterface object if one has not been created yet or
+    // the parameter type has changed.
+    fvlam::Transform3WithCovariance solve_t_map_camera(const fvlam::Observations &observations,
+                                                       const fvlam::CameraInfo &camera_info,
+                                                       const fvlam::MarkerMap &map)
     {
-      return *lc_pi_;
+      // Check that a LocalizeCameraInterface has been instantiated
+      if (!localize_camera_ || cxt_.loc_camera_sam_not_cv_ != current_camera_sam_not_cv_) {
+        auto localize_camera_context = fvlam::LocalizeCameraCvContext();
+        localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+        current_camera_sam_not_cv_ = cxt_.loc_camera_sam_not_cv_;
+      }
+
+      return localize_camera_->solve_t_map_camera(observations, camera_info, map);
     }
 
-    std::unique_ptr<fvlam::LocalizeCameraInterface>
   public:
-    VlocNode(const rclcpp::NodeOptions &options) :
+    explicit VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
-      ros_logger_inst_{get_logger()},
       logger_{*this}
     {
       // Get parameters from the command line
       setup_parameters();
 
       // Initialize work objects after parameters have been loaded.
-      auto fiducial_marker_context = fvlam::FiducialMarkerCvContext();
+      auto fiducial_marker_context = fvlam::FiducialMarkerCvContext::from(cxt_);
       fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, logger_);
-
-      auto localize_camera_context = fvlam::LocalizeCameraCvContext();
-      localize_camera_ = make_localize_camera(localize_camera_context, logger_);
-
-      fm_ = make_cv_fiducial_math(cxt_, *so_);
-      lc_pi_ = make_localize_camera_process_image(cxt_, *fm_);
 
       // ROS publishers. Initialize after parameters have been loaded.
       if (psl_cxt_.psl_pub_image_marked_enable_) {
@@ -371,10 +378,10 @@ namespace fiducial_vlam
           auto stamp{msg->header.stamp};
 
           if (!camera_info_msg_) {
-            RCLCPP_DEBUG(get_logger(), "Ignore image message because no camera_info has been received yet.");
+            logger_.debug() << "Ignore image message because no camera_info has been received yet.";
 
           } else if ((stamp.nanosec == 0l && stamp.sec == 0l) || stamp == last_image_stamp_) {
-            RCLCPP_DEBUG(get_logger(), "Ignore image message because stamp is zero or the same as the previous.");
+            logger_.debug() << "Ignore image message because stamp is zero or the same as the previous.";
 
             // If we have just done a calibration and want to publish the marked captured
             // images then there is nothing to do with this image so ignore it.
@@ -394,16 +401,16 @@ namespace fiducial_vlam
         16,
         [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
         {
-          map_ = std::make_unique<Map>(*msg);
+          marker_map_ = fvlam::MarkerMap::from(*msg);
         });
-
-      // Timer for publishing map info
-      calibrate_timer_ = create_wall_timer(
-        std::chrono::milliseconds(250),
-        [this]() -> void
-        {
-          calibrate_timer_callback();
-        });
+//
+//      // Timer for publishing map info
+//      calibrate_timer_ = create_wall_timer(
+//        std::chrono::milliseconds(250),
+//        [this]() -> void
+//        {
+//          calibrate_timer_callback();
+//        });
 
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
       RCLCPP_INFO(get_logger(), "To calibrate camera - set cal_cmd parameter.");
@@ -419,7 +426,6 @@ namespace fiducial_vlam
       (void) sub_camera_info_;
       (void) sub_image_raw_;
       (void) sub_map_;
-      (void) calibrate_timer_;
     }
 
   private:
@@ -463,11 +469,19 @@ namespace fiducial_vlam
         //  image data. image_msg gets destroyed last thing in this method because it is passed by value. But that
         //  is after color_marked is destroyed so there is no chance that the data will be references after being
         //  released.
+
+        // Change image_marked to use the standard parent frame
+        image_msg->header.frame_id = psl_cxt_.psl_pub_map_frame_id_;
       }
 
       // Detect the markers in this image and create a list of
       // observations.
       auto observations = fiducial_marker_->detect_markers(gray->image);
+
+      // Annotate the image_marked with the markers that were found.
+      if (psl_cxt_.psl_pub_image_marked_enable_) {
+        fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
+      }
 
       // Publish the observations.
       if (psl_cxt_.psl_pub_observations_enable_ &&
@@ -486,22 +500,22 @@ namespace fiducial_vlam
       // is not running or has not been able to find the starting node.
       // We need a map and observations before we can publish camera
       // localization information.
-      if (map_ && !observations.observations().empty()) {
+      if (!marker_map_.empty() && !observations.observations().empty()) {
         auto camera_info = fvlam::CameraInfo::from(*camera_info_msg);
 
         // Find the camera pose from the observations.
-        auto t_map_camera = localize_camera_->solve_t_map_camera(observations, camera_info, marker_map_);
+        auto t_map_camera = solve_t_map_camera(observations, camera_info, marker_map_);
 
         if (t_map_camera.is_valid()) {
 
           // If annotated images have been requested, then add the annotations now.
-          if (color_marked.header.stamp != std_msgs::msg::Header::_stamp_type{}) {
-            fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
+          if (psl_cxt_.psl_pub_image_marked_enable_) {
             for (auto &observation : observations.observations()) {
-              auto marker = marker_map_.find_marker(observation.id());
+              auto marker = marker_map_.find_marker_const(observation.id());
               if (marker != nullptr) {
                 auto t_camera_marker = t_map_camera.tf().inverse() * marker->t_world_marker().tf();
-                fiducial_marker_->annotate_image_with_marker_axis(color_marked.image, t_camera_marker, camera_info);
+                fiducial_marker_->annotate_image_with_marker_axis(color_marked.image, t_camera_marker,
+                                                                  camera_info, 0.5 * marker_map_.marker_length());
               }
             }
           }
@@ -528,7 +542,6 @@ namespace fiducial_vlam
             auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
               .set__header(po_header)
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
-            add_fixed_covariance(msg.pose);
             pub_camera_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_camera_odom_enable_) {
@@ -536,7 +549,6 @@ namespace fiducial_vlam
               .set__header(po_header)
               .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
-            add_fixed_covariance(msg.pose);
             pub_camera_odom_->publish(msg);
           }
 
@@ -545,16 +557,14 @@ namespace fiducial_vlam
             auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
               .set__header(po_header)
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
-            add_fixed_covariance(msg.pose);
-            pub_camera_pose_->publish(msg);
+            pub_base_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_base_odom_enable_) {
             auto msg = nav_msgs::msg::Odometry{}
               .set__header(po_header)
               .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
-            add_fixed_covariance(msg.pose);
-            pub_camera_odom_->publish(msg);
+            pub_base_odom_->publish(msg);
           }
 
           // Publish all tfs in one message
@@ -583,7 +593,7 @@ namespace fiducial_vlam
             for (auto &observation : observations.observations()) {
               auto t_marker_camera = localize_camera_->solve_t_camera_marker(
                 observation, camera_info, marker_map_.marker_length()).tf().inverse();
-              auto marker = marker_map_.find_marker(observation.id());
+              auto marker = marker_map_.find_marker_const(observation.id());
               if (marker != nullptr) {
                 auto t_map_camera_n = marker->t_world_marker().tf() * t_marker_camera;
                 auto msg = geometry_msgs::msg::TransformStamped{}
@@ -619,14 +629,14 @@ namespace fiducial_vlam
       }
 
       // Publish an annotated image if requested. Even if there is no map.
-      if (color_marked.image.dims != 0) {
+      if (psl_cxt_.psl_pub_image_marked_enable_) {
         // The marking has been happening on the original message.
         // Republish it now.
         pub_image_marked_->publish(std::move(image_msg));
       }
     }
 
-    std::string compose_frame_id(std::string &prefix, uint64_t id)
+    static std::string compose_frame_id(std::string &prefix, uint64_t id)
     {
       std::ostringstream oss;
       oss << prefix
@@ -635,6 +645,7 @@ namespace fiducial_vlam
       return oss.str();
     }
 
+#if 0
     nav_msgs::msg::Odometry to_odom_message(std_msgs::msg::Header::_stamp_type stamp,
                                             const std::string &child_frame_id,
                                             const TransformWithCovariance &t)
@@ -772,21 +783,23 @@ namespace fiducial_vlam
       return t_map_markers;
     }
 
-    void add_fixed_covariance(geometry_msgs::msg::PoseWithCovariance &pwc)
+    static void add_fixed_covariance(geometry_msgs::msg::PoseWithCovariance &pwc)
     {
-      return; // don't change covariance.
+      (void)pwc;
+//      return; // don't change covariance.
       // A hack for now.
       // Seeing how rviz2 interprets these values, allows me to confirm which columns represent
       // which variables.
-      pwc.covariance[0] = 96e-3; // along fixed x axis
-      pwc.covariance[7] = 24e-3; // along fixed y axis
-      pwc.covariance[14] = 6e-3; // along fixed z axis
-      pwc.covariance[21] = 36e-3; // Not quite sure how rotation works. ??
-      pwc.covariance[28] = 12e-3; //
-      pwc.covariance[35] = 4e-3; //
+//      pwc.covariance[0] = 96e-3; // along fixed x axis
+//      pwc.covariance[7] = 24e-3; // along fixed y axis
+//      pwc.covariance[14] = 6e-3; // along fixed z axis
+//      pwc.covariance[21] = 36e-3; // Not quite sure how rotation works. ??
+//      pwc.covariance[28] = 12e-3; //
+//      pwc.covariance[35] = 4e-3; //
     }
+#endif
 
-
+#if 0
     void calibrate_timer_callback()
     {
       rclcpp::Time time_now{now()};
@@ -834,7 +847,7 @@ namespace fiducial_vlam
 //        }
 //      }
     }
-
+#endif
   };
 
   std::shared_ptr<rclcpp::Node> vloc_node_factory(const rclcpp::NodeOptions &options)

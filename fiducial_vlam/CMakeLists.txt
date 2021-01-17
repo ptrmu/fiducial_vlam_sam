@@ -110,14 +110,9 @@ set(VLOC_NODE_SOURCES
   src/fvlam/conversions_gtsam.cpp
   src/fvlam/localize_camera_cv.cpp
   src/fvlam/localize_camera_gtsam.cpp
+  src/fvlam/transform3_with_covariance.cpp
   src/conversions_ros2.cpp
-  src/convert_util.cpp
-  src/fiducial_math.cpp
-  src/map.cpp
-  src/transform_with_covariance.cpp
   src/vloc_node.cpp
-  src/gtsam_localize.cpp
-  src/cv_utils.cpp
   )
 
 set(VLOC_NODE_DEPS

@@ -243,16 +243,19 @@ namespace fvlam
   private:
     Derived q_{Derived::Identity()};
     RotationMatrix debug_r_{RotationMatrix::Zero()};
+    MuVector debug_xyz_{MuVector::Zero()};
+
+    static MuVector xyz(const Derived &q);
 
   public:
     Rotate3() = default;
 
     explicit Rotate3(const Derived &q) :
-      q_(q), debug_r_{q_.toRotationMatrix()}
+      q_(q), debug_r_{q_.toRotationMatrix()}, debug_xyz_{xyz(q_)}
     {}
 
     explicit Rotate3(const RotationMatrix &rotation_matrix) :
-      q_(rotation_matrix), debug_r_{q_.toRotationMatrix()}
+      q_(rotation_matrix), debug_r_{q_.toRotationMatrix()}, debug_xyz_{xyz(q_)}
     {}
 
     static Rotate3 Rx(double x)
@@ -280,10 +283,11 @@ namespace fvlam
     RotationMatrix rotation_matrix() const
     { return q_.toRotationMatrix(); }
 
-    MuVector xyz() const;
+    MuVector xyz() const
+    { return xyz(q_); }
 
     MuVector mu() const
-    { return xyz(); }
+    { return xyz(q_); }
 
     template<class T>
     static Rotate3 from(T &other);

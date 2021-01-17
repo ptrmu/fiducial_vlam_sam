@@ -23,7 +23,7 @@ namespace fvlam
   {
     auto q = other.getRotation();
     auto t = other.getOrigin();
-    return Transform3{Rotate3{Rotate3::Derived{q.w(), q.x(), q.y(), q.z()}}, Translate3{t.x(), t.y(), t.x()}};
+    return Transform3{Rotate3{Rotate3::Derived{q.w(), q.x(), q.y(), q.z()}}, Translate3{t.x(), t.y(), t.z()}};
   }
 
   template<>
@@ -57,6 +57,19 @@ namespace fvlam
   }
 
   template<>
+  Transform3::CovarianceMatrix Transform3::cov_from<geometry_msgs::msg::PoseWithCovariance::_covariance_type>(
+    geometry_msgs::msg::PoseWithCovariance::_covariance_type &other)
+  {
+    CovarianceMatrix cov{};
+    for (int r = 0; r < CovarianceMatrix::MaxRowsAtCompileTime; r += 1) {
+      for (int c = 0; c < CovarianceMatrix::MaxColsAtCompileTime; c += 1) {
+        cov(r, c) = other[r * 6 + c];
+      }
+    }
+    return cov;
+  }
+
+  template<>
   geometry_msgs::msg::PoseWithCovariance::_covariance_type Transform3::cov_to
     <geometry_msgs::msg::PoseWithCovariance::_covariance_type>(const CovarianceMatrix &cov)
   {
@@ -70,12 +83,20 @@ namespace fvlam
   }
 
   template<>
+  Transform3WithCovariance Transform3WithCovariance::from<geometry_msgs::msg::PoseWithCovariance>(
+    geometry_msgs::msg::PoseWithCovariance &other)
+  {
+    auto tf = Transform3::from(other.pose);
+    auto cov = Transform3::cov_from(other.covariance);
+    return Transform3WithCovariance{std::move(tf), std::move(cov)};
+  }
+
+  template<>
   geometry_msgs::msg::PoseWithCovariance Transform3WithCovariance::to<geometry_msgs::msg::PoseWithCovariance>() const
   {
-    geometry_msgs::msg::PoseWithCovariance msg;
-    msg.pose = tf_.to<geometry_msgs::msg::Pose>();
-    msg.covariance = Transform3::cov_to<geometry_msgs::msg::PoseWithCovariance::_covariance_type>(cov());
-    return msg;
+    return geometry_msgs::msg::PoseWithCovariance{}
+      .set__pose(tf_.to<geometry_msgs::msg::Pose>())
+      .set__covariance(Transform3::cov_to<geometry_msgs::msg::PoseWithCovariance::_covariance_type>(cov()));
   }
 
 // ==============================================================================
@@ -99,33 +120,45 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  void Marker::to<visualization_msgs::msg::Marker>(visualization_msgs::msg::Marker &other) const
+  visualization_msgs::msg::Marker Marker::to<visualization_msgs::msg::Marker>() const
   {
-    other.id = id_;
-    other.pose = t_world_marker().tf().to<geometry_msgs::msg::Pose>();
-    other.type = visualization_msgs::msg::Marker::CUBE;
-    other.action = visualization_msgs::msg::Marker::ADD;
-    other.scale.x = 0.1;
-    other.scale.y = 0.1;
-    other.scale.z = 0.01;
-    other.color.r = 1.f;
-    other.color.g = 1.f;
-    other.color.b = 0.f;
-    other.color.a = 1.f;
+    return visualization_msgs::msg::Marker{}
+      .set__id(id_)
+      .set__pose(t_world_marker().tf().to<geometry_msgs::msg::Pose>())
+      .set__type(visualization_msgs::msg::Marker::CUBE)
+      .set__action(visualization_msgs::msg::Marker::ADD)
+      .set__scale(geometry_msgs::msg::Vector3{}.set__x(0.1).set__y(0.1).set__z(0.01))
+      .set__color(std_msgs::msg::ColorRGBA{}.set__r(1.f).set__g(1.f).set__b(0.f).set__a(1.f));
   }
 
   template<>
-  void MarkerMap::to<fiducial_vlam_msgs::msg::Map>(fiducial_vlam_msgs::msg::Map &other) const
+  MarkerMap MarkerMap::from<fiducial_vlam_msgs::msg::Map>(
+    fiducial_vlam_msgs::msg::Map &other)
   {
-    auto &msg = other;
+    MarkerMap map{other.marker_length};
+    for (std::size_t i = 0; i < other.ids.size(); i += 1) {
+      auto tf = Transform3WithCovariance::from(other.poses[i]);
+      Marker marker{static_cast<std::uint64_t>(other.ids[i]), std::move(tf), other.fixed_flags[i] != 0};
+      map.add_marker(std::move(marker));
+    }
+    return map;
+  }
+
+  template<>
+  fiducial_vlam_msgs::msg::Map MarkerMap::to<fiducial_vlam_msgs::msg::Map>() const
+  {
+    auto msg = fiducial_vlam_msgs::msg::Map{}
+      .set__marker_length(marker_length_)
+      .set__map_style(0);
+
     for (auto &id_marker_pair : markers_) {
       auto &marker = id_marker_pair.second;
       msg.ids.emplace_back(marker.id());
       msg.poses.emplace_back(marker.t_world_marker().to<geometry_msgs::msg::PoseWithCovariance>());
       msg.fixed_flags.emplace_back(marker.is_fixed() ? 1 : 0);
     }
-    msg.marker_length = marker_length_;
-    msg.map_style = 0;
+
+    return msg;
   }
 
 // ==============================================================================

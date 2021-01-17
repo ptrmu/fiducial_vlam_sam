@@ -193,10 +193,16 @@ namespace fvlam
       marker_length]
       (const Marker &marker) -> Observation
     {
+      // The camera coordinate system is described here:
+      // https://docs.opencv.org/3.3.1/d9/d0c/group__calib3d.html
+      // The rvec and tvec inputs to projectPoints are t_camera_world
+      // The points input to projectPoints are in the world frame
+      // The points output from projectPoints are in the 2D image frame
+      auto t_camera_world = t_world_camera.inverse();
       auto camera_matrix = camera_calibration.first;
       auto dist_coeffs = camera_calibration.second;
-      auto rvec = t_world_camera.r().to<cv::Vec3d>();
-      auto tvec = t_world_camera.t().to<cv::Vec3d>();
+      auto rvec = t_camera_world.r().to<cv::Vec3d>();
+      auto tvec = t_camera_world.t().to<cv::Vec3d>();
 
       std::vector<cv::Point2d> image_points;
       auto corners_f_world = marker.to_corners_f_world<std::vector<cv::Point3d>>(marker_length);

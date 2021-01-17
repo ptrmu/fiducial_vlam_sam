@@ -3,9 +3,9 @@
 
 namespace fvlam
 {
-  Eigen::Vector3d Rotate3::xyz() const
+  Rotate3::MuVector Rotate3::xyz(const Derived &q)
   {
-    const auto X = q_.toRotationMatrix();
+    const auto X = q.toRotationMatrix();
     const double x = -atan2(-X(2, 1), X(2, 2));
 
 #if 0
@@ -15,11 +15,11 @@ namespace fvlam
     const Eigen::Matrix3d Z = Y * Ry(-y).q().toRotationMatrix();
     const double z = -atan2(-Z(1, 0), Z(1, 1));
 #else
-    const auto qy = q_ * Rx(-x).q();
+    const auto qy = q * Derived{Eigen::AngleAxisd{-x, Eigen::Vector3d::UnitX()}};
     const auto Y = qy.toRotationMatrix();
     const double y = -atan2(Y(2, 0), Y(2, 2));
 
-    const auto qz = qy * Ry(-y).q();
+    const auto qz = qy * Derived{Eigen::AngleAxisd{-y, Eigen::Vector3d::UnitY()}};
     const auto Z = qz.toRotationMatrix();
     const double z = -atan2(-Z(1, 0), Z(1, 1));
 #endif

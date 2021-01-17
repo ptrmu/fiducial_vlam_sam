@@ -160,7 +160,7 @@ namespace fvlam
 
   class MarkerMap
   {
-    const double marker_length_;
+    double marker_length_;
     std::map<std::uint64_t, Marker> markers_;
 
   public:
@@ -205,6 +205,9 @@ namespace fvlam
     {
       markers_.emplace(marker.id(), std::move(marker));
     }
+
+    bool empty() const
+    { return markers_.empty(); }
 
     void save(const std::string &filename, Logger &logger) const; //
     static MarkerMap load(const std::string &filename, Logger &logger); //

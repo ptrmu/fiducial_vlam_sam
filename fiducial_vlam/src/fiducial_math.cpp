@@ -11,7 +11,7 @@
 #include "ros2_shared/string_printf.hpp"
 #include "tf_utils.hpp"
 #include "transform_with_covariance.hpp"
-#include "vloc_context.hpp"
+#include "vlocx_context.hpp"
 
 namespace fiducial_vlam
 {

@@ -12,39 +12,38 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-map_filename = os.path.join(worlds_directory, 'one_marker_map.yaml')
-world_filename = os.path.join(worlds_directory, 'one_marker.world')
+world_name = "one_marker"
+created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
+existing_map_filename = os.path.join(worlds_directory, world_name + '_map.yaml')
+world_filename = os.path.join(worlds_directory, world_name + '.world')
 forward_camera_sdf = os.path.join(sdf_directory, 'forward_camera.sdf')
+elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
 
 corner_measurement_sigma = 0.7
 
 vloc_args = [{
-    'use_sim_time': False,  # Don't use /clock
-    'psl_publish_tfs': 1,  # Publish drone and camera /tf
-    'psl_stamp_msgs_with_current_time': 1,  # Stamp with now()
-    'map_init_pose_z': 0,
-    'psl_sub_camera_info_best_effort_not_reliable': 1,
-    'psl_publish_camera_tf_per_marker': 0,
-    'psl_publish_image_marked': 1,
-    'psl_camera_frame_id': 'forward_camera',
-    'psl_publish_base_pose': 1,
-    'psl_publish_camera_odom': 1,
-    'psl_publish_base_odom': 1,
+    'loc_camera_sam_not_cv': False,
+    'loc_cv4_corner_refinement_method': 2,
+    'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
+    'psl_pub_tf_base_enable': False,  # Publish drone and camera /tf
+    'psl_sub_camera_info_best_effort_not_reliable': True,
+    'psl_sub_image_raw_best_effort_not_reliable': True,
+    'psl_pub_tf_camera_child_frame_id': 'forward_camera',
+    'psl_pub_camera_odom_enable': False,
+    'psl_pub_base_pose_enable': False,
+    'psl_pub_base_odom_enable': False,
 }]
 
 vmap_args = [{
-    'use_sim_time': False,  # Don't use /clock
-    'psm_publish_tfs': 1,  # Publish marker /tf
-    'map_marker_length': 0.1778,  # Marker length
-    'map_save_filename': map_filename,
-    'map_load_filename': map_filename,
+    'map_marker_length': 0.1775,  # Marker length
+    'map_save_filename': created_map_filename,
+    'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
+    'map_cmd': '',
+    'bmm_algorithm': 1,
+    'bmm_recorded_observations_name': 'recorded_observations.yaml'
 }]
-
-
-# Before running Gazebo, prepare the environment:
-# export GAZEBO_MODEL_PATH=${PWD}/install/sim_fiducial/share/sim_fiducial/models
-# . /usr/share/gazebo/setup.sh
 
 
 def generate_launch_description():
@@ -57,13 +56,18 @@ def generate_launch_description():
             world_filename
         ], output='screen'),
 
+
+
+
         # Add forward-facing camera to the simulation
         Node(package='sim_fiducial', node_executable='inject_entity.py', output='screen',
              arguments=[forward_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', node_executable='vloc_main', output='screen',
+
+
+        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
              parameters=vloc_args, node_namespace='forward_camera'),
-        Node(package='fiducial_vlam', node_executable='vmap_main', output='screen',
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]
 

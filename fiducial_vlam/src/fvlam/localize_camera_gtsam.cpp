@@ -21,7 +21,7 @@ namespace fvlam
                                                 const CameraInfo &camera_info,
                                                 const MarkerMap &map) override
     {
-
+      return Transform3WithCovariance{};
     }
 
     // Given the corners of one marker (observation) calculate t_camera_marker.
@@ -29,7 +29,7 @@ namespace fvlam
                                                    const CameraInfo &camera_info,
                                                    double marker_length) override
     {
-
+      return Transform3WithCovariance{};
     }
   };
 

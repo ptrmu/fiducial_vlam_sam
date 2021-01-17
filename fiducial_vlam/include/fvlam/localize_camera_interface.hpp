@@ -90,7 +90,8 @@ namespace fvlam
     // Draw axes on a marker in an image.
     virtual void annotate_image_with_marker_axis(cv::Mat &color_image,
                                                  const Transform3 &t_camera_marker,
-                                                 const CameraInfo &camera_info) = 0;
+                                                 const CameraInfo &camera_info,
+                                                 double axis_length) = 0;
   };
 
   template<class TFmContext>
@@ -108,5 +109,8 @@ namespace fvlam
     double border_color_blue_;
     int aruco_dictionary_id_;
     int cv4_corner_refinement_method_;
+
+    template<class T>
+    static FiducialMarkerCvContext from(T &other);
   };
 }
