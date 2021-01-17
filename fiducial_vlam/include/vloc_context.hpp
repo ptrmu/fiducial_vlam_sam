@@ -1,8 +1,8 @@
 #pragma once
+
 #include <string>
 
 #include "ros2_shared/param_macros.hpp"
-#include "transform_with_covariance.hpp"
 
 namespace rclcpp
 {
@@ -127,7 +127,5 @@ namespace fiducial_vlam
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
     PAMA_PARAMS_DEFINE(VLOC_ALL_PARAMS)
-
-    TransformWithCovariance loc_t_camera_base_;
   };
 }
