@@ -111,20 +111,23 @@ namespace fiducial_vlam
       PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS PSL_ALL_PARAMS, RCLCPP_ERROR)
     }
 
-    // Solve t_map_camera. Create a LocalizeCameraInterface object if one has not been created yet or
+    // Create a LocalizeCameraInterface object if one has not been created yet or
     // the parameter type has changed.
-    fvlam::Transform3WithCovariance solve_t_map_camera(const fvlam::Observations &observations,
-                                                       const fvlam::CameraInfo &camera_info,
-                                                       const fvlam::MarkerMap &map)
+    fvlam::LocalizeCameraInterface &get_lc()
     {
       // Check that a LocalizeCameraInterface has been instantiated
       if (!localize_camera_ || cxt_.loc_camera_sam_not_cv_ != current_camera_sam_not_cv_) {
-        auto localize_camera_context = fvlam::LocalizeCameraCvContext();
-        localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+        if (cxt_.loc_camera_sam_not_cv_) {
+          auto localize_camera_context = fvlam::LocalizeCameraGtsamContext();
+          localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+        } else {
+          auto localize_camera_context = fvlam::LocalizeCameraCvContext();
+          localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+        }
         current_camera_sam_not_cv_ = cxt_.loc_camera_sam_not_cv_;
       }
 
-      return localize_camera_->solve_t_map_camera(observations, camera_info, map);
+      return *localize_camera_;
     }
 
   public:
@@ -138,39 +141,6 @@ namespace fiducial_vlam
       // Initialize work objects after parameters have been loaded.
       auto fiducial_marker_context = fvlam::FiducialMarkerCvContext::from(cxt_);
       fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, logger_);
-
-      // ROS publishers. Initialize after parameters have been loaded.
-      if (psl_cxt_.psl_pub_image_marked_enable_) {
-        pub_image_marked_ = create_publisher<sensor_msgs::msg::Image>(
-          psl_cxt_.psl_pub_image_marked_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_observations_enable_) {
-        pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
-          psl_cxt_.psl_pub_observations_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_camera_pose_enable_) {
-        pub_camera_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          psl_cxt_.psl_pub_camera_pose_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_camera_odom_enable_) {
-        pub_camera_odom_ = create_publisher<nav_msgs::msg::Odometry>(
-          psl_cxt_.psl_pub_camera_odom_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_base_pose_enable_) {
-        pub_base_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-          psl_cxt_.psl_pub_base_pose_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_base_odom_enable_) {
-        pub_base_odom_ = create_publisher<nav_msgs::msg::Odometry>(
-          psl_cxt_.psl_pub_base_odom_topic_, 16);
-      }
-      if (psl_cxt_.psl_pub_tf_camera_enable_ ||
-          psl_cxt_.psl_pub_tf_base_enable_ ||
-          psl_cxt_.psl_pub_tf_camera_per_marker_enable_ ||
-          psl_cxt_.psl_pub_tf_marker_per_marker_enable_) {
-        pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>(
-          "/tf", 16);
-      }
 
       // ROS subscriptions
       auto camera_info_qos = psl_cxt_.psl_sub_camera_info_best_effort_not_reliable_ ?
@@ -316,6 +286,10 @@ namespace fiducial_vlam
           .set__header(image_msg->header)
           .set__camera_info(*camera_info_msg)
           .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
+        if (!pub_observations_) {
+          pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
+            psl_cxt_.psl_pub_observations_topic_, 16);
+        }
         pub_observations_->publish(msg);
       }
 
@@ -330,7 +304,7 @@ namespace fiducial_vlam
         auto camera_info = fvlam::CameraInfo::from(*camera_info_msg);
 
         // Find the camera pose from the observations.
-        auto t_map_camera = solve_t_map_camera(observations, camera_info, marker_map_);
+        auto t_map_camera = get_lc().solve_t_map_camera(observations, camera_info, marker_map_);
 
         if (t_map_camera.is_valid()) {
 
@@ -368,6 +342,10 @@ namespace fiducial_vlam
             auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
               .set__header(po_header)
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+            if (!pub_camera_pose_) {
+              pub_camera_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+                psl_cxt_.psl_pub_camera_pose_topic_, 16);
+            }
             pub_camera_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_camera_odom_enable_) {
@@ -375,6 +353,10 @@ namespace fiducial_vlam
               .set__header(po_header)
               .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+            if (!pub_camera_odom_) {
+              pub_camera_odom_ = create_publisher<nav_msgs::msg::Odometry>(
+                psl_cxt_.psl_pub_camera_odom_topic_, 16);
+            }
             pub_camera_odom_->publish(msg);
           }
 
@@ -383,6 +365,10 @@ namespace fiducial_vlam
             auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
               .set__header(po_header)
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+            if (!pub_base_pose_) {
+              pub_base_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+                psl_cxt_.psl_pub_base_pose_topic_, 16);
+            }
             pub_base_pose_->publish(msg);
           }
           if (psl_cxt_.psl_pub_base_odom_enable_) {
@@ -390,6 +376,10 @@ namespace fiducial_vlam
               .set__header(po_header)
               .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+            if (!pub_base_odom_) {
+              pub_base_odom_ = create_publisher<nav_msgs::msg::Odometry>(
+                psl_cxt_.psl_pub_base_odom_topic_, 16);
+            }
             pub_base_odom_->publish(msg);
           }
 
@@ -449,6 +439,10 @@ namespace fiducial_vlam
 
           // If there are any transforms to publish, then publish them.
           if (!tfs_msg.transforms.empty()) {
+            if (!pub_tf_) {
+              pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>(
+                "/tf", 16);
+            }
             pub_tf_->publish(tfs_msg);
           }
         }
@@ -458,6 +452,10 @@ namespace fiducial_vlam
       if (psl_cxt_.psl_pub_image_marked_enable_) {
         // The marking has been happening on the original message.
         // Republish it now.
+        if (!pub_image_marked_) {
+          pub_image_marked_ = create_publisher<sensor_msgs::msg::Image>(
+            psl_cxt_.psl_pub_image_marked_topic_, 16);
+        }
         pub_image_marked_->publish(std::move(image_msg));
       }
     }

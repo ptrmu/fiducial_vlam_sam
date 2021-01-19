@@ -57,6 +57,7 @@ namespace fvlam
                      cc.first, cc.second,
                      rvec, tvec);
 
+#if 0 // Not sure if this is still needed
         // For certain cases, there is a chance that the multi marker solvePnP will
         // return the mirror of the correct solution. So try solvePn[Ransac as well.
         if (all_corners_f_image.size() > 1 * 4 && all_corners_f_image.size() < 4 * 4) {
@@ -77,6 +78,8 @@ namespace fvlam
             tvec = tvecRansac;
           }
         }
+#endif
+
       } catch (cv::Exception &ex) {
         return Transform3WithCovariance{};
       }

@@ -128,7 +128,19 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  std::vector<gtsam::Vector3> Marker::to_corners_f_world<std::vector<gtsam::Vector3>>(double marker_length) const
+  std::vector<gtsam::Point3> Marker::to_corners_f_marker<std::vector<gtsam::Point3>>(double marker_length)
+  {
+    auto corners_f_marker = calc_corners3_f_marker(marker_length);
+    return std::vector<gtsam::Point3>{
+      gtsam::Point3{corners_f_marker[0].t()(0), corners_f_marker[0].t()(1), corners_f_marker[0].t()(2)},
+      gtsam::Point3{corners_f_marker[1].t()(0), corners_f_marker[1].t()(1), corners_f_marker[1].t()(2)},
+      gtsam::Point3{corners_f_marker[2].t()(0), corners_f_marker[2].t()(1), corners_f_marker[2].t()(2)},
+      gtsam::Point3{corners_f_marker[3].t()(0), corners_f_marker[3].t()(1), corners_f_marker[3].t()(2)}
+    };
+  }
+
+  template<>
+  std::vector<gtsam::Point3> Marker::to_corners_f_world<std::vector<gtsam::Point3>>(double marker_length) const
   {
     auto corners_f_world = calc_corners3_f_world(marker_length);
     return std::vector<gtsam::Vector3>{
@@ -143,6 +155,16 @@ namespace fvlam
 // from fvlam/observation.hpp
 // ==============================================================================
 
+  template<>
+  std::vector<gtsam::Point2> Observation::to<std::vector<gtsam::Point2>>() const
+  {
+    return std::vector<gtsam::Point2>{
+      gtsam::Point2{corners_f_image_[0].x(), corners_f_image_[0].y()},
+      gtsam::Point2{corners_f_image_[1].x(), corners_f_image_[1].y()},
+      gtsam::Point2{corners_f_image_[2].x(), corners_f_image_[2].y()},
+      gtsam::Point2{corners_f_image_[3].x(), corners_f_image_[3].y()}
+    };
+  }
 
 // ==============================================================================
 // fvlam::Marker conversions that require Observation conversions so

@@ -12,7 +12,7 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-world_name = "three_dense_circles_of_markers"
+world_name = "circle_of_markers"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
 existing_map_filename = os.path.join(worlds_directory, world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
@@ -22,7 +22,7 @@ elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vloc_args = [{
-    'loc_camera_sam_not_cv': False,
+    'loc_camera_sam_not_cv': True,
     'loc_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
@@ -48,7 +48,7 @@ vmap_args = [{
 def generate_launch_description():
     entities = [
         ExecuteProcess(cmd=[
-            'gazebo',
+            'gzserver',
             '--verbose',
             '-s', 'libgazebo_ros_init.so',  # Publish /clock
             '-s', 'libgazebo_ros_factory.so',  # Provide injection endpoints

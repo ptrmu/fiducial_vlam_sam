@@ -67,6 +67,7 @@ namespace fvlam
 
   struct LocalizeCameraGtsamContext
   {
+    double corner_measurement_sigma_{0.5};
   };
 
 

@@ -4,6 +4,7 @@
 
 #include "fvlam/build_marker_map_interface.hpp"
 #include "fvlam/camera_info.hpp"
+#include "fvlam/factors_gtsam.hpp"
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
@@ -266,10 +267,12 @@ namespace fvlam
             Translate3::MuVector::Constant(tmm_context_.mm_between_factor_noise_fixed_sigma_t_)).finished());
 
         case BuildMarkerMapTmmContext::NoiseStrategy::estimation:
-          return gtsam::noiseModel::Gaussian::Covariance(twc.cov());
+          return gtsam::noiseModel::Gaussian::Covariance(
+            GtsamUtil::cov_gtsam_from_ros(twc.tf().to<gtsam::Pose3>(), twc.cov()));
 
         case BuildMarkerMapTmmContext::NoiseStrategy::minimum:
-          Transform3::MuVector t_sigmas = twc.cov().diagonal().array().sqrt();
+          Transform3::MuVector t_sigmas = GtsamUtil::cov_gtsam_from_ros(twc.tf().to<gtsam::Pose3>(),
+                                                                        twc.cov()).diagonal().array().sqrt();
           return gtsam::noiseModel::Diagonal::Sigmas((Transform3::MuVector()
             << minimum_sigma(t_sigmas.head<3>(), tmm_context_.mm_between_factor_noise_fixed_sigma_r_, isotropic),
             minimum_sigma(t_sigmas.tail<3>(), tmm_context_.mm_between_factor_noise_fixed_sigma_t_, isotropic))
@@ -404,12 +407,11 @@ namespace fvlam
           continue;
         }
 
-        // Otherwise add it as a regular marker.
+        // Otherwise add it as a regular marker. Have to convert from Gtsam to Ros covariance.
         const auto &pose = pose_result.at<gtsam::Pose3>(key);
-        auto cov = marginals.marginalCovariance(key);
+        auto cov_ros = GtsamUtil::cov_ros_from_gtsam(pose, marginals.marginalCovariance(key));
 
-        map->add_marker(Marker{id,
-                               Transform3WithCovariance{Transform3::from(pose), cov}});
+        map->add_marker(Marker{id, Transform3WithCovariance{Transform3::from(pose), cov_ros}});
       }
 
       return map;
