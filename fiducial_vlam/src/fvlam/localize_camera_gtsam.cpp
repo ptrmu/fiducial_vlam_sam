@@ -74,7 +74,7 @@ namespace fvlam
                              gtsam::noiseModel::Gaussian::Covariance(
                                GtsamUtil::cov_gtsam_from_ros(
                                  marker_ptr->t_world_marker().tf().to<gtsam::Pose3>(),
-                                   marker_ptr->t_world_marker().cov()));
+                                 marker_ptr->t_world_marker().cov()));
 
           // Add the prior for the known marker.
           graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3> >(marker_key,
@@ -117,9 +117,10 @@ namespace fvlam
       auto params = gtsam::LevenbergMarquardtParams();
       params.setRelativeErrorTol(1e-8);
       params.setAbsoluteErrorTol(1e-8);
+//      params.setVerbosity("TERMINATION");
       auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
-      //      std::cout << "initial error = " << graph.error(initial) << std::endl;
-      //      std::cout << "final error = " << graph.error(result) << std::endl;
+//      std::cout << "initial error = " << graph.error(initial) << std::endl;
+//      std::cout << "final error = " << graph.error(result) << std::endl;
 
       // 5. Extract the result into a TransformWithCovariance
       return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);

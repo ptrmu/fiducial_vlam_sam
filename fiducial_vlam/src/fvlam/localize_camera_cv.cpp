@@ -148,7 +148,7 @@ namespace fvlam
 //     1 = CORNER_REFINE_SUBPIX,   ///< ArUco approach and refine the corners locations using corner subpixel accuracy
 //     2 = CORNER_REFINE_CONTOUR,  ///< ArUco approach and refine the corners locations using the contour-points line fitting
 //     3 = CORNER_REFINE_APRILTAG, ///< Tag and corners detection based on the AprilTag 2 approach @cite wang2016iros
-      detectorParameters->cornerRefinementMethod = fm_context_.cv4_corner_refinement_method_;
+      detectorParameters->cornerRefinementMethod = fm_context_.corner_refinement_method_;
 
       // Detect markers
       std::vector<int> ids;

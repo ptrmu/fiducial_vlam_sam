@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <iostream>
 
+#define ENABLE_TIMING
+
 #include "cv_bridge/cv_bridge.h"
 #include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations.hpp"
@@ -12,6 +14,7 @@
 #include "fvlam/observation.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
 #include "geometry_msgs/msg/pose_with_covariance.hpp"
+#include <gtsam/base/timing.h>
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -23,6 +26,32 @@
 namespace fvlam
 {
 // ==============================================================================
+// LocalizeCameraCvContext from method
+// ==============================================================================
+
+  template<>
+  LocalizeCameraCvContext LocalizeCameraCvContext::from<fiducial_vlam::VlocContext>(
+    fiducial_vlam::VlocContext &other)
+  {
+    (void)other;
+    LocalizeCameraCvContext cxt{};
+    return cxt;
+  }
+
+// ==============================================================================
+// FiducialMarkerCvContext from method
+// ==============================================================================
+
+  template<>
+  LocalizeCameraGtsamContext LocalizeCameraGtsamContext::from<fiducial_vlam::VlocContext>(
+    fiducial_vlam::VlocContext &other)
+  {
+    LocalizeCameraGtsamContext cxt{other.loc_corner_measurement_sigma_,
+                                   other.loc_use_marker_covariance__};
+    return cxt;
+  }
+
+// ==============================================================================
 // FiducialMarkerCvContext from method
 // ==============================================================================
 
@@ -30,12 +59,11 @@ namespace fvlam
   FiducialMarkerCvContext FiducialMarkerCvContext::from<fiducial_vlam::VlocContext>(
     fiducial_vlam::VlocContext &other)
   {
-    FiducialMarkerCvContext cxt{};
+    FiducialMarkerCvContext cxt{other.loc_corner_refinement_method_};
     cxt.border_color_red_ = 0;
     cxt.border_color_green_ = 1.0;
     cxt.border_color_blue_ = 0.;
     cxt.aruco_dictionary_id_ = other.loc_aruco_dictionary_id_;
-    cxt.cv4_corner_refinement_method_ = other.loc_corner_refinement_method_;
     return cxt;
   }
 }
@@ -118,10 +146,10 @@ namespace fiducial_vlam
       // Check that a LocalizeCameraInterface has been instantiated
       if (!localize_camera_ || cxt_.loc_camera_sam_not_cv_ != current_camera_sam_not_cv_) {
         if (cxt_.loc_camera_sam_not_cv_) {
-          auto localize_camera_context = fvlam::LocalizeCameraGtsamContext();
+          auto localize_camera_context = fvlam::LocalizeCameraGtsamContext::from(cxt_);
           localize_camera_ = make_localize_camera(localize_camera_context, logger_);
         } else {
-          auto localize_camera_context = fvlam::LocalizeCameraCvContext();
+          auto localize_camera_context = fvlam::LocalizeCameraCvContext::from(cxt_);
           localize_camera_ = make_localize_camera(localize_camera_context, logger_);
         }
         current_camera_sam_not_cv_ = cxt_.loc_camera_sam_not_cv_;
@@ -231,9 +259,12 @@ namespace fiducial_vlam
       auto stamp = image_msg->header.stamp;
       rclcpp::Time time_stamp{stamp};
 
+      gttic(time_stamp);
       // Convert ROS to OpenCV
       cv_bridge::CvImagePtr gray{cv_bridge::toCvCopy(*image_msg, "mono8")};
+      gttoc(time_stamp);
 
+      gttic(grey);
       // If we are going to publish an annotated image, make a copy of
       // the original message image. If no annotated image is to be published,
       // then just make an empty image pointer. The routines need to check
@@ -269,11 +300,15 @@ namespace fiducial_vlam
         // Change image_marked to use the standard parent frame
         image_msg->header.frame_id = psl_cxt_.psl_pub_map_frame_id_;
       }
+      gttoc(grey);
 
+      gttic(color_marked);
       // Detect the markers in this image and create a list of
       // observations.
       auto observations = fiducial_marker_->detect_markers(gray->image);
+      gttoc(color_marked);
 
+      gttic(observations);
       // Annotate the image_marked with the markers that were found.
       if (psl_cxt_.psl_pub_image_marked_enable_) {
         fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
@@ -457,6 +492,16 @@ namespace fiducial_vlam
             psl_cxt_.psl_pub_image_marked_topic_, 16);
         }
         pub_image_marked_->publish(std::move(image_msg));
+      }
+      gttoc(observations);
+
+      static int ttt = 0;
+      if (++ttt > 100) {
+        ttt = 0;
+#ifdef ENABLE_TIMING
+        gtsam::tictoc_print();
+#endif
+        gtsam::tictoc_reset_();
       }
     }
 
