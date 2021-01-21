@@ -9,13 +9,17 @@ namespace rclcpp
   class Node;
 }
 
+namespace fvlam
+{
+  class Logger;
+}
+
 namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
   PAMA_PARAM(loc_camera_sam_not_cv, bool, false)          /* use gtsam not opencv for localizing the camera */\
-  PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
-  PAMA_PARAM(loc_use_marker_covariance_, bool, true)      /* When localizing a camera, use the covariance stored in the marker. */\
+  PAMA_PARAM(loc_cmd, std::string, "")                    /* commands to vloc_node (diagnostics, ...) */\
    /* Camera frame -> baselink frame transform */\
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_y, double, 0.)             /* camera=>baselink transform component */\
@@ -23,9 +27,12 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
-  /* Aruco markers */\
+  /* Aruco markers detection parameters - done by opencv */\
   PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers  */ \
   PAMA_PARAM(loc_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
+  /* Parameters for GTSAM localization techniques */\
+  PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
+  PAMA_PARAM(loc_use_marker_covariance, bool, true)       /* When localizing a camera, use the covariance stored in the marker. */\
   /* End of list */
 
   // The following parameters control how vloc_node publishes messages and subscribes to messages
@@ -128,5 +135,28 @@ namespace fiducial_vlam
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_DEFINE(n, t, d)
     PAMA_PARAMS_DEFINE(VLOC_ALL_PARAMS)
+  };
+
+  struct VlocDiagnostics
+  {
+    std::uint64_t sub_camera_info_count_{0};
+    std::uint64_t sub_image_raw_count_{0};
+    std::uint64_t sub_map_count_{0};
+    std::uint64_t empty_observations_count_{0};
+    std::uint64_t invalid_t_map_camera_count_{0};
+    std::uint64_t pub_observations_count_{0};
+    std::uint64_t pub_camera_pose_count_{0};
+    std::uint64_t pub_camera_odom_count_{0};
+    std::uint64_t pub_base_pose_count_{0};
+    std::uint64_t pub_base_odom_count_{0};
+    std::uint64_t pub_tf_count_{0};
+    std::uint64_t pub_image_marked_count_{0};
+    rclcpp::Time start_time_;
+
+    explicit VlocDiagnostics(const rclcpp::Time &start_time) :
+      start_time_{start_time}
+    {}
+
+    void report(fvlam::Logger &logger, const rclcpp::Time &end_time);
   };
 }

@@ -66,6 +66,7 @@ namespace fvlam
 
           // Add the marker prior with a noise model.
           bool use_constrained = marker_ptr->is_fixed() ||
+                                 !lc_context_.use_marker_covariance_ ||
                                  marker_ptr->t_world_marker().cov()(0, 0) == 0.0;
 
           // Create the appropriate marker pose prior noise model.

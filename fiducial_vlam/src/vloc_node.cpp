@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <iostream>
 
-#define ENABLE_TIMING
+//#define ENABLE_TIMING
 
 #include "cv_bridge/cv_bridge.h"
 #include "fiducial_vlam_msgs/msg/map.hpp"
@@ -33,7 +33,7 @@ namespace fvlam
   LocalizeCameraCvContext LocalizeCameraCvContext::from<fiducial_vlam::VlocContext>(
     fiducial_vlam::VlocContext &other)
   {
-    (void)other;
+    (void) other;
     LocalizeCameraCvContext cxt{};
     return cxt;
   }
@@ -47,7 +47,7 @@ namespace fvlam
     fiducial_vlam::VlocContext &other)
   {
     LocalizeCameraGtsamContext cxt{other.loc_corner_measurement_sigma_,
-                                   other.loc_use_marker_covariance__};
+                                   other.loc_use_marker_covariance_};
     return cxt;
   }
 
@@ -88,8 +88,11 @@ namespace fiducial_vlam
   class VlocNode : public rclcpp::Node
   {
     LoggerRos2 logger_;
+    VlocDiagnostics diagnostics_;
+
     VlocContext cxt_{};
     PslContext psl_cxt_{};
+
     std::unique_ptr<fvlam::LocalizeCameraInterface> localize_camera_{};
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
     fvlam::MarkerMap marker_map_{1.0};
@@ -110,6 +113,8 @@ namespace fiducial_vlam
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_image_raw_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr sub_camera_info_;
     rclcpp::Subscription<fiducial_vlam_msgs::msg::Map>::SharedPtr sub_map_;
+
+    rclcpp::TimerBase::SharedPtr timer_{};
 
     void validate_parameters()
     {}
@@ -161,7 +166,8 @@ namespace fiducial_vlam
   public:
     explicit VlocNode(const rclcpp::NodeOptions &options) :
       Node("vloc_node", options),
-      logger_{*this}
+      logger_{*this},
+      diagnostics_{now()}
     {
       // Get parameters from the command line
       setup_parameters();
@@ -182,6 +188,7 @@ namespace fiducial_vlam
           // Save this message because it will be used for the next image message.
           // Note: we are taking ownership of this object
           camera_info_msg_ = std::move(msg);
+          diagnostics_.sub_camera_info_count_ += 1;
         });
 
       auto image_raw_qos = psl_cxt_.psl_sub_image_raw_best_effort_not_reliable_ ?
@@ -218,23 +225,25 @@ namespace fiducial_vlam
           }
 
           last_image_stamp_ = stamp;
+          diagnostics_.sub_image_raw_count_ += 1;
         });
 
       sub_map_ = create_subscription<fiducial_vlam_msgs::msg::Map>(
         psl_cxt_.psl_sub_map_topic_,
-        16,
+        1,
         [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
         {
           marker_map_ = fvlam::MarkerMap::from(*msg);
+          diagnostics_.sub_map_count_ += 1;
         });
-//
-//      // Timer for publishing map info
-//      calibrate_timer_ = create_wall_timer(
-//        std::chrono::milliseconds(250),
-//        [this]() -> void
-//        {
-//          calibrate_timer_callback();
-//        });
+
+      // Timer for publishing map info
+      timer_ = create_wall_timer(
+        std::chrono::milliseconds(1000),
+        [this]() -> void
+        {
+          timer_callback();
+        });
 
       RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
       RCLCPP_INFO(get_logger(), "To calibrate camera - set cal_cmd parameter.");
@@ -308,6 +317,10 @@ namespace fiducial_vlam
       auto observations = fiducial_marker_->detect_markers(gray->image);
       gttoc(color_marked);
 
+      if (observations.observations().empty()) {
+        diagnostics_.empty_observations_count_ += 1;
+      }
+
       gttic(observations);
       // Annotate the image_marked with the markers that were found.
       if (psl_cxt_.psl_pub_image_marked_enable_) {
@@ -323,9 +336,10 @@ namespace fiducial_vlam
           .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
         if (!pub_observations_) {
           pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
-            psl_cxt_.psl_pub_observations_topic_, 16);
+            psl_cxt_.psl_pub_observations_topic_, 2);
         }
         pub_observations_->publish(msg);
+        diagnostics_.pub_observations_count_ += 1;
       }
 
       // Debugging hint: If the markers in color_marked are not outlined
@@ -340,6 +354,10 @@ namespace fiducial_vlam
 
         // Find the camera pose from the observations.
         auto t_map_camera = get_lc().solve_t_map_camera(observations, camera_info, marker_map_);
+
+        if (!t_map_camera.is_valid()) {
+          diagnostics_.invalid_t_map_camera_count_ += 1;
+        }
 
         if (t_map_camera.is_valid()) {
 
@@ -379,9 +397,10 @@ namespace fiducial_vlam
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
             if (!pub_camera_pose_) {
               pub_camera_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-                psl_cxt_.psl_pub_camera_pose_topic_, 16);
+                psl_cxt_.psl_pub_camera_pose_topic_, 2);
             }
             pub_camera_pose_->publish(msg);
+            diagnostics_.pub_camera_pose_count_ += 1;
           }
           if (psl_cxt_.psl_pub_camera_odom_enable_) {
             auto msg = nav_msgs::msg::Odometry{}
@@ -390,9 +409,10 @@ namespace fiducial_vlam
               .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
             if (!pub_camera_odom_) {
               pub_camera_odom_ = create_publisher<nav_msgs::msg::Odometry>(
-                psl_cxt_.psl_pub_camera_odom_topic_, 16);
+                psl_cxt_.psl_pub_camera_odom_topic_, 2);
             }
             pub_camera_odom_->publish(msg);
+            diagnostics_.pub_camera_odom_count_ += 1;
           }
 
           // Publish the base pose/odometry in the map frame
@@ -402,9 +422,10 @@ namespace fiducial_vlam
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
             if (!pub_base_pose_) {
               pub_base_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-                psl_cxt_.psl_pub_base_pose_topic_, 16);
+                psl_cxt_.psl_pub_base_pose_topic_, 2);
             }
             pub_base_pose_->publish(msg);
+            diagnostics_.pub_base_pose_count_ += 1;
           }
           if (psl_cxt_.psl_pub_base_odom_enable_) {
             auto msg = nav_msgs::msg::Odometry{}
@@ -413,9 +434,10 @@ namespace fiducial_vlam
               .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
             if (!pub_base_odom_) {
               pub_base_odom_ = create_publisher<nav_msgs::msg::Odometry>(
-                psl_cxt_.psl_pub_base_odom_topic_, 16);
+                psl_cxt_.psl_pub_base_odom_topic_, 2);
             }
             pub_base_odom_->publish(msg);
+            diagnostics_.pub_base_odom_count_ += 1;
           }
 
           // Publish all tfs in one message
@@ -476,9 +498,10 @@ namespace fiducial_vlam
           if (!tfs_msg.transforms.empty()) {
             if (!pub_tf_) {
               pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>(
-                "/tf", 16);
+                "/tf", 2);
             }
             pub_tf_->publish(tfs_msg);
+            diagnostics_.pub_tf_count_ += 1;
           }
         }
       }
@@ -489,9 +512,10 @@ namespace fiducial_vlam
         // Republish it now.
         if (!pub_image_marked_) {
           pub_image_marked_ = create_publisher<sensor_msgs::msg::Image>(
-            psl_cxt_.psl_pub_image_marked_topic_, 16);
+            psl_cxt_.psl_pub_image_marked_topic_, 2);
         }
         pub_image_marked_->publish(std::move(image_msg));
+        diagnostics_.pub_image_marked_count_ += 1;
       }
       gttoc(observations);
 
@@ -514,61 +538,78 @@ namespace fiducial_vlam
       return oss.str();
     }
 
-
-#if 0
-    void calibrate_timer_callback()
+    void timer_callback()
     {
       rclcpp::Time time_now{now()};
 
-      // Figure out if there is a command to process.
-      if (!cal_cxt_.cal_cmd_.empty()) {
-        std::string cmd{cal_cxt_.cal_cmd_};
+      // Figure out if there is an map_cmd to process.
+      if (!cxt_.loc_cmd_.empty()) {
+        std::string cmd{cxt_.loc_cmd_};
 
         // Reset the cmd_string in preparation for the next command.
-        PAMA_SET_PARAM((*this), cal_cxt_, "", cal_cmd, "");
+        PAMA_SET_PARAM((*this), cxt_, "", loc_cmd, "");
 
-        // If we are not in calibrate mode, then don't send the command.
-        if (true) {
-          RCLCPP_ERROR(get_logger(), "Cannot execute cal_cmd when not in calibrate mode");
+        // Process the new command
+
+        if (cmd == "diagnostics") {
+          diagnostics_.report(logger_, now());
 
         } else {
-          auto ret_str = cc_pi_->cal_cmd(cmd, time_now);
-          if (!ret_str.empty()) {
-            RCLCPP_INFO(get_logger(), "cal_cmd '%s' response:\n%s", cmd.c_str(), ret_str.c_str());
-          }
+          logger_.warn() << "Invalid command: " << cmd;
         }
       }
-
-      // Give the camera calibrator process some background time
-      if (false) {
-        auto ret_str = cc_pi_->on_timer(time_now);
-        if (!ret_str.empty()) {
-          RCLCPP_INFO(get_logger(), "cal_on_timer response:\n%s", ret_str.c_str());
-        }
-      }
-
-      // If we have just done a calibration and want to publish the marked captured
-      // images then do it.
-//      if (publish_captured_image_marked()) {
-//        cv::Mat captured_image_marked;
-//        cc_pi_->get_captured_image_marked(time_now, captured_image_marked);
-//        if (captured_image_marked.dims != 0) {
-//
-//          // build up an image message and publish it.
-//          std_msgs::msg::Header header;
-//          header.stamp = time_now;
-//          header.frame_id = "captured_image_marked";
-//          cv_bridge::CvImage cv_image{header, "bgr8", captured_image_marked};
-//          pub_image_marked_->publish(*cv_image.toImageMsg());
-//        }
-//      }
     }
-#endif
   };
 
   std::shared_ptr<rclcpp::Node> vloc_node_factory(const rclcpp::NodeOptions &options)
   {
     return std::shared_ptr<rclcpp::Node>(new VlocNode(options));
+  }
+
+  void VlocDiagnostics::report(fvlam::Logger &logger, const rclcpp::Time &end_time)
+  {
+    double per_sec = 1.0 / (end_time - start_time_).seconds();
+    logger.info() << "Received camera_info: " << sub_camera_info_count_
+                  << " (" << per_sec * sub_camera_info_count_ << " /sec)";
+    logger.info() << "Received image_raw: " << sub_image_raw_count_
+                  << " (" << per_sec * sub_image_raw_count_ << " /sec)";
+    logger.info() << "Received map: " << sub_map_count_
+                  << " (" << per_sec * sub_map_count_ << " /sec)";
+
+    logger.info() << "Empty observations: " << empty_observations_count_
+                  << " (" << per_sec * empty_observations_count_ << " /sec)";
+    logger.info() << "Invalid t_map_camera: " << invalid_t_map_camera_count_
+                  << " (" << per_sec * invalid_t_map_camera_count_ << " /sec)";
+
+    logger.info() << "Published observations: " << pub_observations_count_
+                  << " (" << per_sec * pub_observations_count_ << " /sec)";
+    logger.info() << "Published camera_pose: " << pub_camera_pose_count_
+                  << " (" << per_sec * pub_camera_pose_count_ << " /sec)";
+    logger.info() << "Published camera_odom: " << pub_camera_odom_count_
+                  << " (" << per_sec * pub_camera_odom_count_ << " /sec)";
+    logger.info() << "Published base_pose: " << pub_base_pose_count_
+                  << " (" << per_sec * pub_base_pose_count_ << " /sec)";
+    logger.info() << "Published base_odom: " << pub_base_odom_count_
+                  << " (" << per_sec * pub_base_odom_count_ << " /sec)";
+    logger.info() << "Published tf: " << pub_tf_count_
+                  << " (" << per_sec * pub_tf_count_ << " /sec)";
+    logger.info() << "Published imaged_marked: " << pub_image_marked_count_
+                  << " (" << per_sec * pub_image_marked_count_ << " /sec)";
+
+
+    sub_camera_info_count_ = 0;
+    sub_image_raw_count_ = 0;
+    sub_map_count_ = 0;
+    empty_observations_count_ = 0;
+    invalid_t_map_camera_count_ = 0;
+    pub_observations_count_ = 0;
+    pub_camera_pose_count_ = 0;
+    pub_camera_odom_count_ = 0;
+    pub_base_pose_count_ = 0;
+    pub_base_odom_count_ = 0;
+    pub_tf_count_ = 0;
+    pub_image_marked_count_ = 0;
+    start_time_ = end_time;
   }
 }
 
