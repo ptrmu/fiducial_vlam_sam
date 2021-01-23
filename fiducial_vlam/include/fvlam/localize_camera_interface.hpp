@@ -65,22 +65,38 @@ namespace fvlam
   };
 
 // ==============================================================================
-// LocalizeCameraGtsamContext class
+// LocalizeCameraProjectBetweenContext class
 // ==============================================================================
 
-  struct LocalizeCameraGtsamContext
+  struct LocalizeCameraProjectBetweenContext
   {
     double &corner_measurement_sigma_;
     bool &use_marker_covariance_;
 
-    explicit LocalizeCameraGtsamContext(double &corner_measurement_sigma,
-                                        bool use_marker_covariance) :
+    explicit LocalizeCameraProjectBetweenContext(double &corner_measurement_sigma,
+                                        bool &use_marker_covariance) :
       corner_measurement_sigma_{corner_measurement_sigma},
       use_marker_covariance_{use_marker_covariance}
     {}
 
     template<class T>
-    static LocalizeCameraGtsamContext from(T &other);
+    static LocalizeCameraProjectBetweenContext from(T &other);
+  };
+
+// ==============================================================================
+// LocalizeCameraResectioningContext class
+// ==============================================================================
+
+  struct LocalizeCameraResectioningContext
+  {
+    double &corner_measurement_sigma_;
+
+    explicit LocalizeCameraResectioningContext(double &corner_measurement_sigma) :
+      corner_measurement_sigma_{corner_measurement_sigma}
+    {}
+
+    template<class T>
+    static LocalizeCameraResectioningContext from(T &other);
   };
 
 
@@ -99,7 +115,7 @@ namespace fvlam
 
     // Draw the boundary around detected markers.
     virtual void annotate_image_with_detected_markers(cv::Mat &color_image,
-                                                      const Observations observations) = 0;
+                                                      const Observations &observations) = 0;
 
     // Draw axes on a marker in an image.
     virtual void annotate_image_with_marker_axis(cv::Mat &color_image,
@@ -118,10 +134,10 @@ namespace fvlam
 
   struct FiducialMarkerCvContext
   {
-    double border_color_red_;
-    double border_color_green_;
-    double border_color_blue_;
-    int aruco_dictionary_id_;
+    double border_color_red_{0.0};
+    double border_color_green_{1.0};
+    double border_color_blue_{0.0};
+    int aruco_dictionary_id_{0};
     int &corner_refinement_method_;
 
     explicit FiducialMarkerCvContext(int &corner_refinement_method) :

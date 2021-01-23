@@ -39,15 +39,27 @@ namespace fvlam
   }
 
 // ==============================================================================
-// FiducialMarkerCvContext from method
+// LocalizeCameraResectioningContext from method
 // ==============================================================================
 
   template<>
-  LocalizeCameraGtsamContext LocalizeCameraGtsamContext::from<fiducial_vlam::VlocContext>(
+  LocalizeCameraResectioningContext LocalizeCameraResectioningContext::from<fiducial_vlam::VlocContext>(
     fiducial_vlam::VlocContext &other)
   {
-    LocalizeCameraGtsamContext cxt{other.loc_corner_measurement_sigma_,
-                                   other.loc_use_marker_covariance_};
+    LocalizeCameraResectioningContext cxt{other.loc_corner_measurement_sigma_};
+    return cxt;
+  }
+
+// ==============================================================================
+// LocalizeCameraProjectBetweenContext from method
+// ==============================================================================
+
+  template<>
+  LocalizeCameraProjectBetweenContext LocalizeCameraProjectBetweenContext::from<fiducial_vlam::VlocContext>(
+    fiducial_vlam::VlocContext &other)
+  {
+    LocalizeCameraProjectBetweenContext cxt{other.loc_corner_measurement_sigma_,
+                                            other.loc_use_marker_covariance_};
     return cxt;
   }
 
@@ -97,7 +109,7 @@ namespace fiducial_vlam
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
     fvlam::MarkerMap marker_map_{1.0};
 
-    bool current_camera_sam_not_cv_{};
+    bool current_loc_camera_algorithm_{};
 
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};
@@ -149,15 +161,21 @@ namespace fiducial_vlam
     fvlam::LocalizeCameraInterface &get_lc()
     {
       // Check that a LocalizeCameraInterface has been instantiated
-      if (!localize_camera_ || cxt_.loc_camera_sam_not_cv_ != current_camera_sam_not_cv_) {
-        if (cxt_.loc_camera_sam_not_cv_) {
-          auto localize_camera_context = fvlam::LocalizeCameraGtsamContext::from(cxt_);
+      if (!localize_camera_ || cxt_.loc_camera_algorithm_ != current_loc_camera_algorithm_) {
+        if (cxt_.loc_camera_algorithm_ == 1) {
+          auto localize_camera_context = fvlam::LocalizeCameraResectioningContext::from(cxt_);
           localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+
+        } else if (cxt_.loc_camera_algorithm_ == 2) {
+          auto localize_camera_context = fvlam::LocalizeCameraProjectBetweenContext::from(cxt_);
+          localize_camera_ = make_localize_camera(localize_camera_context, logger_);
+
         } else {
           auto localize_camera_context = fvlam::LocalizeCameraCvContext::from(cxt_);
           localize_camera_ = make_localize_camera(localize_camera_context, logger_);
         }
-        current_camera_sam_not_cv_ = cxt_.loc_camera_sam_not_cv_;
+
+        current_loc_camera_algorithm_ = cxt_.loc_camera_algorithm_;
       }
 
       return *localize_camera_;

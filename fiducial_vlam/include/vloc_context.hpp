@@ -18,7 +18,7 @@ namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
-  PAMA_PARAM(loc_camera_sam_not_cv, bool, false)          /* use gtsam not opencv for localizing the camera */\
+  PAMA_PARAM(loc_camera_algorithm, int, 0)                /* 0 - OpenCV SolvePnp, 1 - GTSAM Resectioning, 2 - GTSAM ProjectBetween */\
   PAMA_PARAM(loc_cmd, std::string, "")                    /* commands to vloc_node (diagnostics, ...) */\
    /* Camera frame -> baselink frame transform */\
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
@@ -28,7 +28,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
   /* Aruco markers detection parameters - done by opencv */\
-  PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers  */ \
+  PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \
   PAMA_PARAM(loc_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* Parameters for GTSAM localization techniques */\
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
@@ -96,12 +96,12 @@ namespace fiducial_vlam
 
 #define PSL_ALL_PARAMS \
   /* Subscription topics */\
-  PAMA_PARAM(psl_sub_image_raw_topic, std::string, "image_raw") /* topic for subscription to sensor_msgs::msg::Image */\
-  PAMA_PARAM(psl_sub_camera_info_topic, std::string, "camera_info") /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  */\
-  PAMA_PARAM(psl_sub_map_topic, std::string, "/fiducial_map") /* topic for subscription to fiducial_vlam_msgs::msg::Map  */\
+  PAMA_PARAM(psl_sub_image_raw_topic, std::string, "image_raw") /* topic for subscription to sensor_msgs::msg::Image (launch only) */\
+  PAMA_PARAM(psl_sub_camera_info_topic, std::string, "camera_info") /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  (launch only) */\
+  PAMA_PARAM(psl_sub_map_topic, std::string, "/fiducial_map") /* topic for subscription to fiducial_vlam_msgs::msg::Map (launch only)  */\
  /* Subscription message quality */\
-  PAMA_PARAM(psl_sub_image_raw_best_effort_not_reliable, bool, true) /* subscribe to image_ros message with best_effort (gazebo camera) not reliable (tello_ros) */\
-  PAMA_PARAM(psl_sub_camera_info_best_effort_not_reliable, bool, true) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) */\
+  PAMA_PARAM(psl_sub_image_raw_best_effort_not_reliable, bool, true) /* subscribe to image_ros message with best_effort (gazebo camera) not reliable (tello_ros) (launch only) */\
+  PAMA_PARAM(psl_sub_camera_info_best_effort_not_reliable, bool, true) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) (launch only) */\
   /* Messages to publish */\
   PAMA_PARAM(psl_pub_image_marked_enable, bool, true)     /* publish the image_marked at every frame  */\
   PAMA_PARAM(psl_pub_observations_enable, bool, true)     /* publish the observations at every frame  */\

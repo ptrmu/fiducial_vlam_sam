@@ -1,3 +1,5 @@
+#pragma clang diagnostic ignored "-Wunused-private-field"
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
@@ -162,7 +164,7 @@ namespace fvlam
 
     // Draw the boundary around detected markers.
     void annotate_image_with_detected_markers(cv::Mat &color_image,
-                                              const Observations observations) override
+                                              const Observations &observations) override
     {
       for (auto &observation : observations.observations()) {
 
