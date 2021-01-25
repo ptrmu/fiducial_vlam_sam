@@ -1,3 +1,4 @@
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 
 #include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/camera_info.hpp"
@@ -48,23 +49,24 @@ namespace fvlam
 
           // The marker corners as seen in the image.
           auto corners_f_image = observation.to<std::vector<gtsam::Point2>>();
-          auto corners_f_marker = Marker::to_corners_f_marker<std::vector<gtsam::Point3>>(map.marker_length());
+          auto corners_f_marker = Marker::corners_f_marker<std::vector<gtsam::Point3>>(map.marker_length());
 
           // Add factors to the graph.
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
-            graph.emplace_shared<ProjectBetweenFactor>(corners_f_image[j],
-                                                       corner_noise,
-                                                       marker_key,
-                                                       corners_f_marker[j],
-                                                       camera_key_,
-                                                       cal3ds2);
+            graph.emplace_shared<ProjectBetweenFactor>(corners_f_image[j], corner_noise,
+                                                       marker_key, camera_key_,
+                                                       corners_f_marker[j], cal3ds2,
+                                                       logger_, true);
           }
 
           // Add the marker initial value.
           auto t_world_marker = marker_ptr->t_world_marker().tf().to<gtsam::Pose3>();
           initial.insert(marker_key, t_world_marker);
 
-          // Add the marker prior with a noise model.
+          // Add the marker prior with a noise model. NOTE: using the marker covariance
+          // ends up giving some unsatisfactory results. The camera location does not optimize
+          // to the best answer. Not quite sure of the explanation. When the markers have uncertainty
+          // they move around to find lower optimums with the camera also moving.
           bool use_constrained = marker_ptr->is_fixed() ||
                                  !lc_context_.use_marker_covariance_ ||
                                  marker_ptr->t_world_marker().cov()(0, 0) == 0.0;
@@ -128,12 +130,18 @@ namespace fvlam
       params.setRelativeErrorTol(1e-8);
       params.setAbsoluteErrorTol(1e-8);
 //      params.setVerbosity("TERMINATION");
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
-//      std::cout << "initial error = " << graph.error(initial) << std::endl;
-//      std::cout << "final error = " << graph.error(result) << std::endl;
 
-      // 5. Extract the result into a TransformWithCovariance
-      return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+      try {
+        auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
+//      logger_.debug() << "initial error = " << graph.error(initial) << std::endl;
+//      logger_.debug() << "final error = " << graph.error(result) << std::endl;
+
+        // 5. Extract the result into a Transform3WithCovariance
+        return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+
+      } catch (gtsam::CheiralityException &e) {
+      }
+      return Transform3WithCovariance{};
     }
 
     // Given the corners of one marker (observation) calculate t_camera_marker.
@@ -188,13 +196,13 @@ namespace fvlam
 
           // The marker corners as seen in the image.
           auto corners_f_image = observation.to<std::vector<gtsam::Point2>>();
-          auto corners_f_map = marker_ptr->to_corners_f_world<std::vector<gtsam::Point3>>(map.marker_length());
+          auto corners_f_map = marker_ptr->corners_f_world<std::vector<gtsam::Point3>>(map.marker_length());
 
           // Add factors to the graph.
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
-            graph.emplace_shared<ResectioningFactor>(corner_noise, camera_key_, cal3ds2,
-                                                     corners_f_map[j],
-                                                     corners_f_image[j]);
+            graph.emplace_shared<ResectioningFactor>(corners_f_image[j], corner_noise,
+                                                     camera_key_, corners_f_map[j], cal3ds2,
+                                                     logger_, true);
           }
         }
       }
@@ -239,12 +247,18 @@ namespace fvlam
       params.setRelativeErrorTol(1e-8);
       params.setAbsoluteErrorTol(1e-8);
 //      params.setVerbosity("TERMINATION");
-      auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
-//      std::cout << "initial error = " << graph.error(initial) << std::endl;
-//      std::cout << "final error = " << graph.error(result) << std::endl;
 
-      // 5. Extract the result into a TransformWithCovariance
-      return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+      try {
+        auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
+//      logger_.debug() << "initial error = " << graph.error(initial) << std::endl;
+//      logger_.debug() << "final error = " << graph.error(result) << std::endl;
+
+        // 5. Extract the result into a Transform3WithCovariance
+        return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+
+      } catch (gtsam::CheiralityException &e) {
+      }
+      return Transform3WithCovariance{};
     }
 
     // Given the corners of one marker (observation) calculate t_camera_marker.

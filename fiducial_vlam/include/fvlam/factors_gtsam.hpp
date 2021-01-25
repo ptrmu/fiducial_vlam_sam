@@ -1,10 +1,13 @@
 #pragma once
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
+#pragma ide diagnostic ignored "OCUnusedStructInspection"
+#pragma ide diagnostic ignored "modernize-use-nodiscard"
 
+#include "fvlam/logger.hpp"
 #include <gtsam/geometry/Cal3DS2.h>
 #include <gtsam/geometry/PinholeCamera.h>
 #include <gtsam/geometry/Point3.h>
 #include <gtsam/geometry/Pose3.h>
-#include <gtsam/inference/Symbol.h>
 #include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
@@ -105,28 +108,37 @@ namespace fvlam
 
   class ProjectBetweenFactor : public gtsam::NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>
   {
+    gtsam::Point2 point_f_image_;
+    gtsam::Key key_marker_;
+    gtsam::Key key_camera_;
+    gtsam::Point3 point_f_marker_;
     const gtsam::Cal3DS2 &cal3ds2_;
-    const gtsam::Point3 point_f_marker_;
-    const gtsam::Point2 point_f_image_;
+    Logger &logger_;
+    bool throwCheirality_;     // If true, rethrows Cheirality exceptions (default: false)
 
   public:
     ProjectBetweenFactor(gtsam::Point2 point_f_image,
                          const gtsam::SharedNoiseModel &model,
-                         const gtsam::Key key_marker,
+                         gtsam::Key key_marker,
+                         gtsam::Key key_camera,
                          gtsam::Point3 point_f_marker,
-                         const gtsam::Key key_camera,
-                         const gtsam::Cal3DS2 &cal3ds2) :
+                         const gtsam::Cal3DS2 &cal3ds2,
+                         Logger &logger,
+                         bool throwCheirality = false) :
       NoiseModelFactor2<gtsam::Pose3, gtsam::Pose3>(model, key_marker, key_camera),
+      point_f_image_{std::move(point_f_image)},
+      key_marker_{key_marker}, key_camera_{key_camera},
+      point_f_marker_{std::move(point_f_marker)},
       cal3ds2_{cal3ds2},
-      point_f_marker_{point_f_marker},
-      point_f_image_{std::move(point_f_image)}
+      logger_{logger},
+      throwCheirality_{throwCheirality}
     {}
 
     /// evaluate the error
     gtsam::Vector evaluateError(const gtsam::Pose3 &marker_f_world,
                                 const gtsam::Pose3 &camera_f_world,
-                                boost::optional<gtsam::Matrix &> H1,
-                                boost::optional<gtsam::Matrix &> H2) const override
+                                boost::optional<gtsam::Matrix &> H1 = boost::none,
+                                boost::optional<gtsam::Matrix &> H2 = boost::none) const override
     {
       gtsam::Matrix36 d_point3_wrt_pose3;
       gtsam::Matrix26 d_point2_wrt_pose3;
@@ -137,11 +149,6 @@ namespace fvlam
         point_f_marker_,
         H1 ? gtsam::OptionalJacobian<3, 6>(d_point3_wrt_pose3) : boost::none);
 
-//      marker_f_world.print("\nmarker_f_world\n");
-//      camera_f_world.print("\ncamera_f_world\n");
-//      cal3ds2_->print("\ncal3ds2\n");
-//      point_f_world.print("point_f_world\n");
-
       // Project this point to the camera's image frame. Catch and return a default
       // value on a CheiralityException.
       auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{camera_f_world, cal3ds2_};
@@ -150,8 +157,6 @@ namespace fvlam
           point_f_world,
           H2 ? gtsam::OptionalJacobian<2, 6>(d_point2_wrt_pose3) : boost::none,
           H1 ? gtsam::OptionalJacobian<2, 3>(d_point2_wrt_point3) : boost::none);
-
-//        point_f_image.print("point_f_image\n");
 
         // Return the Jacobian for each input
         if (H1) {
@@ -165,10 +170,15 @@ namespace fvlam
         return point_f_image - point_f_image_;
 
       } catch (gtsam::CheiralityException &e) {
-        std::cout << "ProjectBetweenFactor CheiralityException Exception!" << std::endl;
+        if (H1) *H1 = gtsam::Matrix26::Zero();
+        if (H2) *H2 = gtsam::Matrix26::Zero();
+
+        logger_.error() << e.what() << ": Marker " << gtsam::DefaultKeyFormatter(key_marker_) <<
+                        " moved behind camera " << gtsam::DefaultKeyFormatter(key_camera_) << std::endl;
+
+        if (throwCheirality_)
+          throw gtsam::CheiralityException(key_camera_);
       }
-      if (H1) *H1 = gtsam::Matrix26::Zero();
-      if (H2) *H2 = gtsam::Matrix26::Zero();
       return gtsam::Vector2{2.0 * cal3ds2_.px(), 2.0 * cal3ds2_.py()};
     }
   };
@@ -180,33 +190,47 @@ namespace fvlam
 
   class ResectioningFactor : public gtsam::NoiseModelFactor1<gtsam::Pose3>
   {
-    const gtsam::Cal3DS2 &cal3ds2_;
-    const gtsam::Point3 point_f_world;
     const gtsam::Point2 point_f_image;
+    gtsam::Key key_camera_;
+    const gtsam::Point3 point_f_world;
+    const gtsam::Cal3DS2 &cal3ds2_;
+    Logger &logger_;
+    bool throwCheirality_;     // If true, rethrows Cheirality exceptions (default: false)
 
   public:
     /// Construct factor given known point P and its projection p
-    ResectioningFactor(const gtsam::SharedNoiseModel &model,
-                       const gtsam::Key key,
-                       const gtsam::Cal3DS2 &cal3ds2,
+    ResectioningFactor(gtsam::Point2 point_f_image,
+                       const gtsam::SharedNoiseModel &model,
+                       gtsam::Key key_camera,
                        gtsam::Point3 point_f_world,
-                       gtsam::Point2 point_f_image) :
-      NoiseModelFactor1<gtsam::Pose3>(model, key),
+                       const gtsam::Cal3DS2 &cal3ds2,
+                       Logger &logger,
+                       bool throwCheirality = false) :
+      NoiseModelFactor1<gtsam::Pose3>(model, key_camera),
+      point_f_image{std::move(point_f_image)},
+      key_camera_{key_camera},
+      point_f_world{std::move(point_f_world)},
       cal3ds2_{cal3ds2},
-      point_f_world{point_f_world},
-      point_f_image{point_f_image}
+      logger_{logger},
+      throwCheirality_{throwCheirality}
     {}
 
     /// evaluate the error
     gtsam::Vector evaluateError(const gtsam::Pose3 &pose,
-                                boost::optional<gtsam::Matrix &> H) const override
+                                boost::optional<gtsam::Matrix &> H = boost::none) const override
     {
       auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose, cal3ds2_};
       try {
         return camera.project(point_f_world, H) - point_f_image;
       } catch (gtsam::CheiralityException &e) {
+        if (H) *H = gtsam::Matrix26::Zero();
+
+        logger_.error() << e.what() << ": point moved behind camera "
+                        << gtsam::DefaultKeyFormatter(key_camera_) << std::endl;
+
+        if (throwCheirality_)
+          throw gtsam::CheiralityException(key_camera_);
       }
-      if (H) *H = gtsam::Matrix26::Zero();
       return gtsam::Vector2{2.0 * cal3ds2_.px(), 2.0 * cal3ds2_.py()};
     }
   };

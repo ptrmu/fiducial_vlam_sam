@@ -40,7 +40,7 @@ namespace fvlam
       for (const auto &observation : observations.observations()) {
         auto marker_ptr = map.find_marker_const(observation.id());
         if (marker_ptr != nullptr) {
-          marker_ptr->to_corners_f_world(map.marker_length(), all_corners_f_map);
+          marker_ptr->corners_f_world(map.marker_length(), all_corners_f_map);
           observation.to(all_corners_f_image);
         }
       }

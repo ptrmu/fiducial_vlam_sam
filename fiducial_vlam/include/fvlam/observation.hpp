@@ -83,6 +83,8 @@ namespace fvlam
     template<class T>
     static Observation from(std::uint64_t id, T &other);
 
+    // If the type we are converting to is an array, a vector, or matrix, then the to() routines extract
+    // the corners_f_image_ values and put them in the array.
     template<class T>
     T to() const;
 

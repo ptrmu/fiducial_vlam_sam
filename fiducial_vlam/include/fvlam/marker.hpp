@@ -114,14 +114,15 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
+    // Return the marker corners in the marker frame (z=0)
     template<class T>
-    static T to_corners_f_marker(double marker_length);
+    static T corners_f_marker(double marker_length);
 
+    // Return the marker corners in the world frame given the t_world_marker transform.
     template<class T>
-    T to_corners_f_world(double marker_length) const;
-
+    T corners_f_world(double marker_length) const; //
     template<class T>
-    void to_corners_f_world(double marker_length, T &other) const;
+    void corners_f_world(double marker_length, T &other) const;
 
     std::string to_string(bool also_cov = false) const; //
     std::string to_id_string() const; //

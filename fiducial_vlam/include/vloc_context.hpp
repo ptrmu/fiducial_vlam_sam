@@ -32,7 +32,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* Parameters for GTSAM localization techniques */\
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
-  PAMA_PARAM(loc_use_marker_covariance, bool, true)       /* When localizing a camera, use the covariance stored in the marker. */\
+  PAMA_PARAM(loc_use_marker_covariance, bool, false)      /* When localizing a camera, use the covariance stored in the marker. */\
   /* End of list */
 
   // The following parameters control how vloc_node publishes messages and subscribes to messages

@@ -85,7 +85,7 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  std::vector<cv::Point3d> Marker::to_corners_f_marker<std::vector<cv::Point3d>>(double marker_length)
+  std::vector<cv::Point3d> Marker::corners_f_marker<std::vector<cv::Point3d>>(double marker_length)
   {
     auto corners_f_marker = calc_corners3_f_marker(marker_length);
     return std::vector<cv::Point3d>{
@@ -97,7 +97,7 @@ namespace fvlam
   }
 
   template<>
-  std::vector<cv::Point3d> Marker::to_corners_f_world<std::vector<cv::Point3d>>(double marker_length) const
+  std::vector<cv::Point3d> Marker::corners_f_world<std::vector<cv::Point3d>>(double marker_length) const
   {
     auto corners_f_world = calc_corners3_f_world(marker_length);
     return std::vector<cv::Point3d>{
@@ -109,7 +109,7 @@ namespace fvlam
   }
 
   template<>
-  void Marker::to_corners_f_world<std::vector<cv::Point3d>>(double marker_length, std::vector<cv::Point3d> &other) const
+  void Marker::corners_f_world<std::vector<cv::Point3d>>(double marker_length, std::vector<cv::Point3d> &other) const
   {
     auto corners_f_world = calc_corners3_f_world(marker_length);
     other.emplace_back(cv::Point3d{corners_f_world[0].t()(0), corners_f_world[0].t()(1), corners_f_world[0].t()(2)});
@@ -205,7 +205,7 @@ namespace fvlam
       auto tvec = t_camera_world.t().to<cv::Vec3d>();
 
       std::vector<cv::Point2d> image_points;
-      auto corners_f_world = marker.to_corners_f_world<std::vector<cv::Point3d>>(marker_length);
+      auto corners_f_world = marker.corners_f_world<std::vector<cv::Point3d>>(marker_length);
       cv::projectPoints(corners_f_world, rvec, tvec, camera_matrix, dist_coeffs, image_points);
       return Observation::from<std::vector<cv::Point2d>>(marker.id(), image_points);
     };
@@ -221,7 +221,7 @@ namespace fvlam
       (const Observation &observation) -> Marker
     {
       // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame.
-      auto corners_f_marker{Marker::to_corners_f_marker<std::vector<cv::Point3d>>(marker_length)};
+      auto corners_f_marker{Marker::corners_f_marker<std::vector<cv::Point3d>>(marker_length)};
       auto corners_f_image{observation.to<std::vector<cv::Point2d>>()};
 
       // Figure out marker pose.

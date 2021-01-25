@@ -128,7 +128,7 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  std::vector<gtsam::Point3> Marker::to_corners_f_marker<std::vector<gtsam::Point3>>(double marker_length)
+  std::vector<gtsam::Point3> Marker::corners_f_marker<std::vector<gtsam::Point3>>(double marker_length)
   {
     auto corners_f_marker = calc_corners3_f_marker(marker_length);
     return std::vector<gtsam::Point3>{
@@ -140,7 +140,7 @@ namespace fvlam
   }
 
   template<>
-  std::vector<gtsam::Point3> Marker::to_corners_f_world<std::vector<gtsam::Point3>>(double marker_length) const
+  std::vector<gtsam::Point3> Marker::corners_f_world<std::vector<gtsam::Point3>>(double marker_length) const
   {
     auto corners_f_world = calc_corners3_f_world(marker_length);
     return std::vector<gtsam::Vector3>{
@@ -189,7 +189,7 @@ namespace fvlam
       auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{gtsam_t_world_camera, camera_calibration};
 
       Observation::Array corners_f_image;
-      auto corners_f_world = marker.to_corners_f_world<std::vector<gtsam::Point3>>(marker_length);
+      auto corners_f_world = marker.corners_f_world<std::vector<gtsam::Point3>>(marker_length);
       for (std::size_t i = 0; i < Observation::ArraySize; i += 1) {
         auto &corner_f_world = corners_f_world[i];
 

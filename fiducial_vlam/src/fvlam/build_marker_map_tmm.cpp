@@ -11,6 +11,7 @@
 #include <gtsam/nonlinear/Marginals.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/sfm/ShonanAveraging.h>
+#include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/InitializePose3.h>
 #include <opencv2/calib3d/calib3d.hpp>
 
@@ -60,7 +61,7 @@ namespace fvlam
     std::map<std::uint64_t, std::set<std::uint64_t>> back_links_{};
 
   public:
-    MarkerMarkerGraph(const MarkerMap &map_initial)
+    explicit MarkerMarkerGraph(const MarkerMap &map_initial)
     {
       for (auto &marker : map_initial.markers()) {
         if (marker.second.is_fixed()) {
@@ -290,20 +291,19 @@ namespace fvlam
           if (solve_tmm) {
             auto t_marker0_marker1 = (*solve_tmm)->t_marker0_marker1();
 
-            // The t_marker0_marker1 measurements are always recorded with the marker with the
-            // lower id first - as the "world" marker and the higher id is the "body" marker. If
-            // when we reassign ids, the higher id ends up as the "world" marker, then the
-            // measurement has to be inverted. TODO: rotate the covariance!
-            if (idix_list.to_id(ix0) > idix_list.to_id(ix1)) {
-              t_marker0_marker1 = Transform3WithCovariance{t_marker0_marker1.tf().inverse(),
-                                                           t_marker0_marker1.cov()};
-            }
-
             auto noise_model = determine_between_factor_noise_model(t_marker0_marker1,
                                                                     tmm_context_.try_shonan_initialization_);
 
+            // The t_marker0_marker1 measurements are always recorded with the marker with the
+            // lower id first - as the "world" marker and the higher id is the "body" marker. If
+            // when we reassign ids, the higher id ends up as the "world" marker, then the
+            // measurement has to be inverted.
+            bool interchange = idix_list.to_id(ix0) > idix_list.to_id(ix1);
+            auto ix0_bf = interchange ? ix1 : ix0;
+            auto ix1_bf = interchange ? ix0 : ix1;
+
             pose_graph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
-              ix0, ix1, t_marker0_marker1.tf().to<gtsam::Pose3>(),
+              ix0_bf, ix1_bf, t_marker0_marker1.tf().to<gtsam::Pose3>(),
               noise_model);
           }
         }
