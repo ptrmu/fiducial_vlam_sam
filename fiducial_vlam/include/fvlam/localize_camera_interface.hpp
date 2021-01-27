@@ -65,38 +65,25 @@ namespace fvlam
   };
 
 // ==============================================================================
-// LocalizeCameraProjectBetweenContext class
+// LocalizeCameraGtsamFactorContext class
 // ==============================================================================
 
-  struct LocalizeCameraProjectBetweenContext
+  struct LocalizeCameraGtsamFactorContext
   {
     double &corner_measurement_sigma_;
+    int &gtsam_factor_type_;
     bool &use_marker_covariance_;
 
-    explicit LocalizeCameraProjectBetweenContext(double &corner_measurement_sigma,
-                                        bool &use_marker_covariance) :
+    explicit LocalizeCameraGtsamFactorContext(double &corner_measurement_sigma,
+                                              int &gtsam_factor_type,
+                                              bool &use_marker_covariance) :
       corner_measurement_sigma_{corner_measurement_sigma},
+      gtsam_factor_type_{gtsam_factor_type},
       use_marker_covariance_{use_marker_covariance}
     {}
 
     template<class T>
-    static LocalizeCameraProjectBetweenContext from(T &other);
-  };
-
-// ==============================================================================
-// LocalizeCameraResectioningContext class
-// ==============================================================================
-
-  struct LocalizeCameraResectioningContext
-  {
-    double &corner_measurement_sigma_;
-
-    explicit LocalizeCameraResectioningContext(double &corner_measurement_sigma) :
-      corner_measurement_sigma_{corner_measurement_sigma}
-    {}
-
-    template<class T>
-    static LocalizeCameraResectioningContext from(T &other);
+    static LocalizeCameraGtsamFactorContext from(T &other);
   };
 
 

@@ -39,27 +39,16 @@ namespace fvlam
   }
 
 // ==============================================================================
-// LocalizeCameraResectioningContext from method
+// LocalizeCameraGtsamFactorContext from method
 // ==============================================================================
 
   template<>
-  LocalizeCameraResectioningContext LocalizeCameraResectioningContext::from<fiducial_vlam::VlocContext>(
+  LocalizeCameraGtsamFactorContext LocalizeCameraGtsamFactorContext::from<fiducial_vlam::VlocContext>(
     fiducial_vlam::VlocContext &other)
   {
-    LocalizeCameraResectioningContext cxt{other.loc_corner_measurement_sigma_};
-    return cxt;
-  }
-
-// ==============================================================================
-// LocalizeCameraProjectBetweenContext from method
-// ==============================================================================
-
-  template<>
-  LocalizeCameraProjectBetweenContext LocalizeCameraProjectBetweenContext::from<fiducial_vlam::VlocContext>(
-    fiducial_vlam::VlocContext &other)
-  {
-    LocalizeCameraProjectBetweenContext cxt{other.loc_corner_measurement_sigma_,
-                                            other.loc_use_marker_covariance_};
+    LocalizeCameraGtsamFactorContext cxt{other.loc_corner_measurement_sigma_,
+                                         other.loc_gtsam_factor_type_,
+                                         other.loc_use_marker_covariance_};
     return cxt;
   }
 
@@ -163,11 +152,7 @@ namespace fiducial_vlam
       // Check that a LocalizeCameraInterface has been instantiated
       if (!localize_camera_ || cxt_.loc_camera_algorithm_ != current_loc_camera_algorithm_) {
         if (cxt_.loc_camera_algorithm_ == 1) {
-          auto localize_camera_context = fvlam::LocalizeCameraResectioningContext::from(cxt_);
-          localize_camera_ = make_localize_camera(localize_camera_context, logger_);
-
-        } else if (cxt_.loc_camera_algorithm_ == 2) {
-          auto localize_camera_context = fvlam::LocalizeCameraProjectBetweenContext::from(cxt_);
+          auto localize_camera_context = fvlam::LocalizeCameraGtsamFactorContext::from(cxt_);
           localize_camera_ = make_localize_camera(localize_camera_context, logger_);
 
         } else {

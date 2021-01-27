@@ -12,7 +12,7 @@ launch_directory = os.path.join(vlam_package_share_directory, 'launch')
 worlds_directory = os.path.join(sim_package_share_directory, 'worlds')
 sdf_directory = os.path.join(sim_package_share_directory, 'sdf')
 
-world_name = "three_dense_circles_of_markers"
+world_name = "circle_of_markers"
 created_map_filename = os.path.join(worlds_directory, 'sim_make_map.yaml')
 existing_map_filename = os.path.join(worlds_directory, world_name + '_map.yaml')
 world_filename = os.path.join(worlds_directory, world_name + '.world')
@@ -22,7 +22,7 @@ elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vloc_args = [{
-    'loc_camera_algorithm': 2,
+    'loc_camera_algorithm': 1,
     'loc_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
@@ -32,6 +32,8 @@ vloc_args = [{
     'psl_pub_camera_odom_enable': False,
     'psl_pub_base_pose_enable': True,
     'psl_pub_base_odom_enable': False,
+    'psl_pub_tf_camera_per_marker_enable': True,
+    'psl_pub_tf_marker_per_marker_enable': True,
 }]
 
 vmap_args = [{

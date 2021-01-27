@@ -394,7 +394,7 @@ namespace fvlam
                                         const gtsam::Values &pose_result)
     {
       auto map = std::make_unique<MarkerMap>(map_initial_.marker_length());
-      gtsam::Marginals marginals(pose_graph, pose_result);
+      gtsam::Marginals marginals{GtsamUtil::construct_marginals(pose_graph, pose_result)};
 
       for (const auto &key_value : pose_result) {
         gtsam::Key key = key_value.key;
@@ -407,11 +407,8 @@ namespace fvlam
           continue;
         }
 
-        // Otherwise add it as a regular marker. Have to convert from Gtsam to Ros covariance.
-        const auto &pose = pose_result.at<gtsam::Pose3>(key);
-        auto cov_ros = GtsamUtil::cov_ros_from_gtsam(pose, marginals.marginalCovariance(key));
-
-        map->add_marker(Marker{id, Transform3WithCovariance{Transform3::from(pose), cov_ros}});
+        auto t_map_marker = GtsamUtil::extract_transform3_with_covariance(marginals, pose_result, key);
+        map->add_marker(Marker{id, t_map_marker});
       }
 
       return map;

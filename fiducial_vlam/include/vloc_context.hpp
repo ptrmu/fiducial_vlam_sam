@@ -18,7 +18,7 @@ namespace fiducial_vlam
 {
 #define VLOC_ALL_PARAMS \
   /* vlocnode flags */\
-  PAMA_PARAM(loc_camera_algorithm, int, 0)                /* 0 - OpenCV SolvePnp, 1 - GTSAM Resectioning, 2 - GTSAM ProjectBetween */\
+  PAMA_PARAM(loc_camera_algorithm, int, 0)                /* 0 - OpenCV SolvePnp, 1 - GTSAM factor */\
   PAMA_PARAM(loc_cmd, std::string, "")                    /* commands to vloc_node (diagnostics, ...) */\
    /* Camera frame -> baselink frame transform */\
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
@@ -31,6 +31,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \
   PAMA_PARAM(loc_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* Parameters for GTSAM localization techniques */\
+  PAMA_PARAM(loc_gtsam_factor_type, int, 2)               /* 0 - Resectioning, 1 - ProjectBetween, 2 - QuadResectioning, 3 - PoseBetween */ \
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
   PAMA_PARAM(loc_use_marker_covariance, bool, false)      /* When localizing a camera, use the covariance stored in the marker. */\
   /* End of list */

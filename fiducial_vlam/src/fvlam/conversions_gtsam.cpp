@@ -216,33 +216,4 @@ namespace fvlam
       return Observation{marker.id(), corners_f_image};
     };
   }
-//
-//  template<>
-//  Marker::SolveFunction Marker::solve_t_camera_marker<gtsam::Cal3DS2>(
-//    const gtsam::Cal3DS2 &camera_calibration, double marker_length)
-//  {
-//    return [
-//      camera_matrix = camera_calibration.first,
-//      dist_coeffs = camera_calibration.second,
-//      marker_length]
-//      (const Observation &observation) -> Marker
-//    {
-//      // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame.
-//      auto corners_f_marker{Marker::to_corners_f_marker<std::vector<cv::Point3d>>(marker_length)};
-//      auto corners_f_image{observation.to<std::vector<cv::Point2d>>()};
-//
-//      // Figure out marker pose.
-//      cv::Vec3d rvec, tvec;
-//      cv::solvePnP(corners_f_marker, corners_f_image,
-//                   camera_matrix, dist_coeffs,
-//                   rvec, tvec);
-//
-//      // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
-//      // camera coordinate system". In this case the marker frame is the model coordinate system.
-//      // So rvec, tvec are the transformation t_camera_marker.
-//      return Marker{bservation.id(),
-//                    Transform3WithCovariance(Transform3(Rotate3::from(rvec), Translate3::from(tvec)))};
-//    };
-//  }
-
 }
