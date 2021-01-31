@@ -42,11 +42,6 @@ namespace fvlam
     virtual Transform3WithCovariance solve_t_map_camera(const Observations &observations,
                                                         const CameraInfo &camera_info,
                                                         const MarkerMap &map) = 0;
-
-    // Given the corners of one marker (observation) calculate t_camera_marker.
-    virtual Transform3WithCovariance solve_t_camera_marker(const Observation &observation,
-                                                           const CameraInfo &camera_info,
-                                                           double marker_length) = 0;
   };
 
   template<class TLcContext>

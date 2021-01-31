@@ -94,6 +94,11 @@ namespace fvlam
     std::string to_string() const;
 
     bool equals(const Observation &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+
+    Transform3 solve_t_camera_marker(const CameraInfo &camera_info, double marker_length) const; //
+    Transform3 solve_t_marker_camera(const CameraInfo &camera_info, double marker_length) const; //
+    Transform3 solve_t_base_marker(const CameraInfo &camera_info, double marker_length) const; //
+    Transform3 solve_t_marker_base(const CameraInfo &camera_info, double marker_length) const; //
   };
 
 // ==============================================================================

@@ -131,7 +131,6 @@ namespace fvlam
     bool equals(const Marker &other, double tol = 1.0e-9, bool check_relative_also = true) const;
 
     using ProjectFunction = std::function<Observation(const Marker &marker)>;
-    using SolveFunction = std::function<Marker(const Observation &observation)>;
 
     template<class TCameraCalibration>
     static ProjectFunction project_t_world_marker(const TCameraCalibration &camera_calibration,
@@ -144,15 +143,6 @@ namespace fvlam
     {
       return project_t_world_marker<TCameraCalibration>(camera_calibration, Transform3{}, marker_length);
     }
-
-    template<class TCameraCalibration>
-    static SolveFunction solve_t_camera_marker(const TCameraCalibration &camera_calibration,
-                                               double marker_length);
-
-    template<class TCameraCalibration>
-    static SolveFunction solve_t_world_marker(const TCameraCalibration &camera_calibration,
-                                              const Transform3 &t_world_camera,
-                                              double marker_length);
   };
 
 // ==============================================================================

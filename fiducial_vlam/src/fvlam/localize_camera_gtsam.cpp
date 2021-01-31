@@ -263,61 +263,6 @@ namespace fvlam
       return Transform3WithCovariance{};
     }
 
-    // Given the corners of one marker (observation) calculate t_camera_marker.
-    Transform3WithCovariance solve_t_camera_marker(const Observation &observation,
-                                                   const CameraInfo &camera_info,
-                                                   double marker_length) override
-    {
-      // Get an estimate of t_camera_marker.
-      auto t_camera_marker_cv = lc_cv_->solve_t_camera_marker(observation, camera_info, marker_length);
-
-      // If we could not find an estimate, then return.
-      if (!t_camera_marker_cv.is_valid()) {
-        return t_camera_marker_cv;
-      }
-
-      // 1. Allocate the graph and initial estimate
-      gtsam::NonlinearFactorGraph graph{};
-      gtsam::Values initial{};
-
-      // Create a GTSAM camera calibration structure.
-      auto cal3ds2 = std::make_shared<const gtsam::Cal3DS2>(camera_info.to<gtsam::Cal3DS2>());
-
-      // Create a noise model for the corners measurements
-      auto corner_noise = gtsam::noiseModel::Isotropic::Sigma(8, lc_context_.corner_measurement_sigma_);
-
-      // Add the camera initial value.
-      initial.insert(camera_key_, t_camera_marker_cv.tf().inverse().to<gtsam::Pose3>());
-
-      // Add measurement factor to the graph
-      auto corners_f_image = observation.to<std::vector<gtsam::Point2>>();
-      auto corners_f_marker = fvlam::Marker::corners_f_marker<std::vector<gtsam::Point3>>(marker_length);
-
-      // Add factor to the graph.
-      graph.emplace_shared<QuadResectioningFactor>(corners_f_image, corner_noise,
-                                                   camera_key_, corners_f_marker, cal3ds2,
-                                                   logger_, true);
-
-      // 4. Optimize the graph using Levenberg-Marquardt
-      auto params = gtsam::LevenbergMarquardtParams();
-      params.setRelativeErrorTol(1e-8);
-      params.setAbsoluteErrorTol(1e-8);
-//      params.setVerbosity("TERMINATION");
-
-      try {
-        auto result = gtsam::LevenbergMarquardtOptimizer(graph, initial, params).optimize();
-//        logger_.debug() << "initial error = " << graph.error(initial) << std::endl;
-//        logger_.debug() << "final error = " << graph.error(result) << std::endl;
-
-        // 5. Extract the result into a Transform3WithCovariance. Note that we invert the result
-        // because the optimization returns t_marker_camera and we want t_camera_marker.
-        return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_, true);
-
-      } catch (gtsam::CheiralityException &e) {
-      }
-
-      return Transform3WithCovariance{};
-    }
   };
 
   template<>

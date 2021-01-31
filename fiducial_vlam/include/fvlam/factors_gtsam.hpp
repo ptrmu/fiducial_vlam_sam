@@ -310,6 +310,7 @@ namespace fvlam
         }
 
         return (gtsam::Vector8{} << e0, e1, e2, e3).finished();
+
       } catch (gtsam::CheiralityException &e) {
         if (H) *H = gtsam::Matrix86::Zero();
 
@@ -319,7 +320,8 @@ namespace fvlam
         if (throwCheirality_)
           throw gtsam::CheiralityException(key_camera_);
       }
-      return gtsam::Vector2{2.0 * cal3ds2_->px(), 2.0 * cal3ds2_->py()};
+      auto max_e = gtsam::Vector2{2.0 * cal3ds2_->px(), 2.0 * cal3ds2_->py()};
+      return (gtsam::Vector8{} << max_e, max_e, max_e, max_e).finished();
     }
   };
 }

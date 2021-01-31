@@ -172,6 +172,41 @@ namespace fvlam
     return observations;
   }
 
+  Transform3 Observation::solve_t_camera_marker(const CameraInfo &camera_info, double marker_length) const
+  {
+    auto camera_calibration = camera_info.to<CvCameraCalibration>();
+
+    // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame.
+    auto corners_f_marker{Marker::corners_f_marker<std::vector<cv::Point3d>>(marker_length)};
+    auto corners_f_image{to<std::vector<cv::Point2d>>()};
+
+    // Figure out marker pose.
+    cv::Vec3d rvec, tvec;
+    cv::solvePnP(corners_f_marker, corners_f_image,
+                 camera_calibration.first, camera_calibration.second,
+                 rvec, tvec);
+
+    // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
+    // camera coordinate system". In this case the marker frame is the model coordinate system.
+    // So rvec, tvec are the transformation t_camera_marker.
+    return Transform3(Rotate3::from(rvec), Translate3::from(tvec));
+  }
+
+  Transform3 Observation::solve_t_marker_camera(const CameraInfo &camera_info, double marker_length) const
+  {
+    return solve_t_camera_marker(camera_info, marker_length).inverse();
+  }
+
+  Transform3 Observation::solve_t_base_marker(const CameraInfo &camera_info, double marker_length) const
+  {
+    return camera_info.t_base_camera() * solve_t_camera_marker(camera_info, marker_length);
+  }
+
+  Transform3 Observation::solve_t_marker_base(const CameraInfo &camera_info, double marker_length) const
+  {
+    return solve_t_base_marker(camera_info, marker_length).inverse();
+  }
+
 // ==============================================================================
 // fvlam::Marker conversions that require Observation conversions so
 // have to be after those conversions in the file.
@@ -208,52 +243,6 @@ namespace fvlam
       auto corners_f_world = marker.corners_f_world<std::vector<cv::Point3d>>(marker_length);
       cv::projectPoints(corners_f_world, rvec, tvec, camera_matrix, dist_coeffs, image_points);
       return Observation::from<std::vector<cv::Point2d>>(marker.id(), image_points);
-    };
-  }
-
-  template<>
-  Marker::SolveFunction Marker::solve_t_camera_marker<CvCameraCalibration>(
-    const CvCameraCalibration &camera_calibration, double marker_length)
-  {
-    return [
-      camera_calibration,
-      marker_length]
-      (const Observation &observation) -> Marker
-    {
-      // Build up two lists of corner points: 2D in the image frame, 3D in the marker frame.
-      auto corners_f_marker{Marker::corners_f_marker<std::vector<cv::Point3d>>(marker_length)};
-      auto corners_f_image{observation.to<std::vector<cv::Point2d>>()};
-
-      // Figure out marker pose.
-      cv::Vec3d rvec, tvec;
-      cv::solvePnP(corners_f_marker, corners_f_image,
-                   camera_calibration.first, camera_calibration.second,
-                   rvec, tvec);
-
-      // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
-      // camera coordinate system". In this case the marker frame is the model coordinate system.
-      // So rvec, tvec are the transformation t_camera_marker.
-      return Marker{observation.id(),
-                    Transform3WithCovariance(Transform3(Rotate3::from(rvec), Translate3::from(tvec)))};
-    };
-  }
-
-  template<>
-  Marker::SolveFunction Marker::solve_t_world_marker<CvCameraCalibration>(
-    const CvCameraCalibration &camera_calibration,
-    const Transform3 &t_world_camera,
-    double marker_length)
-  {
-    auto solve_t_camera_marker_function = solve_t_camera_marker<CvCameraCalibration>(camera_calibration,
-                                                                                     marker_length);
-    return [
-      solve_t_camera_marker_function,
-      t_world_camera]
-      (const Observation &observation) -> Marker
-    {
-      auto t_camera_marker = solve_t_camera_marker_function(observation);
-      return Marker{observation.id(),
-                    Transform3WithCovariance{t_world_camera * t_camera_marker.t_world_marker().tf()}};
     };
   }
 }

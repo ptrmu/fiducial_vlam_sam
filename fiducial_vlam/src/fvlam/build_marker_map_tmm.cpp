@@ -567,10 +567,8 @@ namespace fvlam
                     const Observation &observation1,
                     const CameraInfo &camera_info) override
     {
-      auto solve_t_camera_marker_function = fvlam::Marker::solve_t_camera_marker<CvCameraCalibration>
-        (camera_info.to<CvCameraCalibration>(), marker_length_);
-      auto t_camera_marker0 = solve_t_camera_marker_function(observation0).t_world_marker().tf();
-      auto t_camera_marker1 = solve_t_camera_marker_function(observation1).t_world_marker().tf();
+      auto t_camera_marker0 = observation0.solve_t_camera_marker(camera_info, marker_length_);
+      auto t_camera_marker1 = observation1.solve_t_camera_marker(camera_info, marker_length_);
       auto t_marker0_marker1 = t_camera_marker0.inverse() * t_camera_marker1;
       if (solve_tmm_context_.average_on_space_not_manifold_) {
         emac_algebra_.accumulate(t_marker0_marker1);

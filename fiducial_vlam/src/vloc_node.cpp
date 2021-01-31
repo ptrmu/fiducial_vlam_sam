@@ -467,8 +467,7 @@ namespace fiducial_vlam
           // if requested, publish the camera tf as determined from each marker in world/map coordinates.
           if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {
             for (auto &observation : observations.observations()) {
-              auto t_marker_camera = localize_camera_->solve_t_camera_marker(
-                observation, camera_info, marker_map_.marker_length()).tf().inverse();
+              auto t_marker_camera = observation.solve_t_marker_camera(camera_info, marker_map_.marker_length());
               auto marker = marker_map_.find_marker_const(observation.id());
               if (marker != nullptr) {
                 auto t_map_camera_n = marker->t_world_marker().tf() * t_marker_camera;
@@ -485,8 +484,7 @@ namespace fiducial_vlam
           // if requested, publish the marker tf as determined from the camera location and the observation.
           if (psl_cxt_.psl_pub_tf_marker_per_marker_enable_) {
             for (auto &observation : observations.observations()) {
-              auto t_camera_marker = localize_camera_->solve_t_camera_marker(
-                observation, camera_info, marker_map_.marker_length()).tf();
+              auto t_camera_marker = observation.solve_t_camera_marker(camera_info, marker_map_.marker_length());
               auto t_map_marker_n = t_map_camera.tf() * t_camera_marker;
               auto msg = geometry_msgs::msg::TransformStamped{}
                 .set__header(po_header)

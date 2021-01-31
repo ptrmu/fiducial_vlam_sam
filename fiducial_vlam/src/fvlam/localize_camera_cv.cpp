@@ -96,16 +96,6 @@ namespace fvlam
       auto t_camera_map = Transform3(Rotate3::from(rvec), Translate3::from(tvec));
       return Transform3WithCovariance(t_camera_map.inverse());
     }
-
-    // Given the corners of one marker (observation) calculate t_camera_marker.
-    Transform3WithCovariance solve_t_camera_marker(const Observation &observation,
-                                                   const CameraInfo &camera_info,
-                                                   double marker_length) override
-    {
-      auto cv_camera_info = camera_info.to<CvCameraCalibration>();
-      auto solve_function = Marker::solve_t_camera_marker(cv_camera_info, marker_length);
-      return solve_function(observation).t_world_marker();
-    }
   };
 
   template<>
