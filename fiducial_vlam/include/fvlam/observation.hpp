@@ -31,6 +31,7 @@ namespace fvlam
     // origin = upper left, x -> left to right, y -> top to bottom
     Array corners_f_image_;
 
+    // The covariance for a corner point measurement. All corners have the same covariance.
     Element::CovarianceMatrix cov_;
 
   public:
@@ -107,14 +108,15 @@ namespace fvlam
 
   class Observations
   {
-    std::uint64_t stamp_;
+    std::uint64_t stamp_; // Same as image_raw
+    std::string frame_id_; // The frame id of the camera that produced the image that these observations came from.
 
     // The list of observations
     std::vector<Observation> observations_{};
 
   public:
     explicit Observations(std::uint64_t stamp = 0) :
-      stamp_(stamp)
+      stamp_(stamp), frame_id_{}
     {}
 
     auto const &observations() const
@@ -142,5 +144,31 @@ namespace fvlam
     }
   };
 
+// ==============================================================================
+// ObservationsSynced class
+// ==============================================================================
 
+  class ObservationsSynced : std::vector<Observations>
+  {
+    std::uint64_t stamp_; // The average of the image raw stamps.
+    std::string frame_id_; // Of the base of the group of cameras.
+
+  public:
+    explicit ObservationsSynced(std::uint64_t stamp = 0) :
+      stamp_(stamp), frame_id_{}
+    {}
+
+    template<typename T>
+    static ObservationsSynced from(T &other);
+
+    template<typename T>
+    T to() const;
+
+    template<class T>
+    void to(T &other) const;
+
+    std::string to_string() const;
+
+    bool equals(const Observations &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+  };
 }
