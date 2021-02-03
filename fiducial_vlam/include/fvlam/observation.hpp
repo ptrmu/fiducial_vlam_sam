@@ -106,24 +106,15 @@ namespace fvlam
 // Observations class
 // ==============================================================================
 
-  class Observations
+  class Observations : public std::vector<Observation>
   {
     std::uint64_t stamp_; // Same as image_raw
     std::string frame_id_; // The frame id of the camera that produced the image that these observations came from.
-
-    // The list of observations
-    std::vector<Observation> observations_{};
 
   public:
     explicit Observations(std::uint64_t stamp = 0) :
       stamp_(stamp), frame_id_{}
     {}
-
-    auto const &observations() const
-    { return observations_; }
-
-    auto size() const
-    { return observations_.size(); }
 
     template<typename T>
     static Observations from(T &other);
@@ -137,18 +128,13 @@ namespace fvlam
     std::string to_string() const;
 
     bool equals(const Observations &other, double tol = 1.0e-9, bool check_relative_also = true) const;
-
-    void add(const Observation &observation)
-    {
-      observations_.emplace_back(observation);
-    }
   };
 
 // ==============================================================================
 // ObservationsSynced class
 // ==============================================================================
 
-  class ObservationsSynced : std::vector<Observations>
+  class ObservationsSynced : public std::vector<Observations>
   {
     std::uint64_t stamp_; // The average of the image raw stamps.
     std::string frame_id_; // Of the base of the group of cameras.

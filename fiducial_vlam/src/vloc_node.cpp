@@ -320,7 +320,7 @@ namespace fiducial_vlam
       auto observations = fiducial_marker_->detect_markers(gray->image);
       gttoc(color_marked);
 
-      if (observations.observations().empty()) {
+      if (observations.empty()) {
         diagnostics_.empty_observations_count_ += 1;
       }
 
@@ -332,7 +332,7 @@ namespace fiducial_vlam
 
       // Publish the observations.
       if (psl_cxt_.psl_pub_observations_enable_ &&
-          !observations.observations().empty()) {
+          !observations.empty()) {
         auto msg = fiducial_vlam_msgs::msg::Observations{}
           .set__header(image_msg->header)
           .set__camera_info(*camera_info_msg)
@@ -352,7 +352,7 @@ namespace fiducial_vlam
       // is not running or has not been able to find the starting node.
       // We need a map and observations before we can publish camera
       // localization information.
-      if (!marker_map_.empty() && !observations.observations().empty()) {
+      if (!marker_map_.empty() && !observations.empty()) {
         auto camera_info = fvlam::CameraInfo::from(*camera_info_msg);
 
         // Find the camera pose from the observations.
@@ -366,7 +366,7 @@ namespace fiducial_vlam
 
           // If annotated images have been requested, then add the annotations now.
           if (psl_cxt_.psl_pub_image_marked_enable_) {
-            for (auto &observation : observations.observations()) {
+            for (auto &observation : observations) {
               auto marker = marker_map_.find_marker_const(observation.id());
               if (marker != nullptr) {
                 auto t_camera_marker = t_map_camera.tf().inverse() * marker->t_world_marker().tf();
@@ -466,7 +466,7 @@ namespace fiducial_vlam
 
           // if requested, publish the camera tf as determined from each marker in world/map coordinates.
           if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {
-            for (auto &observation : observations.observations()) {
+            for (auto &observation : observations) {
               auto t_marker_camera = observation.solve_t_marker_camera(camera_info, marker_map_.marker_length());
               auto marker = marker_map_.find_marker_const(observation.id());
               if (marker != nullptr) {
@@ -483,7 +483,7 @@ namespace fiducial_vlam
 
           // if requested, publish the marker tf as determined from the camera location and the observation.
           if (psl_cxt_.psl_pub_tf_marker_per_marker_enable_) {
-            for (auto &observation : observations.observations()) {
+            for (auto &observation : observations) {
               auto t_camera_marker = observation.solve_t_camera_marker(camera_info, marker_map_.marker_length());
               auto t_map_marker_n = t_map_camera.tf() * t_camera_marker;
               auto msg = geometry_msgs::msg::TransformStamped{}

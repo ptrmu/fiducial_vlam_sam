@@ -37,7 +37,7 @@ namespace fvlam
       std::vector<cv::Point3d> all_corners_f_map;
       std::vector<cv::Point2d> all_corners_f_image;
 
-      for (const auto &observation : observations.observations()) {
+      for (const auto &observation : observations) {
         auto marker_ptr = map.find_marker_const(observation.id());
         if (marker_ptr != nullptr) {
           marker_ptr->corners_f_world(map.marker_length(), all_corners_f_map);
@@ -156,7 +156,7 @@ namespace fvlam
     void annotate_image_with_detected_markers(cv::Mat &color_image,
                                               const Observations &observations) override
     {
-      for (auto &observation : observations.observations()) {
+      for (auto &observation : observations) {
 
         // draw marker sides
         for (int j = 0; j < 4; j++) {
@@ -196,12 +196,12 @@ namespace fvlam
       auto tvec = t_camera_marker.t().to<cv::Vec3d>();
       auto cc = camera_info.to<CvCameraCalibration>();
 
-      std::vector <cv::Point3f> axesPoints;
+      std::vector<cv::Point3f> axesPoints;
       axesPoints.emplace_back(cv::Point3f(0, 0, 0));
       axesPoints.emplace_back(cv::Point3f(axis_length, 0, 0));
       axesPoints.emplace_back(cv::Point3f(0, axis_length, 0));
       axesPoints.emplace_back(cv::Point3f(0, 0, axis_length));
-      std::vector <cv::Point2f> imagePoints;
+      std::vector<cv::Point2f> imagePoints;
       cv::projectPoints(axesPoints, rvec, tvec, cc.first, cc.second, imagePoints);
 
       cv::line(color_image, imagePoints[0], imagePoints[1], cv::Scalar(255, 0, 0), 3);

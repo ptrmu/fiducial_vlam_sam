@@ -142,7 +142,7 @@ namespace fiducial_vlam
       std::vector<cv::Point3d> all_corners_f_map;
       std::vector<cv::Point2d> all_corners_f_image;
 
-      for (const auto &observation : observations.observations()) {
+      for (auto &observation : observations.observations()) {
         auto marker_ptr = map.find_marker_const(observation.id());
         if (marker_ptr != nullptr) {
           TFConvert::corners_f_map(marker_ptr->t_map_marker(), map.marker_length(), all_corners_f_map);

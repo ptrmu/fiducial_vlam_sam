@@ -171,7 +171,7 @@ namespace fiducial_vlam
 //       << "}"
 //       << "observations" << "[";
 //
-//    for (auto &observation : observations.observations()) {
+//    for (auto &observation : observations) {
 //      auto t_camera_marker = CvUtils::solve_t_camera_marker(observation, *camera_info, marker_length);
 //      auto mu = t_camera_marker.mu();
 //      fs << "{:"

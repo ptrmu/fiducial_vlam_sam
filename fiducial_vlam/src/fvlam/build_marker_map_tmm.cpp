@@ -458,8 +458,6 @@ namespace fvlam
     void process(const Observations &observations,
                  const CameraInfo &camera_info) override
     {
-      auto &obs = observations.observations();
-
       // Walk through all pairs of observations
       for (std::size_t m0 = 0; m0 < observations.size(); m0 += 1)
         for (std::size_t m1 = m0 + 1; m1 < observations.size(); m1 += 1) {
@@ -467,15 +465,15 @@ namespace fvlam
           std::size_t m1r{m1};
 
           // Alawys do the transform calculation with the lower id first.
-          if (obs[m1r].id() < obs[m0r].id()) {
+          if (observations[m1r].id() < observations[m0r].id()) {
             m0r = m1;
             m1r = m0;
           }
 
           // Find the appropriate SolveTmmInterface
-          auto &solve_tmm = solve_tmm_graph_.add_or_lookup(obs[m0r].id(), obs[m1r].id(),
+          auto &solve_tmm = solve_tmm_graph_.add_or_lookup(observations[m0r].id(), observations[m1r].id(),
                                                            tmm_context_.solve_tmm_factory_);
-          solve_tmm->accumulate(obs[m0r], obs[m1r], camera_info);
+          solve_tmm->accumulate(observations[m0r], observations[m1r], camera_info);
         }
     }
 

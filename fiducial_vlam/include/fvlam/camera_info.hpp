@@ -3,6 +3,8 @@
 #pragma ide diagnostic ignored "NotImplementedFunctions"
 #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
 
+#include <map>
+
 #include <Eigen/Geometry>
 #include "transform3_with_covariance.hpp"
 
@@ -102,6 +104,27 @@ namespace fvlam
     bool equals(const CameraInfo &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 
+// ==============================================================================
+// CameraInfo class
+// ==============================================================================
+
+  class CameraInfoMap : public std::map<std::string, CameraInfo>
+  {
+    template<class T>
+    static CameraInfoMap from(T &other);
+
+    template<class T>
+    T to() const;
+
+    template<class T>
+    void to(T &other) const;
+
+    std::string to_string() const;
+
+    bool equals(const CameraInfoMap &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+  };
+
+  
 // Used for specializing the from/to methods on CameraInfo
   using CvCameraCalibration = std::pair<cv::Matx<double, 3, 3>, cv::Vec<double, 5>>;
 }

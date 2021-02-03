@@ -423,7 +423,7 @@ namespace fvlam
                             double tol, bool check_relative_also) const
   {
     return stamp_ == other.stamp_ &&
-           equals_vector(observations_, other.observations_, tol, check_relative_also);
+           equals_vector(*this, other, tol, check_relative_also);
   }
 
   bool ObservationsBundle::equals(const ObservationsBundle &other,

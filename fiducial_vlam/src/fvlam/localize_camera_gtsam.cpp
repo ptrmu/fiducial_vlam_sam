@@ -49,7 +49,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors to the graph
-      for (auto &observation : observations.observations()) {
+      for (auto &observation : observations) {
 
         // See if this is a known marker by looking it up in the map.
         auto marker_ptr = map.find_marker_const(observation.id());
@@ -95,7 +95,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors, known marker priors, and marker initial estimates to the graph
-      for (auto &observation : observations.observations()) {
+      for (auto &observation : observations) {
         gtsam::Symbol marker_key{'m', observation.id()};
 
         // See if this is a known marker by looking it up in the map.
@@ -171,7 +171,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors to the graph
-      for (auto &observation : observations.observations()) {
+      for (auto &observation : observations) {
 
         // See if this is a known marker by looking it up in the map.
         auto marker_ptr = map.find_marker_const(observation.id());

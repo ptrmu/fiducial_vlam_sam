@@ -171,11 +171,11 @@ namespace fvlam
   {
     fvlam::Observations observations;
     for (auto &obs : other.observations) {
-      observations.add(Observation(obs.id,
-                                   obs.x0, obs.y0,
-                                   obs.x1, obs.y1,
-                                   obs.x2, obs.y2,
-                                   obs.x3, obs.y3));
+      observations.emplace_back(Observation(obs.id,
+                                            obs.x0, obs.y0,
+                                            obs.x1, obs.y1,
+                                            obs.x2, obs.y2,
+                                            obs.x3, obs.y3));
     }
     return observations;
   }
@@ -186,7 +186,7 @@ namespace fvlam
     <std::vector<fiducial_vlam_msgs::msg::Observation>>() const
   {
     std::vector<fiducial_vlam_msgs::msg::Observation> msgs;
-    for (auto observation: observations_) {
+    for (auto observation: *this) {
       fiducial_vlam_msgs::msg::Observation msg;
       msg.id = observation.id();
       msg.x0 = observation.corners_f_image_[0].x();

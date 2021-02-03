@@ -109,7 +109,7 @@ namespace fiducial_vlam
                                      const std::function<bool(bool, const Observation &)> &do_add_func,
                                      gtsam::NonlinearFactorGraph &graph)
     {
-      for (auto &observation : observations.observations()) {
+      for (auto &observation : observations) {
         auto marker_key{GtsamUtil::marker_key(observation.id())};
 
         // Look for the marker_seen_count record for this marker.

@@ -412,7 +412,7 @@ namespace fvlam
     for (auto it = observations_node.begin(); it != observations_node.end(); ++it) {
       auto observation_context = other.make(*it);
       auto observation = Observation::from(observation_context);
-      observations.add(observation);
+      observations.emplace_back(observation);
     }
 
     return observations;
@@ -426,7 +426,7 @@ namespace fvlam
     other << "stamp_hi" << int(stamp_ >> 32 & UINT32_MAX);
     other << "observations" << "[";
 
-    for (auto &observation : observations_) {
+    for (auto &observation : *this) {
       observation.to(other);
     }
 
