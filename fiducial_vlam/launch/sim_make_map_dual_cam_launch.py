@@ -28,7 +28,9 @@ vloc_args = [{
     'loc_corner_refinement_method': 2,
     'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
+    'psl_sub_camera_info_topic': 'right/camera_info',
     'psl_sub_camera_info_best_effort_not_reliable': True,
+    'psl_sub_image_raw_topic': 'right/image_raw',
     'psl_sub_image_raw_best_effort_not_reliable': True,
     'psl_pub_tf_camera_child_frame_id': 'forward_camera',
     'psl_pub_camera_odom_enable': False,
@@ -66,10 +68,10 @@ def generate_launch_description():
         Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
              arguments=[camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
-        #      parameters=vloc_args, namespace='forward_camera'),
-        # Node(package='fiducial_vlam', executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+             parameters=vloc_args, namespace='dual_camera'),
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)
