@@ -5,6 +5,7 @@
 //#define ENABLE_TIMING
 
 #include "cv_bridge/cv_bridge.h"
+#include "fiducial_vlam/fiducial_vlam.hpp"
 #include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations.hpp"
 #include "fvlam/camera_info.hpp"

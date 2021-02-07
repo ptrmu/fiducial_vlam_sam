@@ -3,6 +3,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include "fiducial_vlam/fiducial_vlam.hpp"
 #include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations.hpp"
 #include "fvlam/build_marker_map_interface.hpp"

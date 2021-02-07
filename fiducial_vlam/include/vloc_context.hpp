@@ -4,11 +4,6 @@
 
 #include "ros2_shared/param_macros.hpp"
 
-namespace rclcpp
-{
-  class Node;
-}
-
 namespace fvlam
 {
   class Logger;
@@ -24,8 +19,8 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_y, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_z, double, 0)              /* camera=>baselink transform component */\
-  PAMA_PARAM(loc_t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
-  PAMA_PARAM(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  PAMA_PARAM(loc_t_camera_base_roll, double, M_PI_2)      /* camera=>baselink transform component */\
+  PAMA_PARAM(loc_t_camera_base_pitch, double, -M_PI_2)    /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
   /* Aruco markers detection parameters - done by opencv */\
   PAMA_PARAM(loc_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \

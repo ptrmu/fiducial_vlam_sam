@@ -20,8 +20,8 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_camera_base_x, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_y, double, 0.)             /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_z, double, -0.035)         /* camera=>baselink transform component */\
-  PAMA_PARAM(loc_t_camera_base_roll, double, TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
-  PAMA_PARAM(loc_t_camera_base_pitch, double, -TF2SIMD_HALF_PI) /* camera=>baselink transform component */\
+  PAMA_PARAM(loc_t_camera_base_roll, double, M_PI_2)      /* camera=>baselink transform component */\
+  PAMA_PARAM(loc_t_camera_base_pitch, double, -M_PI_2)    /* camera=>baselink transform component */\
   PAMA_PARAM(loc_t_camera_base_yaw, double, 0.)           /* camera=>baselink transform component */\
   /* Corner Kalman Filters */\
   PAMA_PARAM(loc_corner_filter_process_std, float, 0.)    /* Process Noise Std Dev for Kalman filtering corners */\

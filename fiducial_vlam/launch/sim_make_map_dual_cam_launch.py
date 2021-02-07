@@ -23,6 +23,9 @@ camera_sdf = os.path.join(sdf_directory, 'dual_camera.sdf')
 
 corner_measurement_sigma = 2.0
 
+vdet_args = [{
+}]
+
 vloc_args = [{
     'loc_camera_algorithm': 1,
     'loc_corner_refinement_method': 2,
@@ -68,10 +71,15 @@ def generate_launch_description():
         Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
              arguments=[camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
-             parameters=vloc_args, namespace='dual_camera'),
-        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
-             parameters=vmap_args),
+        Node(package='fiducial_vlam', executable='vdet_main', output='screen',
+             parameters=vdet_args, namespace='/dual_camera/left'),
+        Node(package='fiducial_vlam', executable='vdet_main', output='screen',
+             parameters=vdet_args, namespace='/dual_camera/right'),
+
+        # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+        #      parameters=vloc_args, namespace='dual_camera_x'),
+        # Node(package='fiducial_vlam', executable='vmap_main', output='screen',
+        #      parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)

@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "cv_bridge/cv_bridge.h"
+#include "fiducial_vlam/fiducial_vlam.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"

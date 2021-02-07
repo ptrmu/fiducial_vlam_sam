@@ -102,6 +102,65 @@ endif ()
 set(node_plugins "")
 
 #=============
+# vdet node
+#=============
+
+set(VDET_NODE_SOURCES
+  src/fvlam/conversions_cv.cpp
+  src/fvlam/conversions_gtsam.cpp
+  src/fvlam/localize_camera_cv.cpp
+  src/fvlam/localize_camera_gtsam.cpp
+  src/fvlam/transform3_with_covariance.cpp
+  src/conversions_ros2.cpp
+  src/vdet_node.cpp
+  )
+
+set(VDET_NODE_DEPS
+  class_loader
+  cv_bridge
+  fiducial_vlam_msgs
+  ${MY_GTSAM_LIB}
+  OpenCV
+  rclcpp
+  ros2_shared
+  sensor_msgs
+  std_msgs
+  tf2_msgs
+  )
+
+add_library(vdet_node SHARED
+  ${VDET_NODE_SOURCES})
+
+target_compile_definitions(vdet_node
+  PRIVATE "COMPOSITION_BUILDING_DLL")
+
+ament_target_dependencies(vdet_node
+  ${VDET_NODE_DEPS})
+
+rclcpp_components_register_nodes(vdet_node "fiducial_vlam::VdetNode")
+set(node_plugins "${node_plugins}fiducial_vlam::VdetNode;$<TARGET_FILE:vdet_node>\n")
+
+add_executable(vdet_main
+  src/vdet_main.cpp
+  ${VDET_NODE_SOURCES}
+  )
+
+ament_target_dependencies(vdet_main
+  ${VDET_NODE_DEPS})
+
+if (GTSAM_FOUND)
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vdet_node
+    gtsam
+    )
+
+  # ?? Why can't I put this in ament_target_dependencies
+  target_link_libraries(vdet_main
+    gtsam
+    )
+endif ()
+
+#=============
 # vloc node
 #=============
 
@@ -310,6 +369,7 @@ install(TARGETS
 
 # Install executables
 install(TARGETS
+  vdet_main
   vloc_main
   vlocx_main
   vmap_main
