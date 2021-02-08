@@ -24,6 +24,7 @@ camera_sdf = os.path.join(sdf_directory, 'dual_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vdet_args = [{
+    'det_aruco_dictionary_id': 9,  # aruco marker dictionary
 }]
 
 vloc_args = [{

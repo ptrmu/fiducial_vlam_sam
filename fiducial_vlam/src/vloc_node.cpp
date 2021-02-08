@@ -97,7 +97,7 @@ namespace fiducial_vlam
 
     std::unique_ptr<fvlam::LocalizeCameraInterface> localize_camera_{};
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
-    fvlam::MarkerMap marker_map_{1.0};
+    fvlam::MarkerMap marker_map_{};
 
     bool current_loc_camera_algorithm_{};
 
@@ -334,10 +334,10 @@ namespace fiducial_vlam
       // Publish the observations.
       if (psl_cxt_.psl_pub_observations_enable_ &&
           !observations.empty()) {
-        auto msg = fiducial_vlam_msgs::msg::Observations{}
-          .set__header(image_msg->header)
-          .set__camera_info(*camera_info_msg)
-          .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
+        auto msg = fiducial_vlam_msgs::msg::Observations{}; // ToDo Fix this
+//          .set__header(image_msg->header)
+//          .set__camera_info(*camera_info_msg)
+//          .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
         if (!pub_observations_) {
           pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
             psl_cxt_.psl_pub_observations_topic_, 2);

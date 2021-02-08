@@ -1,7 +1,9 @@
-# An observation of a marker.
-int32 id
+# An observation of a marker in an image.
 
-# vertices
+# The marker id
+uint64 id
+
+# Corners of the marker in the image.
 float64 x0
 float64 y0
 float64 x1

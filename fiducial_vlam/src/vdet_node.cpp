@@ -1,9 +1,11 @@
 
 #include "cv_bridge/cv_bridge.h"
 #include "fiducial_vlam/fiducial_vlam.hpp"
-#include "fiducial_vlam_msgs/msg/observations.hpp"
+#include "fiducial_vlam_msgs/msg/observations_stamped.hpp"
+#include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/logger.hpp"
+#include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
 #include <gtsam/base/timing.h>
 #include "rclcpp/rclcpp.hpp"
@@ -62,11 +64,11 @@ namespace fiducial_vlam
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_image_raw_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr sub_camera_info_;
 
-    std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
+    sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_marked_{};
-    rclcpp::Publisher<fiducial_vlam_msgs::msg::Observations>::SharedPtr pub_observations_{};
+    rclcpp::Publisher<fiducial_vlam_msgs::msg::ObservationsStamped>::SharedPtr pub_observations_{};
 
     void validate_parameters()
     {}
@@ -116,11 +118,14 @@ namespace fiducial_vlam
       sub_camera_info_ = create_subscription<sensor_msgs::msg::CameraInfo>(
         psd_cxt_.psd_sub_camera_info_topic_,
         camera_info_qos,
-        [this](sensor_msgs::msg::CameraInfo::UniquePtr msg) -> void
+        [this](sensor_msgs::msg::CameraInfo::SharedPtr msg) -> void
         {
           // Save this message because it will be used for the next image message.
-          // Note: we are taking ownership of this object
-          camera_info_msg_ = std::move(msg);
+          // Note: We are holding on to a shared pointer. This will be released when
+          // the next camera_info message is received. Due to the timing of image_raw
+          // and camera_info messages, this message may be used for processing zero,
+          // one, or two image_raw messages.
+          camera_info_msg_ = msg;
           diagnostics_.sub_camera_info_count_ += 1;
         });
 
@@ -151,10 +156,7 @@ namespace fiducial_vlam
             // images then there is nothing to do with this image so ignore it.
           } else {
 
-            // rviz doesn't like it when time goes backward when a bag is played again.
-            // The stamp_msgs_with_current_time_ parameter can help this by replacing the
-            // image message time with the current time.
-            process_image(std::move(msg), std::move(camera_info_msg_));
+            process_image(std::move(msg), *camera_info_msg_);
           }
 
           last_image_stamp_ = stamp;
@@ -167,7 +169,7 @@ namespace fiducial_vlam
 
   private:
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
-                       sensor_msgs::msg::CameraInfo::UniquePtr camera_info_msg)
+                       sensor_msgs::msg::CameraInfo &sensor_ci_msg)
     {
       auto stamp = image_msg->header.stamp;
       rclcpp::Time time_stamp{stamp};
@@ -234,12 +236,47 @@ namespace fiducial_vlam
       // Publish the observations.
       if (psd_cxt_.psd_pub_observations_enable_ &&
           !observations.empty()) {
-        auto msg = fiducial_vlam_msgs::msg::Observations{}
-          .set__header(image_msg->header)
-          .set__camera_info(*camera_info_msg)
+
+        // Create an ObservationStamped message.
+        // Start by creating a MapEnvironment
+        auto map_environment_msg = fvlam::MapEnvironment{
+          cxt_.det_map_description_, cxt_.det_aruco_dictionary_id_, cxt_.det_marker_length_}
+          .to<fiducial_vlam_msgs::msg::MapEnvironment>();
+
+        // Then create our CameraInfo message by first creating a CameraInfo structure
+        // from a ROS2 CameraIndo message.
+        auto camera_info_frame_id = psd_cxt_.psd_pub_camera_info_frame_id_.empty() ?
+                                    image_msg->header.frame_id : psd_cxt_.psd_pub_camera_info_frame_id_;
+        auto t_base_camera = fvlam::Transform3{
+          fvlam::Rotate3::RzRyRx(cxt_.det_t_base_camera_yaw_,
+                                 cxt_.det_t_base_camera_pitch_,
+                                 cxt_.det_t_base_camera_roll_),
+          fvlam::Translate3{cxt_.det_t_base_camera_x_,
+                            cxt_.det_t_base_camera_y_,
+                            cxt_.det_t_base_camera_z_}};
+        auto camera_info = fvlam::CameraInfo{camera_info_frame_id,
+                                             fvlam::CameraInfo::from(sensor_ci_msg),
+                                             t_base_camera};
+        auto camera_info_msg = camera_info.to<fiducial_vlam_msgs::msg::CameraInfo>();
+
+        // Then bundle up the observations and the CameraInfo message
+        auto observations_msg = fiducial_vlam_msgs::msg::Observations{}
+          .set__camera_info(camera_info_msg)
           .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
+
+        // Finally create the ObservationsStamped message. Use the image message
+        // stamp and the frame_id as specified by the parameters.
+        auto observations_frame_id = psd_cxt_.psd_pub_observations_frame_id_.empty() ?
+                                     image_msg->header.frame_id : psd_cxt_.psd_pub_observations_frame_id_;
+        auto msg = fiducial_vlam_msgs::msg::ObservationsStamped{}
+          .set__header(std_msgs::msg::Header{}
+                         .set__stamp(image_msg->header.stamp)
+                         .set__frame_id(observations_frame_id))
+          .set__map_environment(map_environment_msg)
+          .set__observations(observations_msg);
+
         if (!pub_observations_) {
-          pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::Observations>(
+          pub_observations_ = create_publisher<fiducial_vlam_msgs::msg::ObservationsStamped>(
             psd_cxt_.psd_pub_observations_topic_, 2);
         }
         pub_observations_->publish(msg);
@@ -247,16 +284,15 @@ namespace fiducial_vlam
       }
 
       // Debugging hint: If the markers in color_marked are not outlined
-      // in green, then they haven't been detected. If the markers in
-      // color_marked are outlined but they have no axes drawn, then
-      // no map message has been received. This could be because vmap_node
-      // is not running or has not been able to find the starting node.
-      // We need a map and observations before we can publish camera
-      // localization information.
+      // in green, then they haven't been detected.
 
-      // Publish an annotated image if requested. Even if there is no map.
+      // Publish an annotated image if requested.
       if (psd_cxt_.psd_pub_image_marked_enable_) {
         // The marking has been happening on the original message.
+        auto image_marked_frame_id = psd_cxt_.psd_pub_image_marked_frame_id_.empty() ?
+                                     image_msg->header.frame_id : psd_cxt_.psd_pub_image_marked_frame_id_;
+        image_msg->header.frame_id = image_marked_frame_id;
+        
         // Republish it now.
         if (!pub_image_marked_) {
           pub_image_marked_ = create_publisher<sensor_msgs::msg::Image>(

@@ -6,6 +6,7 @@
 #include "fvlam/observation.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
 #include "geometry_msgs/msg/transform.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include "tf2/LinearMath/Vector3.h"
 #include "tf2/LinearMath/Transform.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
@@ -115,9 +116,64 @@ namespace fvlam
                       m.d[4]};
   }
 
+  template<>
+  fiducial_vlam_msgs::msg::CameraInfo CameraInfo::to<fiducial_vlam_msgs::msg::CameraInfo>() const
+  {
+    return fiducial_vlam_msgs::msg::CameraInfo{}
+      .set__frame_id(frame_id_)
+      .set__width(width_)
+      .set__height(height_)
+      .set__fx(camera_matrix_(0, 0))
+      .set__fy(camera_matrix_(1, 1))
+      .set__cx(camera_matrix_(0, 2))
+      .set__cy(camera_matrix_(1, 2))
+      .set__k1(dist_coeffs_(0))
+      .set__k2(dist_coeffs_(1))
+      .set__p1(dist_coeffs_(2))
+      .set__p2(dist_coeffs_(3))
+      .set__k3(dist_coeffs_(4))
+      .set__t_base_camera(t_base_camera_.to<geometry_msgs::msg::Transform>());
+  }
+
 // ==============================================================================
-// from fvlam/marker_map.hpp
+// from fvlam/marker.hpp
 // ==============================================================================
+
+  template<>
+  MapEnvironment MapEnvironment::from<fiducial_vlam_msgs::msg::MapEnvironment>(
+    fiducial_vlam_msgs::msg::MapEnvironment &other)
+  {
+    return MapEnvironment{other.description,
+                          other.marker_dictionary_id,
+                          other.marker_length};
+  }
+
+  template<>
+  fiducial_vlam_msgs::msg::MapEnvironment MapEnvironment::to<fiducial_vlam_msgs::msg::MapEnvironment>() const
+  {
+    return fiducial_vlam_msgs::msg::MapEnvironment{}
+      .set__description(description_)
+      .set__marker_dictionary_id(marker_dictionary_id_)
+      .set__marker_length(marker_length_);
+  }
+
+  template<>
+  Marker Marker::from<fiducial_vlam_msgs::msg::Marker>(
+    fiducial_vlam_msgs::msg::Marker &other)
+  {
+    return Marker{other.id,
+                  Transform3WithCovariance::from(other.t_map_marker),
+                  other.is_fixed};
+  }
+
+  template<>
+  fiducial_vlam_msgs::msg::Marker Marker::to<fiducial_vlam_msgs::msg::Marker>() const
+  {
+    return fiducial_vlam_msgs::msg::Marker{}
+      .set__id(id_)
+      .set__is_fixed(is_fixed_)
+      .set__t_map_marker(t_world_marker_.to<geometry_msgs::msg::PoseWithCovariance>());
+  }
 
   template<>
   visualization_msgs::msg::Marker Marker::to<visualization_msgs::msg::Marker>() const
@@ -135,11 +191,9 @@ namespace fvlam
   MarkerMap MarkerMap::from<fiducial_vlam_msgs::msg::Map>(
     fiducial_vlam_msgs::msg::Map &other)
   {
-    MarkerMap map{other.marker_length};
-    for (std::size_t i = 0; i < other.ids.size(); i += 1) {
-      auto tf = Transform3WithCovariance::from(other.poses[i]);
-      Marker marker{static_cast<std::uint64_t>(other.ids[i]), std::move(tf), other.fixed_flags[i] != 0};
-      map.add_marker(std::move(marker));
+    MarkerMap map{MapEnvironment::from(other.map_environment)};
+    for (auto &marker : other.markers) {
+      map.add_marker(Marker::from(marker));
     }
     return map;
   }
@@ -148,14 +202,10 @@ namespace fvlam
   fiducial_vlam_msgs::msg::Map MarkerMap::to<fiducial_vlam_msgs::msg::Map>() const
   {
     auto msg = fiducial_vlam_msgs::msg::Map{}
-      .set__marker_length(marker_length_)
-      .set__map_style(0);
+      .set__map_environment(map_environment().to<fiducial_vlam_msgs::msg::MapEnvironment>());
 
-    for (auto &id_marker_pair : markers_) {
-      auto &marker = id_marker_pair.second;
-      msg.ids.emplace_back(marker.id());
-      msg.poses.emplace_back(marker.t_world_marker().to<geometry_msgs::msg::PoseWithCovariance>());
-      msg.fixed_flags.emplace_back(marker.is_fixed() ? 1 : 0);
+    for (auto &id_marker_pair : *this) {
+      msg.markers.emplace_back(id_marker_pair.second.to<fiducial_vlam_msgs::msg::Marker>());
     }
 
     return msg;

@@ -72,6 +72,16 @@ namespace fvlam
       t_base_camera_{}
     {}
 
+    CameraInfo(const std::string &frame_id,
+               const CameraInfo &base,
+               const Transform3 &t_base_camera) :
+      frame_id_{frame_id},
+      width_{base.width_}, height_{base.height_},
+      camera_matrix_{base.camera_matrix_},
+      dist_coeffs_{base.dist_coeffs_},
+      t_base_camera_{t_base_camera}
+    {}
+
     auto & frame_id() const
     { return frame_id_; }
 
