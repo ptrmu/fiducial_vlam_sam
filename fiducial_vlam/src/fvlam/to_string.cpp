@@ -143,7 +143,7 @@ namespace fvlam
     bool first{true};
 
     // Assume a map keeps items sorted
-    for (auto &kvp : markers_) {
+    for (auto &kvp : *this) {
       ss << (first ? "" : "\n") << "marker id:" << kvp.second.to_string(also_cov);
       first = false;
     }
@@ -178,7 +178,7 @@ namespace fvlam
 
   std::string ObservationsBundles::to_string(bool also_cov) const
   {
-    (void)also_cov;
+    (void) also_cov;
     std::stringstream ss{};
     NumFmt nf(9, 3);
 
@@ -400,11 +400,19 @@ namespace fvlam
            t_world_marker_.equals(other.t_world_marker_, tol, check_relative_also);
   }
 
+  bool MapEnvironment::equals(const MapEnvironment &other,
+                              double tol, bool check_relative_also) const
+  {
+    return description_ == other.description_ &&
+           marker_dictionary_id_ == other.marker_dictionary_id_ &&
+           test_double(marker_length_, other.marker_length_, tol, check_relative_also);
+  }
+
   bool MarkerMap::equals(const MarkerMap &other,
                          double tol, bool check_relative_also) const
   {
-    return test_double(marker_length_, other.marker_length_, tol, check_relative_also) &&
-           equals_map(markers_, other.markers_, tol, check_relative_also);
+    return map_environment_.equals(other.map_environment_, tol, check_relative_also) &&
+           equals_map(*this, other, tol, check_relative_also);
   }
 
   bool Observation::equals(const Observation &other,

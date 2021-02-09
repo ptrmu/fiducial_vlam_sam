@@ -292,7 +292,7 @@ namespace fiducial_vlam
         auto image_marked_frame_id = psd_cxt_.psd_pub_image_marked_frame_id_.empty() ?
                                      image_msg->header.frame_id : psd_cxt_.psd_pub_image_marked_frame_id_;
         image_msg->header.frame_id = image_marked_frame_id;
-        
+
         // Republish it now.
         if (!pub_image_marked_) {
           pub_image_marked_ = create_publisher<sensor_msgs::msg::Image>(

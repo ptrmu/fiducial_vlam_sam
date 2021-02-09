@@ -143,7 +143,8 @@ namespace fiducial_vlam
             bmm_cnt_every_n_msg_ = 0;
 
             // From the observations message, pick out the CameraInfo and Observations
-            auto camera_info = fvlam::CameraInfo::from(msg->camera_info);
+//            auto camera_info = fvlam::CameraInfo::from(msg->camera_info); todo Fix This
+            auto camera_info = fvlam::CameraInfo{};
             auto observations = fvlam::Observations::from(*msg);
 
             // Send these observations off for processing
@@ -370,7 +371,7 @@ namespace fiducial_vlam
       if (psm_cxt_.psm_pub_visuals_enable_) {
         diagnostics_.pub_visuals_count_ += 1;
         auto visuals_msg = visualization_msgs::msg::MarkerArray{};
-        for (auto &id_marker_pair: marker_map_->markers()) {
+        for (auto &id_marker_pair: *marker_map_) {
           auto marker_msg = id_marker_pair.second.to<visualization_msgs::msg::Marker>()
             .set__header(header); // set header after setting marker.
           visuals_msg.markers.emplace_back(marker_msg);
@@ -382,7 +383,7 @@ namespace fiducial_vlam
       if (psm_cxt_.psm_pub_tf_marker_enable_) {
         diagnostics_.pub_tf_count_ += 1;
         tf2_msgs::msg::TFMessage tfs_msg;
-        for (auto &id_marker_pair: marker_map_->markers()) {
+        for (auto &id_marker_pair: *marker_map_) {
           auto &t_world_marker = id_marker_pair.second.t_world_marker().tf();
 
           std::ostringstream oss_child_frame_id;
@@ -445,9 +446,9 @@ namespace fiducial_vlam
     std::unique_ptr<fvlam::MarkerMap> copy_markers(const fvlam::MarkerMap &map_from_file,
                                                    bool copy_one_fixed_marker)
     {
-      auto map = std::make_unique<fvlam::MarkerMap>(map_from_file.marker_length());
+      auto map = std::make_unique<fvlam::MarkerMap>(map_from_file.map_environment());
 
-      for (auto &id_marker_pair : map_from_file.markers()) {
+      for (auto &id_marker_pair : map_from_file) {
         if (!copy_one_fixed_marker ||
             id_marker_pair.second.is_fixed()) {
           map->add_marker(id_marker_pair.second);
@@ -496,7 +497,8 @@ namespace fiducial_vlam
       }
 
       // Create a map with one marker defined by the parameters.
-      auto map = std::make_unique<fvlam::MarkerMap>(cxt_.map_marker_length_);
+//      auto map = std::make_unique<fvlam::MarkerMap>(cxt_.map_marker_length_); // Todo Fix this
+      auto map = std::make_unique<fvlam::MarkerMap>();
       auto marker_new = fvlam::Marker(
         cxt_.map_init_id_, fvlam::Transform3WithCovariance{fvlam::Transform3{
           fvlam::Rotate3::RzRyRx(cxt_.map_init_pose_yaw_,

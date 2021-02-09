@@ -63,7 +63,7 @@ namespace fvlam
   public:
     explicit MarkerMarkerGraph(const MarkerMap &map_initial)
     {
-      for (auto &marker : map_initial.markers()) {
+      for (auto &marker : map_initial) {
         if (marker.second.is_fixed()) {
           fixed_markers_.emplace(marker);
         }
@@ -227,7 +227,7 @@ namespace fvlam
 
     static fvlam::Marker find_fixed_marker(const MarkerMap &map)
     {
-      for (auto &marker : map.markers()) {
+      for (auto &marker : map) {
         if (marker.second.is_fixed()) {
           return marker.second;
         }
@@ -393,7 +393,8 @@ namespace fvlam
                                         const gtsam::NonlinearFactorGraph &pose_graph,
                                         const gtsam::Values &pose_result)
     {
-      auto map = std::make_unique<MarkerMap>(map_initial_.marker_length());
+//      auto map = std::make_unique<MarkerMap>(map_initial_.marker_length()); todo: Fix this
+      auto map = std::make_unique<MarkerMap>();
       gtsam::Marginals marginals{GtsamUtil::construct_marginals(pose_graph, pose_result)};
 
       for (const auto &key_value : pose_result) {
@@ -420,8 +421,8 @@ namespace fvlam
       double t_sum{0.0};
       uint64_t n{0};
 
-      for (auto it0 = map.markers().begin(); it0 != map.markers().end(); ++it0)
-        for (auto it1 = map.markers().upper_bound(it0->first); it1 != map.markers().end(); ++it1) {
+      for (auto it0 = map.begin(); it0 != map.end(); ++it0)
+        for (auto it1 = map.upper_bound(it0->first); it1 != map.end(); ++it1) {
           auto solve_tmm = solve_tmm_graph_.lookup(it0->first, it1->first);
           if (solve_tmm != nullptr) {
             auto tmm_meas = (*solve_tmm)->t_marker0_marker1().tf();
@@ -482,7 +483,7 @@ namespace fvlam
       auto idix_list = solve_tmm_graph_.find_linked_nodes();
 
       // Make sure there are some markers linked to the fixed markers.
-      if (idix_list.size() == map_initial_.markers().size()) {
+      if (idix_list.size() == map_initial_.size()) {
         return std::make_unique<MarkerMap>(map_initial_);
       }
 

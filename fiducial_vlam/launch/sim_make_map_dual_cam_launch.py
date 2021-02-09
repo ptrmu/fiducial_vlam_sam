@@ -23,8 +23,20 @@ camera_sdf = os.path.join(sdf_directory, 'dual_camera.sdf')
 
 corner_measurement_sigma = 2.0
 
-vdet_args = [{
+vdet_left_args = [{
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'det_marker_length': 0.1775,  # Marker length
+    'det_t_base_camera_y': 0.2,
+    'psd_pub_observations_frame_id': 'base_link',
+    'psd_pub_camera_info_frame_id': 'left_camera'
+}]
+
+vdet_right_args = [{
+    'det_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'det_marker_length': 0.1775,  # Marker length
+    'det_t_base_camera_y': -0.2,
+    'psd_pub_observations_frame_id': 'base_link',
+    'psd_pub_camera_info_frame_id': 'right_camera'
 }]
 
 vloc_args = [{
@@ -73,9 +85,9 @@ def generate_launch_description():
              arguments=[camera_sdf, '0', '0', '0', '0', '0', '0']),
 
         Node(package='fiducial_vlam', executable='vdet_main', output='screen',
-             parameters=vdet_args, namespace='/dual_camera/left'),
+             parameters=vdet_left_args, namespace='/dual_camera/left'),
         Node(package='fiducial_vlam', executable='vdet_main', output='screen',
-             parameters=vdet_args, namespace='/dual_camera/right'),
+             parameters=vdet_right_args, namespace='/dual_camera/right'),
 
         # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
         #      parameters=vloc_args, namespace='dual_camera_x'),

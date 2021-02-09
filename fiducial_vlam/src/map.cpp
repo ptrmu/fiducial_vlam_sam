@@ -32,9 +32,9 @@ namespace fiducial_vlam
                                                              const sensor_msgs::msg::CameraInfo &camera_info_msg)
   {
     fiducial_vlam_msgs::msg::Observations msg;
-    msg.header.frame_id = frame_id;
-    msg.header.stamp = stamp;
-    msg.camera_info = camera_info_msg;
+//    msg.header.frame_id = frame_id;
+//    msg.header.stamp = stamp;
+//    msg.camera_info = camera_info_msg;
     for (
       auto observation: observations_) {
       fiducial_vlam_msgs::msg::Observation obs_msg;
@@ -63,13 +63,14 @@ namespace fiducial_vlam
   {}
 
   Map::Map(const fiducial_vlam_msgs::msg::Map &msg) :
-    map_style_{static_cast<Map::MapStyles>(msg.map_style)}, marker_length_{msg.marker_length}
+//    map_style_{static_cast<Map::MapStyles>(msg.map_style)}, marker_length_{msg.marker_length}
+    map_style_{static_cast<Map::MapStyles>(0)}, marker_length_{0}
   {
-    for (std::size_t i = 0; i < msg.ids.size(); i += 1) {
-      Marker marker(msg.ids[i], to_TransformWithCovariance(msg.poses[i]));
-      marker.set_is_fixed(msg.fixed_flags[i] != 0);
-      add_marker(std::move(marker));
-    }
+//    for (std::size_t i = 0; i < msg.ids.size(); i += 1) {
+//      Marker marker(msg.ids[i], to_TransformWithCovariance(msg.poses[i]));
+//      marker.set_is_fixed(msg.fixed_flags[i] != 0);
+//      add_marker(std::move(marker));
+//    }
   }
 
   void Map::reset(const Map &map)
@@ -86,16 +87,16 @@ namespace fiducial_vlam
   Map::to_map_msg(const std_msgs::msg::Header &header_msg)
   {
     auto map_msg_unique = std::make_unique<fiducial_vlam_msgs::msg::Map>();
-    auto &map_msg = *map_msg_unique;
-    for (auto &marker_pair : markers_) {
-      auto &marker = marker_pair.second;
-      map_msg.ids.emplace_back(marker.id());
-      map_msg.poses.emplace_back(to_PoseWithCovariance_msg(marker.t_map_marker()));
-      map_msg.fixed_flags.emplace_back(marker.is_fixed() ? 1 : 0);
-    }
-    map_msg.header = header_msg;
-    map_msg.marker_length = marker_length_;
-    map_msg.map_style = map_style_;
+//    auto &map_msg = *map_msg_unique;
+//    for (auto &marker_pair : markers_) {
+//      auto &marker = marker_pair.second;
+//      map_msg.ids.emplace_back(marker.id());
+//      map_msg.poses.emplace_back(to_PoseWithCovariance_msg(marker.t_map_marker()));
+//      map_msg.fixed_flags.emplace_back(marker.is_fixed() ? 1 : 0);
+//    }
+//    map_msg.header = header_msg;
+//    map_msg.marker_length = marker_length_;
+//    map_msg.map_style = map_style_;
     return map_msg_unique;
   }
 

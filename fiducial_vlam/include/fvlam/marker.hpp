@@ -157,7 +157,7 @@ namespace fvlam
 
   public:
     MapEnvironment() :
-      description_{}, marker_dictionary_id_{0}, marker_length_{0.2}
+      description_{}, marker_dictionary_id_{0}, marker_length_{0.0}
     {}
 
     MapEnvironment(std::string description,

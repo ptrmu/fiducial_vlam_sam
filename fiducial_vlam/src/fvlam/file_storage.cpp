@@ -325,10 +325,31 @@ namespace fvlam
   }
 
   template<>
+  MapEnvironment MapEnvironment::from<FileStorageContext::Node>(FileStorageContext::Node &other)
+  {
+    auto description = other()["desc"];
+    auto marker_dictionary_id = other()["dict"];
+    auto marker_length = other()["mlen"];
+    return MapEnvironment{description, marker_dictionary_id, marker_length};
+  }
+
+  template<>
+  void MapEnvironment::to<cv::FileStorage>(cv::FileStorage &other) const
+  {
+    other << "{";
+    other << "desc" << description_;
+    other << "dict" << marker_dictionary_id_;
+    other << "mlen" << marker_length_;
+    other << "}";
+  }
+
+  template<>
   MarkerMap MarkerMap::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    double marker_length = other()["marker_length"];
-    MarkerMap map{marker_length};
+    auto me_node = other()["me"];
+    auto me_context = other.make(me_node);
+    auto me = MapEnvironment::from(me_context);
+    MarkerMap map{me};
 
     auto markers_node = other()["markers"];
     for (auto it = markers_node.begin(); it != markers_node.end(); ++it) {
@@ -344,13 +365,14 @@ namespace fvlam
   void MarkerMap::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "marker_length" << marker_length();
-    other << "markers" << "[";
 
-    for (auto &marker : markers_) {
+    other << "me";
+    map_environment_.to(other);
+
+    other << "markers" << "[";
+    for (auto &marker : *this) {
       marker.second.to(other);
     }
-
     other << "]";
     other << "}";
   }
@@ -510,7 +532,7 @@ namespace fvlam
     cv::FileStorage fs(filename, cv::FileStorage::READ | cv::FileStorage::FORMAT_YAML);
     if (!fs.isOpened()) {
       logger.error() << "Could not open MarkerMap file :" << filename;
-      return MarkerMap{0.0};
+      return MarkerMap{};
     }
 
     FileStorageContext context{logger};
@@ -518,7 +540,7 @@ namespace fvlam
     auto marker_map_node = root_node.make(root_node()["marker_map"]);
 
     auto map = MarkerMap::from(marker_map_node().empty() ? root_node : marker_map_node);
-    return context.success() ? map : MarkerMap{0.0};
+    return context.success() ? map : MarkerMap{};
   }
 
 
@@ -543,7 +565,7 @@ namespace fvlam
     cv::FileStorage fs(filename, cv::FileStorage::READ | cv::FileStorage::FORMAT_YAML);
     if (!fs.isOpened()) {
       logger.error() << "Could not open ObservationsBundles file :" << filename;
-      return ObservationsBundles{MarkerMap{0.0}};
+      return ObservationsBundles{MarkerMap{}};
     }
 
     FileStorageContext context{logger};
@@ -551,6 +573,6 @@ namespace fvlam
     auto observations_bundles_node = root_node.make(root_node()["observations_bundles"]);
 
     auto map = ObservationsBundles::from(observations_bundles_node);
-    return context.success() ? map : ObservationsBundles{MarkerMap{0.0}};
+    return context.success() ? map : ObservationsBundles{MarkerMap{}};
   }
 }
