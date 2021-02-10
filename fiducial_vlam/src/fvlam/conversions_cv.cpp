@@ -161,7 +161,7 @@ namespace fvlam
     auto &ids = other.first;
     auto &corners = other.second;
 
-    Observations observations;
+    Observations observations{0, ""}; // ToDo fix this
     for (size_t i = 0; i < ids.size(); i += 1) {
       observations.emplace_back(Observation(ids[i],
                                             corners[i][0].x, corners[i][0].y,

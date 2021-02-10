@@ -143,6 +143,7 @@ set(node_plugins "${node_plugins}fiducial_vlam::VdetNode;$<TARGET_FILE:vdet_node
 add_executable(vdet_main
   src/vdet_main.cpp
   ${VDET_NODE_SOURCES}
+  src/observation_maker.cpp
   )
 
 ament_target_dependencies(vdet_main

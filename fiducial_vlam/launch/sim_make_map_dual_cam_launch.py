@@ -27,16 +27,16 @@ vdet_left_args = [{
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'det_marker_length': 0.1775,  # Marker length
     'det_t_base_camera_y': 0.2,
-    'psd_pub_observations_frame_id': 'base_link',
-    'psd_pub_camera_info_frame_id': 'left_camera'
+    'det_pub_observations_frame_id': 'base_link',
+    'det_pub_camera_info_frame_id': 'left_camera'
 }]
 
 vdet_right_args = [{
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'det_marker_length': 0.1775,  # Marker length
     'det_t_base_camera_y': -0.2,
-    'psd_pub_observations_frame_id': 'base_link',
-    'psd_pub_camera_info_frame_id': 'right_camera'
+    'det_pub_observations_frame_id': 'base_link',
+    'det_pub_camera_info_frame_id': 'right_camera'
 }]
 
 vloc_args = [{

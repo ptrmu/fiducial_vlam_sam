@@ -112,9 +112,15 @@ namespace fvlam
     std::string frame_id_; // The frame id of the camera that produced the image that these observations came from.
 
   public:
-    explicit Observations(std::uint64_t stamp = 0) :
-      stamp_(stamp), frame_id_{}
+    Observations(std::uint64_t stamp, std::string frame_id) :
+      stamp_(stamp), frame_id_{frame_id}
     {}
+
+    auto &stamp() const
+    { return stamp_; }
+
+    auto &frame_id() const
+    { return frame_id_; }
 
     template<typename T>
     static Observations from(T &other);
@@ -140,9 +146,15 @@ namespace fvlam
     std::string frame_id_; // Of the base of the group of cameras.
 
   public:
-    explicit ObservationsSynced(std::uint64_t stamp = 0) :
-      stamp_(stamp), frame_id_{}
+    ObservationsSynced(std::uint64_t stamp, std::string frame_id) :
+      stamp_(stamp), frame_id_{std::move(frame_id)}
     {}
+
+    auto &stamp() const
+    { return stamp_; }
+
+    auto &frame_id() const
+    { return frame_id_; }
 
     template<typename T>
     static ObservationsSynced from(T &other);

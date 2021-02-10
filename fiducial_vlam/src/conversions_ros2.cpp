@@ -219,7 +219,7 @@ namespace fvlam
   Observations Observations::from<fiducial_vlam_msgs::msg::Observations>(
     fiducial_vlam_msgs::msg::Observations &other)
   {
-    fvlam::Observations observations;
+    fvlam::Observations observations{0, ""}; // ToDo fix this
     for (auto &obs : other.observations) {
       observations.emplace_back(Observation(obs.id,
                                             obs.x0, obs.y0,
