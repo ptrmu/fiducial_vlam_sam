@@ -368,45 +368,26 @@ namespace fvlam
     using CovarianceMatrix = Eigen::Matrix<double, MuVector::MaxSizeAtCompileTime, MuVector::MaxSizeAtCompileTime>;
 
   private:
-    std::uint64_t id_;
     Rotate3 r_;
     Translate3 t_;
 
   public:
     Transform3() :
-      id_{0}, r_{}, t_{}
+      r_{}, t_{}
     {}
 
     Transform3(Rotate3 r, Translate3 t) :
-      id_{0}, r_(std::move(r)), t_(std::move(t))
-    {}
-
-    Transform3(std::uint64_t id, Rotate3 r, Translate3 t) :
-      id_{id}, r_(std::move(r)), t_(std::move(t))
-    {}
-
-    Transform3(std::uint64_t id, Transform3 tf) :
-      id_{id}, r_(std::move(tf.r_)), t_(std::move(tf.t_))
+      r_(std::move(r)), t_(std::move(t))
     {}
 
     Transform3(double rx, double ry, double rz, double tx, double ty, double tz) :
-      id_{0}, r_{Rotate3::RzRyRx(rx, ry, rz)}, t_(Translate3{tx, ty, tz})
+      r_{Rotate3::RzRyRx(rx, ry, rz)}, t_(Translate3{tx, ty, tz})
     {}
 
     explicit Transform3(const MuVector &mu) :
-      id_{0},
       r_(Rotate3::RzRyRx(mu(0), mu(1), mu(2))),
       t_(Translate3(mu(3), mu(4), mu(5)))
     {}
-
-    Transform3(std::uint64_t id, const MuVector &mu) :
-      id_{id},
-      r_(Rotate3::RzRyRx(mu(0), mu(1), mu(2))),
-      t_(Translate3(mu(3), mu(4), mu(5)))
-    {}
-
-    auto id() const
-    { return id_; }
 
     const auto &r() const
     { return r_; }
@@ -433,7 +414,7 @@ namespace fvlam
     template<class T>
     static void cov_to(const CovarianceMatrix &cov, T &other); //
 
-    std::string to_string(bool also_id = false) const; //
+    std::string to_string() const; //
     static std::string cov_to_string(const CovarianceMatrix &cov); //
 
     bool equals(const Transform3 &other, double tol = 1.0e-9, bool check_relative_also = true) const; //
@@ -519,9 +500,6 @@ namespace fvlam
 
     const auto &cov() const
     { return cov_; }
-
-    auto id() const
-    { return tf_.id(); }
 
     template<class T>
     static Transform3WithCovariance from(T &other);

@@ -10,6 +10,47 @@
 
 namespace fvlam
 {
+  class CameraInfo;
+
+// ==============================================================================
+// Stamp class
+// ==============================================================================
+
+// A time class modeled after the ROS2 message stamp class
+  class Stamp
+  {
+    std::int32_t sec_;
+    std::uint32_t nanosec_;
+
+  public:
+    Stamp() :
+      Stamp(0, 0)
+    {}
+
+    Stamp(std::int32_t sec, std::uint32_t nanosec) :
+      sec_{sec}, nanosec_{nanosec}
+    {}
+
+    auto sec() const
+    { return sec_; }
+
+    auto nanosec() const
+    { return nanosec_; }
+
+    template<class T>
+    static Stamp from(T &other);
+
+    template<class T>
+    T to() const;
+
+    template<class T>
+    void to(T &other) const;
+
+    std::string to_string() const;
+
+    bool equals(const Stamp &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+  };
+
 // ==============================================================================
 // Observation class
 // ==============================================================================
@@ -108,11 +149,11 @@ namespace fvlam
 
   class Observations : public std::vector<Observation>
   {
-    std::uint64_t stamp_; // Same as image_raw
+    Stamp stamp_; // Same as image_raw
     std::string frame_id_; // The frame id of the camera that produced the image that these observations came from.
 
   public:
-    Observations(std::uint64_t stamp, std::string frame_id) :
+    Observations(Stamp stamp, std::string frame_id) :
       stamp_(stamp), frame_id_{frame_id}
     {}
 
@@ -142,11 +183,11 @@ namespace fvlam
 
   class ObservationsSynced : public std::vector<Observations>
   {
-    std::uint64_t stamp_; // The average of the image raw stamps.
+    Stamp stamp_; // The average of the image raw stamps.
     std::string frame_id_; // Of the base of the group of cameras.
 
   public:
-    ObservationsSynced(std::uint64_t stamp, std::string frame_id) :
+    ObservationsSynced(Stamp stamp, std::string frame_id) :
       stamp_(stamp), frame_id_{std::move(frame_id)}
     {}
 

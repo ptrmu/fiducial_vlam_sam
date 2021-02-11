@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "observation.hpp"
 #include "transform3_with_covariance.hpp"
 
 namespace rclcpp
@@ -24,8 +25,6 @@ namespace fvlam
   class Logger; //
   class CameraInfo; //
   class MarkerMap; //
-  class Observation; //
-  class Observations; //
 
 // ==============================================================================
 // BuildMarkerMapInterface class
@@ -93,7 +92,9 @@ namespace fvlam
     virtual ~FiducialMarkerInterface() = default;
 
     // Look for fiducial markers in a gray image.
-    virtual Observations detect_markers(cv::Mat &gray_image) = 0;
+    virtual Observations detect_markers(cv::Mat &gray_image,
+                                        const std::string &frame_id,
+                                        const Stamp &stamp) = 0;
 
     // Draw the boundary around detected markers.
     virtual void annotate_image_with_detected_markers(cv::Mat &color_image,

@@ -223,9 +223,9 @@ namespace fvlam
     return to_row_str(xyz());
   }
 
-  std::string Transform3::to_string(bool also_id) const
+  std::string Transform3::to_string() const
   {
-    return (also_id ? to_id_str(id_) + "\n" : "") + r_.to_string() + " " + t_.to_string();
+    return r_.to_string() + " " + t_.to_string();
   }
 
   std::string Transform3::cov_to_string(const Transform3::CovarianceMatrix &cov)
@@ -427,10 +427,20 @@ namespace fvlam
            Translate2::cov_equals(cov_, other.cov_, tol, check_relative_also);
   }
 
+  bool Stamp::equals(const Stamp &other,
+                     double tol, bool check_relative_also) const
+  {
+    (void) tol;
+    (void) check_relative_also;
+    return sec_ == other.sec_ &&
+           nanosec_ == other.nanosec_;
+  }
+
   bool Observations::equals(const Observations &other,
                             double tol, bool check_relative_also) const
   {
-    return stamp_ == other.stamp_ &&
+    return frame_id_ == other.frame_id_ &&
+           stamp_.equals(other.stamp_, tol, check_relative_also) &&
            equals_vector(*this, other, tol, check_relative_also);
   }
 

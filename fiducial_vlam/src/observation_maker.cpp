@@ -1,5 +1,6 @@
 
 #include "cv_bridge/cv_bridge.h"
+#include "fiducial_vlam_msgs/msg/observations_synced.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/logger.hpp"
@@ -9,6 +10,26 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "observation_maker.hpp"
 #include "vdet_context.hpp"
+
+
+namespace fvlam
+{
+// ==============================================================================
+// FiducialMarkerCvContext from method
+// ==============================================================================
+
+  template<>
+  FiducialMarkerCvContext FiducialMarkerCvContext::from<fiducial_vlam::VdetContext>(
+    fiducial_vlam::VdetContext &other)
+  {
+    FiducialMarkerCvContext cxt{other.det_corner_refinement_method_};
+    cxt.border_color_red_ = 0;
+    cxt.border_color_green_ = 1.0;
+    cxt.border_color_blue_ = 0.;
+    cxt.aruco_dictionary_id_ = other.det_aruco_dictionary_id_;
+    return cxt;
+  }
+}
 
 namespace fiducial_vlam
 {
@@ -28,6 +49,69 @@ namespace fiducial_vlam
     void report(fvlam::Logger &logger, const rclcpp::Time &end_time);
   };
 
+// ==============================================================================
+// ObservationPublisher class
+// ==============================================================================
+
+  class ObservationPublisher
+  {
+    rclcpp::Node &node_;
+    fvlam::Logger &logger_;
+    VdetContext &cxt_;
+    SomDiagnostics &diagnostics_;
+
+    rclcpp::Publisher<fiducial_vlam_msgs::msg::ObservationsSynced>::SharedPtr pub_observations_{};
+
+  public:
+    ObservationPublisher(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
+                         SomDiagnostics &diagnostics) :
+      node_{node}, logger_{logger}, cxt_{cxt}, diagnostics_{diagnostics}
+    {}
+
+    void publish_observations_synced(const fvlam::CameraInfoMap &camera_info_map,
+                                     const fvlam::ObservationsSynced &observations_synced)
+    {
+      // Start by creating a MapEnvironment
+      auto map_environment_msg = fvlam::MapEnvironment{
+        cxt_.det_map_description_, cxt_.det_aruco_dictionary_id_, cxt_.det_marker_length_}
+        .to<fiducial_vlam_msgs::msg::MapEnvironment>();
+
+      // Create the ObservationSynced message.
+      auto msg = fiducial_vlam_msgs::msg::ObservationsSynced{}
+        .set__header(std_msgs::msg::Header{}
+                       .set__stamp(observations_synced.stamp().to<const builtin_interfaces::msg::Time>())
+                       .set__frame_id(observations_synced.frame_id()))
+        .set__map_environment(map_environment_msg);
+
+      // Add the observattions
+      for (auto &observations : observations_synced) {
+        // Find the camera info for these observations.
+        auto ci = camera_info_map.find(observations.frame_id());
+        if (ci == camera_info_map.end()) {
+          continue;
+        }
+
+        auto msg_item = fiducial_vlam_msgs::msg::Observations{}
+          .set__camera_info(ci->second.to<fiducial_vlam_msgs::msg::CameraInfo>())
+          .set__observations(observations.to<std::vector<fiducial_vlam_msgs::msg::Observation>>());
+
+        msg.observations_synced.emplace_back(msg_item);
+      }
+
+      // Publish the message.
+      if (!pub_observations_) {
+        pub_observations_ = node_.create_publisher<fiducial_vlam_msgs::msg::ObservationsSynced>(
+          cxt_.det_pub_observations_topic_, 2);
+      }
+      pub_observations_->publish(msg);
+      diagnostics_.pub_observations_count_ += 1;
+    }
+  };
+
+// ==============================================================================
+// SingleObservationMaker class
+// ==============================================================================
+
   class SingleObservationMaker : public ObservationMakerInterface
   {
     rclcpp::Node &node_;
@@ -36,6 +120,8 @@ namespace fiducial_vlam
     ObservationMakerInterface::OnObservationCallback on_observation_callback_;
 
     SomDiagnostics diagnostics_;
+
+    ObservationPublisher observation_publisher_;
 
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
 
@@ -52,7 +138,8 @@ namespace fiducial_vlam
                            ObservationMakerInterface::OnObservationCallback on_observation_callback) :
       node_{node}, logger_{logger}, cxt_{cxt},
       on_observation_callback_{on_observation_callback},
-      diagnostics_{node.now()}
+      diagnostics_{node.now()},
+      observation_publisher_{node, logger, cxt, diagnostics_}
     {
       // Initialize work objects after parameters have been loaded.
       auto fiducial_marker_context = fvlam::FiducialMarkerCvContext::from(cxt_);
@@ -122,8 +209,7 @@ namespace fiducial_vlam
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
                        sensor_msgs::msg::CameraInfo &sensor_ci_msg)
     {
-      auto stamp = image_msg->header.stamp;
-      rclcpp::Time time_stamp{stamp};
+      auto stamp = fvlam::Stamp::from(image_msg->header.stamp);
 
       // Convert ROS to OpenCV
       cv_bridge::CvImagePtr gray{cv_bridge::toCvCopy(*image_msg, "mono8")};
@@ -166,23 +252,43 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = fiducial_marker_->detect_markers(gray->image);
+      auto camera_info_frame_id = cxt_.det_pub_camera_info_frame_id_.empty() ?
+                                  image_msg->header.frame_id : cxt_.det_pub_camera_info_frame_id_;
+      auto observations = fiducial_marker_->detect_markers(gray->image, camera_info_frame_id, stamp);
+
+      auto observations_frame_id = cxt_.det_pub_observations_frame_id_.empty() ?
+                                   image_msg->header.frame_id : cxt_.det_pub_observations_frame_id_;
+      auto observations_synced = fvlam::ObservationsSynced(stamp, observations_frame_id);
+      observations_synced.emplace_back(observations);
 
       if (observations.empty()) {
         diagnostics_.empty_observations_count_ += 1;
       }
 
+      // Debugging hint: If the markers in color_marked are not outlined
+      // in green, then they haven't been detected.
+
       // Annotate the image_marked with the markers that were found.
       if (cxt_.det_pub_image_marked_enable_) {
-        fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
-      }
 
-      // Callback with the observations.
+        fiducial_marker_->annotate_image_with_detected_markers(color_marked.image, observations);
+
+        // The marking has been happening on the original message.
+        auto image_marked_frame_id = cxt_.det_pub_image_marked_frame_id_.empty() ?
+                                     image_msg->header.frame_id : cxt_.det_pub_image_marked_frame_id_;
+        image_msg->header.frame_id = image_marked_frame_id;
+
+        // Republish it now.
+        if (!pub_image_marked_) {
+          pub_image_marked_ = node_.create_publisher<sensor_msgs::msg::Image>(
+            cxt_.det_pub_image_marked_topic_, 2);
+        }
+        pub_image_marked_->publish(std::move(image_msg));
+        diagnostics_.pub_image_marked_count_ += 1;
+      }
 
       // Create our CameraInfo message by first creating a CameraInfo structure
       // from a ROS2 CameraIndo message.
-      auto camera_info_frame_id = cxt_.det_pub_camera_info_frame_id_.empty() ?
-                                  image_msg->header.frame_id : cxt_.det_pub_camera_info_frame_id_;
       auto t_base_camera = fvlam::Transform3{
         fvlam::Rotate3::RzRyRx(cxt_.det_t_base_camera_yaw_,
                                cxt_.det_t_base_camera_pitch_,
@@ -197,32 +303,13 @@ namespace fiducial_vlam
       camera_info_map.emplace(camera_info.frame_id(), camera_info);
 
 
-      auto observations_frame_id = cxt_.det_pub_observations_frame_id_.empty() ?
-                                   image_msg->header.frame_id : cxt_.det_pub_observations_frame_id_;
-      auto observations_synced = fvlam::ObservationsSynced(0, observations_frame_id); //Todo figure stamp
-      observations_synced.emplace_back(observations);
-
-      on_observation_callback_(camera_info_map, observations_synced);
-      diagnostics_.pub_observations_count_ += 1;
-
-      // Debugging hint: If the markers in color_marked are not outlined
-      // in green, then they haven't been detected.
-
-      // Publish an annotated image if requested.
-      if (cxt_.det_pub_image_marked_enable_) {
-        // The marking has been happening on the original message.
-        auto image_marked_frame_id = cxt_.det_pub_image_marked_frame_id_.empty() ?
-                                     image_msg->header.frame_id : cxt_.det_pub_image_marked_frame_id_;
-        image_msg->header.frame_id = image_marked_frame_id;
-
-        // Republish it now.
-        if (!pub_image_marked_) {
-          pub_image_marked_ = node_.create_publisher<sensor_msgs::msg::Image>(
-            cxt_.det_pub_image_marked_topic_, 2);
-        }
-        pub_image_marked_->publish(std::move(image_msg));
-        diagnostics_.pub_image_marked_count_ += 1;
+      // publish the observations if requested
+      if (cxt_.det_pub_observations_enable_) {
+        observation_publisher_.publish_observations_synced(camera_info_map, observations_synced);
       }
+
+      // Callback with the observations.
+      on_observation_callback_(camera_info_map, observations_synced);
     }
   };
 

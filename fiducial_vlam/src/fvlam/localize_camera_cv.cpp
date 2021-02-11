@@ -132,7 +132,9 @@ namespace fvlam
     {}
 
     // Look for fiducial markers in a gray image.
-    Observations detect_markers(cv::Mat &gray_image) override
+    Observations detect_markers(cv::Mat &gray_image,
+                                const std::string &frame_id,
+                                const Stamp &stamp) override
     {
       auto detectorParameters = cv::aruco::DetectorParameters::create();
 
@@ -148,8 +150,15 @@ namespace fvlam
       cv::aruco::detectMarkers(gray_image, localization_aruco_dictionary_, corners, ids, detectorParameters);
 
       // return the corners as an observations structure.
-      std::pair<std::vector<int>, std::vector<std::vector<cv::Point2f>>> args{ids, corners};
-      return fvlam::Observations::from(args);
+      auto observations = fvlam::Observations{stamp, frame_id};
+      for (size_t i = 0; i < ids.size(); i += 1) {
+        observations.emplace_back(Observation(ids[i],
+                                              corners[i][0].x, corners[i][0].y,
+                                              corners[i][1].x, corners[i][1].y,
+                                              corners[i][2].x, corners[i][2].y,
+                                              corners[i][3].x, corners[i][3].y));
+      }
+      return observations;
     }
 
     // Draw the boundary around detected markers.

@@ -83,6 +83,7 @@ namespace fiducial_vlam
                                 const rclcpp::Time &time_stamp,
                                 cv::Mat &color_marked) override
     {
+      (void) time_stamp;
       auto detectorParameters = cv::aruco::DetectorParameters::create();
 #if (CV_VERSION_MAJOR == 4)
 //     0 = CORNER_REFINE_NONE,     ///< Tag and corners detection based on the ArUco approach

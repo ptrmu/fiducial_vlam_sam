@@ -8,6 +8,7 @@
 #include "fiducial_vlam/fiducial_vlam.hpp"
 #include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations.hpp"
+#include "fiducial_vlam_msgs/msg/observations_stamped.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
 #include "fvlam/logger.hpp"
@@ -22,6 +23,8 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "tf2_msgs/msg/tf_message.hpp"
 #include "logger_ros2.hpp"
+#include "observation_maker.hpp"
+#include "vdet_context.hpp"
 #include "vloc_context.hpp"
 
 namespace fvlam
@@ -93,7 +96,10 @@ namespace fiducial_vlam
     VlocDiagnostics diagnostics_;
 
     VlocContext cxt_{};
+    VdetContext det_cxt_{};
     PslContext psl_cxt_{};
+
+    std::unique_ptr<ObservationMakerInterface> observation_maker_{};
 
     std::unique_ptr<fvlam::LocalizeCameraInterface> localize_camera_{};
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
@@ -129,21 +135,24 @@ namespace fiducial_vlam
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
       PAMA_PARAMS_INIT((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters)
+      PAMA_PARAMS_INIT((*this), det_cxt_, , VDET_ALL_PARAMS, validate_psl_parameters)
       PAMA_PARAMS_INIT((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
       PAMA_PARAMS_CHANGED((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), det_cxt_, , VDET_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
       PAMA_PARAMS_CHANGED((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
       PAMA_PARAMS_LOG((*this), cxt_, , VLOC_ALL_PARAMS, RCLCPP_INFO)
+      PAMA_PARAMS_LOG((*this), det_cxt_, , VDET_ALL_PARAMS, RCLCPP_INFO)
       PAMA_PARAMS_LOG((*this), psl_cxt_, , PSL_ALL_PARAMS, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
-      PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS PSL_ALL_PARAMS, RCLCPP_ERROR)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS VDET_ALL_PARAMS PSL_ALL_PARAMS, RCLCPP_ERROR)
     }
 
     // Create a LocalizeCameraInterface object if one has not been created yet or
@@ -176,6 +185,15 @@ namespace fiducial_vlam
       // Get parameters from the command line
       setup_parameters();
 
+      observation_maker_ = make_observation_maker(
+        det_cxt_, *this, logger_,
+        [this](const fvlam::CameraInfoMap &camera_info_map,
+               const fvlam::ObservationsSynced &observations_synced) -> void
+        {
+          on_observation_callback(camera_info_map, observations_synced);
+        });
+
+#if 0
       // Initialize work objects after parameters have been loaded.
       auto fiducial_marker_context = fvlam::FiducialMarkerCvContext::from(cxt_);
       fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, logger_);
@@ -240,6 +258,7 @@ namespace fiducial_vlam
           marker_map_ = fvlam::MarkerMap::from(*msg);
           diagnostics_.sub_map_count_ += 1;
         });
+#endif
 
       // Timer for publishing map info
       timer_ = create_wall_timer(
@@ -266,6 +285,11 @@ namespace fiducial_vlam
     }
 
   private:
+    void on_observation_callback(const fvlam::CameraInfoMap &camera_info_map,
+                                 const fvlam::ObservationsSynced &observations_synced)
+    {
+    }
+
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
                        sensor_msgs::msg::CameraInfo::UniquePtr camera_info_msg)
     {
@@ -318,7 +342,7 @@ namespace fiducial_vlam
       gttic(color_marked);
       // Detect the markers in this image and create a list of
       // observations.
-      auto observations = fiducial_marker_->detect_markers(gray->image);
+      auto observations = fiducial_marker_->detect_markers(gray->image, "", fvlam::Stamp{}); // Todo
       gttoc(color_marked);
 
       if (observations.empty()) {

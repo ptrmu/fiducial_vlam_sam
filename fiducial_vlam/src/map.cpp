@@ -31,6 +31,9 @@ namespace fiducial_vlam
                                                              const std_msgs::msg::Header::_frame_id_type &frame_id,
                                                              const sensor_msgs::msg::CameraInfo &camera_info_msg)
   {
+    (void) stamp;
+    (void) frame_id;
+    (void) camera_info_msg;
     fiducial_vlam_msgs::msg::Observations msg;
 //    msg.header.frame_id = frame_id;
 //    msg.header.stamp = stamp;
@@ -50,8 +53,7 @@ namespace fiducial_vlam
       msg.observations.
         emplace_back(obs_msg);
     }
-    return
-      msg;
+    return msg;
   }
 
 // ==============================================================================
@@ -66,6 +68,7 @@ namespace fiducial_vlam
 //    map_style_{static_cast<Map::MapStyles>(msg.map_style)}, marker_length_{msg.marker_length}
     map_style_{static_cast<Map::MapStyles>(0)}, marker_length_{0}
   {
+    (void) msg;
 //    for (std::size_t i = 0; i < msg.ids.size(); i += 1) {
 //      Marker marker(msg.ids[i], to_TransformWithCovariance(msg.poses[i]));
 //      marker.set_is_fixed(msg.fixed_flags[i] != 0);
@@ -86,6 +89,7 @@ namespace fiducial_vlam
   std::unique_ptr<fiducial_vlam_msgs::msg::Map>
   Map::to_map_msg(const std_msgs::msg::Header &header_msg)
   {
+    (void) header_msg;
     auto map_msg_unique = std::make_unique<fiducial_vlam_msgs::msg::Map>();
 //    auto &map_msg = *map_msg_unique;
 //    for (auto &marker_pair : markers_) {

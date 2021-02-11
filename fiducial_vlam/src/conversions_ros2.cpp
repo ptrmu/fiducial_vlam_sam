@@ -216,10 +216,26 @@ namespace fvlam
 // ==============================================================================
 
   template<>
+  Stamp Stamp::from<builtin_interfaces::msg::Time>(
+    builtin_interfaces::msg::Time &other)
+  {
+    return Stamp{other.sec, other.nanosec};
+  }
+
+  template<>
+  const builtin_interfaces::msg::Time Stamp::to
+    <const builtin_interfaces::msg::Time>() const
+  {
+    return builtin_interfaces::msg::Time{}
+      .set__sec(sec_)
+      .set__nanosec(nanosec_);
+  }
+
+  template<>
   Observations Observations::from<fiducial_vlam_msgs::msg::Observations>(
     fiducial_vlam_msgs::msg::Observations &other)
   {
-    fvlam::Observations observations{0, ""}; // ToDo fix this
+    fvlam::Observations observations{fvlam::Stamp{}, ""}; // ToDo fix this
     for (auto &obs : other.observations) {
       observations.emplace_back(Observation(obs.id,
                                             obs.x0, obs.y0,
@@ -229,7 +245,6 @@ namespace fvlam
     }
     return observations;
   }
-
 
   template<>
   std::vector<fiducial_vlam_msgs::msg::Observation> Observations::to
@@ -251,5 +266,4 @@ namespace fvlam
     }
     return msgs;
   }
-
 }

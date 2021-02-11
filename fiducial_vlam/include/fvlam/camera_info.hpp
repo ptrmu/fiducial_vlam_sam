@@ -73,6 +73,17 @@ namespace fvlam
     {}
 
     CameraInfo(const std::string &frame_id,
+               std::uint32_t width, std::uint32_t height,
+               CameraMatrix camera_matrix, DistCoeffs dist_coeffs,
+               const Transform3 &t_base_camera) :
+      frame_id_{frame_id},
+      width_{width}, height_{height},
+      camera_matrix_{std::move(camera_matrix)},
+      dist_coeffs_{std::move(dist_coeffs)},
+      t_base_camera_{t_base_camera}
+    {}
+
+    CameraInfo(const std::string &frame_id,
                const CameraInfo &base,
                const Transform3 &t_base_camera) :
       frame_id_{frame_id},
@@ -82,7 +93,7 @@ namespace fvlam
       t_base_camera_{t_base_camera}
     {}
 
-    auto & frame_id() const
+    auto &frame_id() const
     { return frame_id_; }
 
     auto &width() const
@@ -134,7 +145,7 @@ namespace fvlam
     bool equals(const CameraInfoMap &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 
-  
+
 // Used for specializing the from/to methods on CameraInfo
   using CvCameraCalibration = std::pair<cv::Matx<double, 3, 3>, cv::Vec<double, 5>>;
 }

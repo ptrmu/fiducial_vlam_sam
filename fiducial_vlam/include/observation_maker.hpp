@@ -22,7 +22,7 @@ namespace fvlam
 namespace fiducial_vlam
 {
 // ==============================================================================
-// ImageInterpreterInterface class
+// ObservationMakerInterface class
 // ==============================================================================
 
   class ObservationMakerInterface

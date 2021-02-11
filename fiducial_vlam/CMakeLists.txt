@@ -172,6 +172,7 @@ set(VLOC_NODE_SOURCES
   src/fvlam/localize_camera_gtsam.cpp
   src/fvlam/transform3_with_covariance.cpp
   src/conversions_ros2.cpp
+  src/observation_maker.cpp
   src/vloc_node.cpp
   )
 
