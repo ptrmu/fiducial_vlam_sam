@@ -24,6 +24,7 @@ namespace fvlam
 {
   class Logger; //
   class CameraInfo; //
+  class CameraInfoMap; //
   class MarkerMap; //
 
 // ==============================================================================
@@ -41,6 +42,12 @@ namespace fvlam
     virtual Transform3WithCovariance solve_t_map_camera(const Observations &observations,
                                                         const CameraInfo &camera_info,
                                                         const MarkerMap &map) = 0;
+
+    // Given observations of fiducial markers and a map of world locations of those
+    // markers, figure out the bass pose in the world frame.
+    virtual Transform3WithCovariance solve_t_map_cambase(const ObservationsSynced &observations_synced,
+                                                         const CameraInfoMap &camera_info_map,
+                                                         const MarkerMap &map) = 0;
   };
 
   template<class TLcContext>
@@ -93,7 +100,7 @@ namespace fvlam
 
     // Look for fiducial markers in a gray image.
     virtual Observations detect_markers(cv::Mat &gray_image,
-                                        const std::string &frame_id,
+                                        const std::string &camera_frame_id,
                                         const Stamp &stamp) = 0;
 
     // Draw the boundary around detected markers.

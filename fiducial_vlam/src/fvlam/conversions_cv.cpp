@@ -181,7 +181,7 @@ namespace fvlam
 
   Transform3 Observation::solve_t_base_marker(const CameraInfo &camera_info, double marker_length) const
   {
-    return camera_info.t_base_camera() * solve_t_camera_marker(camera_info, marker_length);
+    return camera_info.t_cambase_camera() * solve_t_camera_marker(camera_info, marker_length);
   }
 
   Transform3 Observation::solve_t_marker_base(const CameraInfo &camera_info, double marker_length) const

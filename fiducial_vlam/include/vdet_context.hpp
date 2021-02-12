@@ -40,13 +40,13 @@ namespace fiducial_vlam
   PAMA_PARAM(det_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \
   PAMA_PARAM(det_marker_length, double, 0.2)              /* Length of sides of all the markers */ \
   PAMA_PARAM(det_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
-  /* Camera frame -> baselink frame transform */\
-  PAMA_PARAM(det_t_base_camera_x, double, 0.)             /* camera=>baselink transform component */\
-  PAMA_PARAM(det_t_base_camera_y, double, 0.)             /* camera=>baselink transform component */\
-  PAMA_PARAM(det_t_base_camera_z, double, 0.)             /* camera=>baselink transform component */\
-  PAMA_PARAM(det_t_base_camera_roll, double, M_PI_2)      /* camera=>baselink transform component */\
-  PAMA_PARAM(det_t_base_camera_pitch, double, -M_PI_2)    /* camera=>baselink transform component */\
-  PAMA_PARAM(det_t_base_camera_yaw, double, 0.)           /* camera=>baselink transform component */\
+  /* Camera frame -> cambase frame transform */\
+  PAMA_PARAM(det_t_cambase_camera_x, double, 0.)          /* camera=>cambase transform component */\
+  PAMA_PARAM(det_t_cambase_camera_y, double, 0.)          /* camera=>cambase transform component */\
+  PAMA_PARAM(det_t_cambase_camera_z, double, 0.)          /* camera=>cambase transform component */\
+  PAMA_PARAM(det_t_cambase_camera_roll, double, M_PI_2)   /* camera=>cambase transform component */\
+  PAMA_PARAM(det_t_cambase_camera_pitch, double, -M_PI_2) /* camera=>cambase transform component */\
+  PAMA_PARAM(det_t_cambase_camera_yaw, double, 0.)        /* camera=>cambase transform component */\
   /* Subscription topics */\
   PAMA_PARAM(det_sub_image_raw_topic, std::string, "image_raw") /* topic for subscription to sensor_msgs::msg::Image (launch only) */\
   PAMA_PARAM(det_sub_camera_info_topic, std::string, "camera_info") /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  (launch only) */\
@@ -61,8 +61,8 @@ namespace fiducial_vlam
   PAMA_PARAM(det_pub_observations_topic, std::string, "observations") /* topic for publishing fiducial observations  */\
   /* Frame ids for published messages */\
   PAMA_PARAM(det_pub_image_marked_frame_id, std::string, "") /* frame_id for image_marked message if non-empty otherwise same as image_raw */\
-  PAMA_PARAM(det_pub_observations_frame_id, std::string, "") /* frame_id for observations message if non-empty otherwise same as image_raw */\
-  PAMA_PARAM(det_pub_camera_info_frame_id, std::string, "")  /* frame_id for our camera_info message if non-empty otherwise same as image_raw */\
+  PAMA_PARAM(det_pub_observations_frame_id, std::string, "") /* frame_id (cambase) for observations message if non-empty otherwise same as image_raw */\
+  PAMA_PARAM(det_pub_camera_info_frame_id, std::string, "")  /* frame_id (camera) for our camera_info message if non-empty otherwise same as image_raw */\
   /* End of list */
 
   struct VdetContext

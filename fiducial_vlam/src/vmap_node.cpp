@@ -384,7 +384,7 @@ namespace fiducial_vlam
         diagnostics_.pub_tf_count_ += 1;
         tf2_msgs::msg::TFMessage tfs_msg;
         for (auto &id_marker_pair: *marker_map_) {
-          auto &t_world_marker = id_marker_pair.second.t_world_marker().tf();
+          auto &t_world_marker = id_marker_pair.second.t_map_marker().tf();
 
           std::ostringstream oss_child_frame_id;
           oss_child_frame_id << psm_cxt_.psm_pub_tf_marker_child_frame_id_

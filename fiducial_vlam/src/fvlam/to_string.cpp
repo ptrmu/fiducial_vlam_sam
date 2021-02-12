@@ -102,9 +102,9 @@ namespace fvlam
     NumFmt nf(9, 3);
 
     if (also_cov) {
-      ss << nf(id_) << std::endl << t_world_marker_.to_string();
+      ss << nf(id_) << std::endl << t_map_marker_.to_string();
     } else {
-      ss << nf(id_) << t_world_marker_.tf().to_string();
+      ss << nf(id_) << t_map_marker_.tf().to_string();
     }
     return ss.str();
   }
@@ -397,7 +397,7 @@ namespace fvlam
   {
     return id_ == other.id_ &&
            is_fixed_ == other.is_fixed_ &&
-           t_world_marker_.equals(other.t_world_marker_, tol, check_relative_also);
+           t_map_marker_.equals(other.t_map_marker_, tol, check_relative_also);
   }
 
   bool MapEnvironment::equals(const MapEnvironment &other,
@@ -439,7 +439,7 @@ namespace fvlam
   bool Observations::equals(const Observations &other,
                             double tol, bool check_relative_also) const
   {
-    return frame_id_ == other.frame_id_ &&
+    return camera_frame_id_ == other.camera_frame_id_ &&
            stamp_.equals(other.stamp_, tol, check_relative_also) &&
            equals_vector(*this, other, tol, check_relative_also);
   }

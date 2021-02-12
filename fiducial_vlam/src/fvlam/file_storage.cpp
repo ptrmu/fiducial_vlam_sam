@@ -1,4 +1,4 @@
-
+#pragma ide diagnostic ignored "modernize-use-nodiscard"
 
 #include "fvlam/camera_info.hpp"
 #include "fvlam/logger.hpp"
@@ -26,11 +26,13 @@ namespace fvlam
       cv::FileNode node_;
 
     public:
-      Node(FileStorageContext &cxt, cv::FileNode node)
+      Node(FileStorageContext &cxt, const cv::FileNode &node)
         : cxt_{cxt}, node_{node}
-      {}
+      {
+        (void) cxt;
+      }
 
-      Node make(cv::FileNode file_node)
+      Node make(const cv::FileNode &file_node)
       {
         return Node{cxt_, file_node};
       }
@@ -38,15 +40,17 @@ namespace fvlam
       cv::FileNode operator()()
       { return node_; }
 
-      FileStorageContext &cxt()
-      { return cxt_; }
+//      FileStorageContext &cxt()
+//      { return cxt_; }
     };
 
     explicit FileStorageContext(Logger &logger) :
       logger_{logger}
-    {}
+    {
+      (void) logger_;
+    }
 
-    Node make(cv::FileNode file_node)
+    Node make(const cv::FileNode &file_node)
     {
       return Node{*this, file_node};
     }
@@ -117,13 +121,13 @@ namespace fvlam
   static std::string string_from_uint64(uint64_t val)//
   { return std::to_string(val); } //
 
-  static int32_t int32_from_string(std::string str) //
+  static int32_t int32_from_string(const std::string &str) //
   { return std::stol(str); } //
-  static uint32_t uint32_from_string(std::string str) //
+  static uint32_t uint32_from_string(const std::string &str) //
   { return std::stoul(str); } //
-//  static int64_t int64_from_string(std::string str) //
+//  static int64_t int64_from_string(const std::string &str) //
 //  { return std::stoll(str); } //
-  static uint64_t uint64_from_string(std::string str) //
+  static uint64_t uint64_from_string(const std::string &str) //
   { return std::stoull(str); } //
 
 
@@ -266,7 +270,7 @@ namespace fvlam
   template<>
   CameraInfo CameraInfo::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    auto frame_id = other()["frame_id"].string();
+    auto camera_frame_id = other()["camera_frame_id"].string();
     auto width = uint32_from_string(other()["width"].string());
     auto height = uint32_from_string(other()["height"].string());
 
@@ -284,18 +288,18 @@ namespace fvlam
       d_cxt()[2], d_cxt()[3],
       d_cxt()[4]).finished();
 
-    auto tbc_node = other()["t_base_camera"];
+    auto tbc_node = other()["t_cambase_camera"];
     auto tbc_cxt = other.make(tbc_node);
     auto tbc = Transform3::from(tbc_cxt);
 
-    return CameraInfo{frame_id, width, height, k, d, tbc};
+    return CameraInfo{camera_frame_id, width, height, k, d, tbc};
   }
 
   template<>
   void CameraInfo::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "frame_id" << frame_id_;
+    other << "camera_frame_id" << camera_frame_id_;
     other << "width" << string_from_uint32(width_);
     other << "height" << string_from_uint32(height_);
     other << "k" << "["
@@ -306,21 +310,22 @@ namespace fvlam
           << dist_coeffs_(0) << dist_coeffs_(1)
           << dist_coeffs_(2) << dist_coeffs_(3)
           << dist_coeffs_(4) << "]";
-    other << "t_base_camera";
-    t_base_camera_.to(other);
+    other << "t_cambase_camera";
+    t_cambase_camera_.to(other);
     other << "}";
   }
 
   template<>
   Marker Marker::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    int id = uint64_from_string(other()["id"].string());
-    int fixed = int(other()["f"]);
+    // There are two formats for the serialization of markers. The original format
+    // writes the ID as an integer.
 
-    // There are two formats for the serialization of markers. The original format does
-    // not write the data in a hierarchical format. Look for that format here:
-    auto xyz_node = other()["xyz"];
-    if (!xyz_node.empty()) {
+    auto id_node = other()["id"];
+    if (id_node.type() == cv::FileNode::INT) {
+      int id = int(id_node);
+      int fixed = int(other()["f"]);
+
       auto t_node = other()["xyz"];
       auto t_context = other.make(t_node);
       auto t = Translate3::from(t_context);
@@ -333,7 +338,9 @@ namespace fvlam
     }
 
     // Otherwise use the hierarchical format
-    auto twc_node = other()["t_world_marker"];
+    std::uint64_t id = uint64_from_string(id_node.string());
+    int fixed = int(other()["f"]);
+    auto twc_node = other()["t_map_marker"];
     auto twc_context = other.make(twc_node);
     auto twc = Transform3WithCovariance::from(twc_context);
 
@@ -346,8 +353,8 @@ namespace fvlam
     other << "{";
     other << "id" << string_from_uint64(id_);
     other << "f" << (is_fixed_ ? 1 : 0);
-    other << "t_world_marker";
-    t_world_marker_.to(other);
+    other << "t_map_marker";
+    t_map_marker_.to(other);
     other << "}";
   }
 
@@ -373,10 +380,21 @@ namespace fvlam
   template<>
   MarkerMap MarkerMap::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    auto me_node = other()["me"];
-    auto me_context = other.make(me_node);
-    auto me = MapEnvironment::from(me_context);
-    MarkerMap map{me};
+    MarkerMap map{};
+
+    // The old format has the marker_length here
+    auto ml_node = other()["marker_length"];
+    if (!ml_node.empty()) {
+      auto marker_length = double(ml_node);
+      map = MarkerMap{MapEnvironment{"", 0, marker_length}};
+
+    } else {
+      // The new format has the marker_length in the map_environment
+      auto me_node = other()["me"];
+      auto me_context = other.make(me_node);
+      auto me = MapEnvironment::from(me_context);
+      map = MarkerMap{me};
+    }
 
     auto markers_node = other()["markers"];
     for (auto it = markers_node.begin(); it != markers_node.end(); ++it) {
@@ -471,7 +489,7 @@ namespace fvlam
   template<>
   Observations Observations::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    std::string frame_id = other()["frame_id"].string();
+    std::string frame_id = other()["camera_frame_id"].string();
     auto stamp_node = other()["stamp"];
     auto stamp_context = other.make(stamp_node);
     auto stamp = Stamp::from(stamp_context);
@@ -491,7 +509,7 @@ namespace fvlam
   void Observations::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "frame_id" << frame_id_;
+    other << "camera_frame_id" << camera_frame_id_;
     other << "stamp";
     stamp_.to(other);
     other << "observations" << "[";

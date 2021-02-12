@@ -120,7 +120,7 @@ namespace fvlam
   fiducial_vlam_msgs::msg::CameraInfo CameraInfo::to<fiducial_vlam_msgs::msg::CameraInfo>() const
   {
     return fiducial_vlam_msgs::msg::CameraInfo{}
-      .set__frame_id(frame_id_)
+      .set__camera_frame_id(camera_frame_id_)
       .set__width(width_)
       .set__height(height_)
       .set__fx(camera_matrix_(0, 0))
@@ -132,7 +132,7 @@ namespace fvlam
       .set__p1(dist_coeffs_(2))
       .set__p2(dist_coeffs_(3))
       .set__k3(dist_coeffs_(4))
-      .set__t_base_camera(t_base_camera_.to<geometry_msgs::msg::Transform>());
+      .set__t_cambase_camera(t_cambase_camera_.to<geometry_msgs::msg::Transform>());
   }
 
 // ==============================================================================
@@ -172,7 +172,7 @@ namespace fvlam
     return fiducial_vlam_msgs::msg::Marker{}
       .set__id(id_)
       .set__is_fixed(is_fixed_)
-      .set__t_map_marker(t_world_marker_.to<geometry_msgs::msg::PoseWithCovariance>());
+      .set__t_map_marker(t_map_marker_.to<geometry_msgs::msg::PoseWithCovariance>());
   }
 
   template<>
@@ -180,7 +180,7 @@ namespace fvlam
   {
     return visualization_msgs::msg::Marker{}
       .set__id(id_)
-      .set__pose(t_world_marker().tf().to<geometry_msgs::msg::Pose>())
+      .set__pose(t_map_marker().tf().to<geometry_msgs::msg::Pose>())
       .set__type(visualization_msgs::msg::Marker::CUBE)
       .set__action(visualization_msgs::msg::Marker::ADD)
       .set__scale(geometry_msgs::msg::Vector3{}.set__x(0.1).set__y(0.1).set__z(0.01))
@@ -223,8 +223,8 @@ namespace fvlam
   }
 
   template<>
-  const builtin_interfaces::msg::Time Stamp::to
-    <const builtin_interfaces::msg::Time>() const
+  builtin_interfaces::msg::Time Stamp::to
+    <builtin_interfaces::msg::Time>() const
   {
     return builtin_interfaces::msg::Time{}
       .set__sec(sec_)

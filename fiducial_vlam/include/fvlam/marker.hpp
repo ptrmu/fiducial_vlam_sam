@@ -34,7 +34,7 @@ namespace fvlam
     std::uint64_t id_;
 
     // The pose of the marker in some world frame. Which frame is world depends on the context.
-    Transform3WithCovariance t_world_marker_;
+    Transform3WithCovariance t_map_marker_;
 
     // Prevent modification if true
     bool is_fixed_{false};
@@ -78,23 +78,23 @@ namespace fvlam
     inline Array3 calc_corners3_f_world(double marker_length) const
     {
       auto corners_f_marker = calc_corners3_f_marker(marker_length);
-      return Array3{t_world_marker_.tf() * corners_f_marker[0],
-                    t_world_marker_.tf() * corners_f_marker[1],
-                    t_world_marker_.tf() * corners_f_marker[2],
-                    t_world_marker_.tf() * corners_f_marker[3]};
+      return Array3{t_map_marker_.tf() * corners_f_marker[0],
+                    t_map_marker_.tf() * corners_f_marker[1],
+                    t_map_marker_.tf() * corners_f_marker[2],
+                    t_map_marker_.tf() * corners_f_marker[3]};
     }
 
   public:
     Marker() :
-      id_(0), t_world_marker_(), is_fixed_(false)
+      id_(0), t_map_marker_(), is_fixed_(false)
     {}
 
-    Marker(std::uint64_t id, Transform3WithCovariance t_world_marker, bool is_fixed = false) :
-      id_(id), t_world_marker_(std::move(t_world_marker)), is_fixed_(is_fixed)
+    Marker(std::uint64_t id, Transform3WithCovariance t_map_marker, bool is_fixed = false) :
+      id_(id), t_map_marker_(std::move(t_map_marker)), is_fixed_(is_fixed)
     {}
 
     auto is_valid() const
-    { return t_world_marker_.is_valid(); }
+    { return t_map_marker_.is_valid(); }
 
     auto id() const
     { return id_; }
@@ -102,8 +102,8 @@ namespace fvlam
     auto is_fixed() const
     { return is_fixed_; }
 
-    const auto &t_world_marker() const
-    { return t_world_marker_; }
+    const auto &t_map_marker() const
+    { return t_map_marker_; }
 
     template<class T>
     static Marker from(T &other);
@@ -163,7 +163,9 @@ namespace fvlam
     MapEnvironment(std::string description,
                    int marker_dictionary_id,
                    double marker_length) :
-      description_{description}, marker_dictionary_id_{marker_dictionary_id}, marker_length_{marker_length}
+      description_{std::move(description)},
+      marker_dictionary_id_{marker_dictionary_id},
+      marker_length_{marker_length}
     {}
 
     const auto &description() const
@@ -204,7 +206,7 @@ namespace fvlam
     {}
 
     explicit MarkerMap(MapEnvironment map_environment) :
-      map_environment_{map_environment}
+      map_environment_{std::move(map_environment)}
     {}
 
     const auto &map_environment() const

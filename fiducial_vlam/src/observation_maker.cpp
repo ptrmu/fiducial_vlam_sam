@@ -79,14 +79,14 @@ namespace fiducial_vlam
       // Create the ObservationSynced message.
       auto msg = fiducial_vlam_msgs::msg::ObservationsSynced{}
         .set__header(std_msgs::msg::Header{}
-                       .set__stamp(observations_synced.stamp().to<const builtin_interfaces::msg::Time>())
-                       .set__frame_id(observations_synced.frame_id()))
+                       .set__stamp(observations_synced.stamp().to<builtin_interfaces::msg::Time>())
+                       .set__frame_id(observations_synced.cambase_frame_id()))
         .set__map_environment(map_environment_msg);
 
       // Add the observattions
       for (auto &observations : observations_synced) {
         // Find the camera info for these observations.
-        auto ci = camera_info_map.find(observations.frame_id());
+        auto ci = camera_info_map.find(observations.camera_frame_id());
         if (ci == camera_info_map.end()) {
           continue;
         }
@@ -289,18 +289,18 @@ namespace fiducial_vlam
 
       // Create our CameraInfo message by first creating a CameraInfo structure
       // from a ROS2 CameraIndo message.
-      auto t_base_camera = fvlam::Transform3{
-        fvlam::Rotate3::RzRyRx(cxt_.det_t_base_camera_yaw_,
-                               cxt_.det_t_base_camera_pitch_,
-                               cxt_.det_t_base_camera_roll_),
-        fvlam::Translate3{cxt_.det_t_base_camera_x_,
-                          cxt_.det_t_base_camera_y_,
-                          cxt_.det_t_base_camera_z_}};
+      auto t_cambase_camera = fvlam::Transform3{
+        fvlam::Rotate3::RzRyRx(cxt_.det_t_cambase_camera_yaw_,
+                               cxt_.det_t_cambase_camera_pitch_,
+                               cxt_.det_t_cambase_camera_roll_),
+        fvlam::Translate3{cxt_.det_t_cambase_camera_x_,
+                          cxt_.det_t_cambase_camera_y_,
+                          cxt_.det_t_cambase_camera_z_}};
       auto camera_info = fvlam::CameraInfo{camera_info_frame_id,
                                            fvlam::CameraInfo::from(sensor_ci_msg),
-                                           t_base_camera};
+                                           t_cambase_camera};
       auto camera_info_map = fvlam::CameraInfoMap{};
-      camera_info_map.emplace(camera_info.frame_id(), camera_info);
+      camera_info_map.emplace(camera_info.camera_frame_id(), camera_info);
 
 
       // publish the observations if requested

@@ -31,70 +31,70 @@ namespace fvlam
     using DistCoeffs = Eigen::Matrix<double, 5, 1>; // k1, k2, p1, p2 [, k3 [, k4, k5, k6]]
 
   private:
-    std::string frame_id_;
+    std::string camera_frame_id_;
     std::uint32_t width_;
     std::uint32_t height_;
     CameraMatrix camera_matrix_;
     DistCoeffs dist_coeffs_;
-    Transform3 t_base_camera_;
+    Transform3 t_cambase_camera_;
 
   public:
     CameraInfo() :
-      frame_id_{},
+      camera_frame_id_{},
       width_{0}, height_{0},
       camera_matrix_{CameraMatrix::Identity()},
       dist_coeffs_{DistCoeffs::Zero()},
-      t_base_camera_{}
+      t_cambase_camera_{}
     {}
 
     CameraInfo(std::uint32_t width, std::uint32_t height, CameraMatrix camera_matrix, DistCoeffs dist_coeffs) :
-      frame_id_{},
+      camera_frame_id_{},
       width_{width}, height_{height},
       camera_matrix_{std::move(camera_matrix)},
       dist_coeffs_{std::move(dist_coeffs)},
-      t_base_camera_{}
+      t_cambase_camera_{}
     {}
 
     CameraInfo(double fx, double fy, double s, double u0, double v0) :
-      frame_id_{},
+      camera_frame_id_{},
       width_{std::uint32_t(std::ceil(u0 * 2))}, height_{std::uint32_t(std::ceil(v0 * 2))},
       camera_matrix_{(CameraMatrix() << fx, s, u0, 0.0, fy, v0, 0.0, 0.0, 1.0).finished()},
       dist_coeffs_{DistCoeffs::Zero()},
-      t_base_camera_{}
+      t_cambase_camera_{}
     {}
 
     CameraInfo(double fx, double fy, double s, double u0, double v0,
                double k1, double k2, double p1, double p2, double k3) :
-      frame_id_{},
+      camera_frame_id_{},
       width_{std::uint32_t(std::ceil(u0 * 2))}, height_{std::uint32_t(std::ceil(v0 * 2))},
       camera_matrix_{(CameraMatrix() << fx, s, u0, 0.0, fy, v0, 0.0, 0.0, 1.0).finished()},
       dist_coeffs_{(DistCoeffs() << k1, k2, p1, p2, k3).finished()},
-      t_base_camera_{}
+      t_cambase_camera_{}
     {}
 
-    CameraInfo(const std::string &frame_id,
+    CameraInfo(std::string camera_frame_id,
                std::uint32_t width, std::uint32_t height,
                CameraMatrix camera_matrix, DistCoeffs dist_coeffs,
-               const Transform3 &t_base_camera) :
-      frame_id_{frame_id},
+               Transform3 t_cambase_camera) :
+      camera_frame_id_{std::move(camera_frame_id)},
       width_{width}, height_{height},
       camera_matrix_{std::move(camera_matrix)},
       dist_coeffs_{std::move(dist_coeffs)},
-      t_base_camera_{t_base_camera}
+      t_cambase_camera_{std::move(t_cambase_camera)}
     {}
 
-    CameraInfo(const std::string &frame_id,
+    CameraInfo(std::string camera_frame_id,
                const CameraInfo &base,
-               const Transform3 &t_base_camera) :
-      frame_id_{frame_id},
+               Transform3 t_cambase_camera) :
+      camera_frame_id_{std::move(camera_frame_id)},
       width_{base.width_}, height_{base.height_},
       camera_matrix_{base.camera_matrix_},
       dist_coeffs_{base.dist_coeffs_},
-      t_base_camera_{t_base_camera}
+      t_cambase_camera_{std::move(t_cambase_camera)}
     {}
 
-    auto &frame_id() const
-    { return frame_id_; }
+    auto &camera_frame_id() const
+    { return camera_frame_id_; }
 
     auto &width() const
     { return width_; }
@@ -108,8 +108,8 @@ namespace fvlam
     const auto &dist_coeffs() const
     { return dist_coeffs_; }
 
-    const auto &t_base_camera() const
-    { return t_base_camera_; }
+    const auto &t_cambase_camera() const
+    { return t_cambase_camera_; }
 
     template<class T>
     static CameraInfo from(T &other);

@@ -20,14 +20,14 @@ namespace fvlam
     ObservationsBundles observations_bundles_;
 
   public:
-    BuildMarkerMapRecorder(const BuildMarkerMapRecorderContext &recorder_context,
+    BuildMarkerMapRecorder(BuildMarkerMapRecorderContext recorder_context,
                            Logger &logger,
                            MarkerMap map_initial) :
-      recorder_context_{recorder_context}, logger_{logger},
-      map_initial_{std::make_unique<fvlam::MarkerMap>(map_initial)}, observations_bundles_{map_initial}
+      recorder_context_{std::move(recorder_context)}, logger_{logger},
+      map_initial_{std::make_unique<fvlam::MarkerMap>(map_initial)}, observations_bundles_{std::move(map_initial)}
     {}
 
-    ~BuildMarkerMapRecorder() // virtual destructor
+    ~BuildMarkerMapRecorder() override// virtual destructor
     {
       observations_bundles_.save(recorder_context_.bmm_recorded_observations_name_, logger_);
     }

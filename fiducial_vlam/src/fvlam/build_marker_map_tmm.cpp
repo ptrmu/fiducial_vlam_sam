@@ -312,7 +312,7 @@ namespace fvlam
       for (auto &id_marker_pair : solve_tmm_graph_.fixed_markers()) {
         pose_graph.emplace_shared<gtsam::PriorFactor<gtsam::Pose3>>(
           idix_list.to_ix(id_marker_pair.first),
-          id_marker_pair.second.t_world_marker().tf().to<gtsam::Pose3>(),
+          id_marker_pair.second.t_map_marker().tf().to<gtsam::Pose3>(),
           gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Pose3::TangentVector::Zero()));
       }
 
@@ -360,7 +360,7 @@ namespace fvlam
       for (const auto &key_value : shonan_result.first) {
         if (key_value.key == fixed_marker_ix) {
           r_world_shonan =
-            solve_tmm_graph_.fixed_markers().begin()->second.t_world_marker().tf().r().to<gtsam::Rot3>() *
+            solve_tmm_graph_.fixed_markers().begin()->second.t_map_marker().tf().r().to<gtsam::Rot3>() *
             shonan_result.first.at<typename gtsam::Pose3::Rotation>(key_value.key).inverse();
           break;
         }
@@ -426,8 +426,8 @@ namespace fvlam
           auto solve_tmm = solve_tmm_graph_.lookup(it0->first, it1->first);
           if (solve_tmm != nullptr) {
             auto tmm_meas = (*solve_tmm)->t_marker0_marker1().tf();
-            auto tmm_calc = it0->second.t_world_marker().tf().inverse() *
-                            it1->second.t_world_marker().tf();
+            auto tmm_calc = it0->second.t_map_marker().tf().inverse() *
+                            it1->second.t_map_marker().tf();
             r_sum += tmm_calc.r().q().angularDistance(tmm_meas.r().q());
             t_sum += (tmm_calc.t().t() - tmm_meas.t().t()).norm();
             n += 1;

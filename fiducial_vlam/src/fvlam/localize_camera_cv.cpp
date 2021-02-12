@@ -27,6 +27,24 @@ namespace fvlam
       lc_context_{lc_context}, logger_{logger}
     {}
 
+    Transform3WithCovariance solve_t_map_cambase(const ObservationsSynced &observations_synced,
+                                                 const CameraInfoMap &camera_info_map,
+                                                 const MarkerMap &map) override
+    {
+      if (observations_synced.size() == 1) {
+        auto &observations = observations_synced[0];
+        auto ci = camera_info_map.find(observations.camera_frame_id());
+        if (ci != camera_info_map.end()) {
+          auto &camera_info = ci->second;
+          auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
+          return Transform3WithCovariance{
+            t_map_camera.tf() * camera_info.t_cambase_camera().inverse(),
+            t_map_camera.cov()};
+        }
+      }
+      return Transform3WithCovariance{};
+    }
+
     // Given observations of fiducial markers and a map of world locations of those
     // markers, figure out the camera pose in the world frame.
     Transform3WithCovariance solve_t_map_camera(const Observations &observations,

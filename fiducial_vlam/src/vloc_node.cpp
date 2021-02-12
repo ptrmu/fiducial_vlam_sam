@@ -268,16 +268,16 @@ namespace fiducial_vlam
           timer_callback();
         });
 
-      RCLCPP_INFO(get_logger(), "Using opencv %d.%d.%d", CV_VERSION_MAJOR, CV_VERSION_MINOR, CV_VERSION_REVISION);
-      RCLCPP_INFO(get_logger(), "To calibrate camera - set cal_cmd parameter.");
-      RCLCPP_INFO(get_logger(), "  cal_cmd capture - Capture an image and add it to the set of calibration images.");
-      RCLCPP_INFO(get_logger(),
-                  "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.");
-      RCLCPP_INFO(get_logger(), "  cal_cmd status - Report on the number of images in the set of calibration images.");
-      RCLCPP_INFO(get_logger(), "  cal_cmd load_images - Load the set of calibration images from files.");
-      RCLCPP_INFO(get_logger(),
-                  "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.");
-      RCLCPP_INFO(get_logger(), "vloc_node ready");
+      logger_.info()
+        << "Using opencv " << CV_VERSION_MAJOR << "."
+        << CV_VERSION_MINOR << "." << CV_VERSION_REVISION << "\n"
+        << "To calibrate camera - set cal_cmd parameter.\n"
+        << "  cal_cmd capture - Capture an image and add it to the set of calibration images.\n"
+        << "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.\n"
+        << "  cal_cmd status - Report on the number of images in the set of calibration images.\n"
+        << "  cal_cmd load_images - Load the set of calibration images from files.\n"
+        << "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.\n"
+        << "vloc_node ready";
 
       (void) sub_camera_info_;
       (void) sub_image_raw_;
@@ -288,8 +288,111 @@ namespace fiducial_vlam
     void on_observation_callback(const fvlam::CameraInfoMap &camera_info_map,
                                  const fvlam::ObservationsSynced &observations_synced)
     {
+      // Find the camera pose from the observations.
+      auto t_map_base = get_lc().solve_t_map_cambase(observations_synced, camera_info_map, marker_map_);
+
+      if (!t_map_base.is_valid()) {
+        diagnostics_.invalid_t_map_camera_count_ += 1;
+      }
+
+      if (t_map_base.is_valid()) {
+
+        // Header to use with pose, odometry, and tf messages
+        auto po_header = std_msgs::msg::Header{}
+          .set__frame_id(observations_synced.cambase_frame_id())
+          .set__stamp(observations_synced.stamp().to<builtin_interfaces::msg::Time>());
+
+        // Publish the base pose/odometry in the map frame
+        if (psl_cxt_.psl_pub_base_pose_enable_) {
+          auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
+            .set__header(po_header)
+            .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+          if (!pub_base_pose_) {
+            pub_base_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+              psl_cxt_.psl_pub_base_pose_topic_, 2);
+          }
+          pub_base_pose_->publish(msg);
+          diagnostics_.pub_base_pose_count_ += 1;
+        }
+        if (psl_cxt_.psl_pub_base_odom_enable_) {
+          auto msg = nav_msgs::msg::Odometry{}
+            .set__header(po_header)
+            .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
+            .set__pose(t_map_base.to<geometry_msgs::msg::PoseWithCovariance>());
+          if (!pub_base_odom_) {
+            pub_base_odom_ = create_publisher<nav_msgs::msg::Odometry>(
+              psl_cxt_.psl_pub_base_odom_topic_, 2);
+          }
+          pub_base_odom_->publish(msg);
+          diagnostics_.pub_base_odom_count_ += 1;
+        }
+#if 0
+        // Publish all tfs in one message
+        tf2_msgs::msg::TFMessage tfs_msg;
+
+        // Publish the camera's tf
+        if (psl_cxt_.psl_pub_tf_camera_enable_) {
+          auto msg = geometry_msgs::msg::TransformStamped{}
+            .set__header(po_header)
+            .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
+            .set__transform(t_map_camera.tf().to<geometry_msgs::msg::Transform>());
+          tfs_msg.transforms.emplace_back(msg);
+        }
+
+        // Publish the base's tf
+        if (psl_cxt_.psl_pub_tf_base_enable_) {
+          auto msg = geometry_msgs::msg::TransformStamped{}
+            .set__header(po_header)
+            .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
+            .set__transform(t_map_base.tf().to<geometry_msgs::msg::Transform>());
+          tfs_msg.transforms.emplace_back(msg);
+        }
+
+        // if requested, publish the camera tf as determined from each marker in world/map coordinates.
+        if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {
+          for (auto &observation : observations) {
+            auto t_marker_camera = observation.solve_t_marker_camera(camera_info, marker_map_.marker_length());
+            auto marker = marker_map_.find_marker_const(observation.id());
+            if (marker != nullptr) {
+              auto t_map_camera_n = marker->t_world_marker().tf() * t_marker_camera;
+              auto msg = geometry_msgs::msg::TransformStamped{}
+                .set__header(po_header)
+                .set__child_frame_id(compose_frame_id(psl_cxt_.psl_pub_tf_camera_per_marker_child_frame_id_,
+                                                      observation.id()))
+                .set__transform(t_map_camera_n.to<geometry_msgs::msg::Transform>());
+              tfs_msg.transforms.emplace_back(msg);
+            }
+          }
+        }
+
+        // if requested, publish the marker tf as determined from the camera location and the observation.
+        if (psl_cxt_.psl_pub_tf_marker_per_marker_enable_) {
+          for (auto &observation : observations) {
+            auto t_camera_marker = observation.solve_t_camera_marker(camera_info, marker_map_.marker_length());
+            auto t_map_marker_n = t_map_camera.tf() * t_camera_marker;
+            auto msg = geometry_msgs::msg::TransformStamped{}
+              .set__header(po_header)
+              .set__child_frame_id(compose_frame_id(psl_cxt_.psl_pub_tf_marker_per_marker_child_frame_id_,
+                                                    observation.id()))
+              .set__transform(t_map_marker_n.to<geometry_msgs::msg::Transform>());
+            tfs_msg.transforms.emplace_back(msg);
+          }
+        }
+
+        // If there are any transforms to publish, then publish them.
+        if (!tfs_msg.transforms.empty()) {
+          if (!pub_tf_) {
+            pub_tf_ = create_publisher<tf2_msgs::msg::TFMessage>(
+              "/tf", 2);
+          }
+          pub_tf_->publish(tfs_msg);
+          diagnostics_.pub_tf_count_ += 1;
+        }
+#endif
+      }
     }
 
+#if 0
     void process_image(sensor_msgs::msg::Image::UniquePtr image_msg,
                        sensor_msgs::msg::CameraInfo::UniquePtr camera_info_msg)
     {
@@ -554,6 +657,7 @@ namespace fiducial_vlam
         gtsam::tictoc_reset_();
       }
     }
+#endif
 
     static std::string compose_frame_id(std::string &prefix, uint64_t id)
     {

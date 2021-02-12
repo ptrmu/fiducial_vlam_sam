@@ -3,7 +3,7 @@
 # The name of the transformation frame that defines the image of this camera.
 # This frame has z pointing in the direction of the camera lens with x going
 # across the image and y going down the image.
-string frame_id
+string camera_frame_id
 
 # Dimensions of the image
 uint32 width
@@ -23,5 +23,5 @@ float64 p1
 float64 p2
 float64 k3
 
-# Transform from camera image frame to base frame.
-geometry_msgs/Transform t_base_camera
+# Transform from camera image frame to cambase frame.
+geometry_msgs/Transform t_cambase_camera

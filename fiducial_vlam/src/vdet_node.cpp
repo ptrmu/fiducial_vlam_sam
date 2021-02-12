@@ -86,7 +86,7 @@ namespace fiducial_vlam
                const fvlam::ObservationsSynced &) -> void
         {});
 
-      RCLCPP_INFO(get_logger(), "vdet_node ready");
+      logger_.info() << "vdet_node ready";
     }
 
 

@@ -150,18 +150,18 @@ namespace fvlam
   class Observations : public std::vector<Observation>
   {
     Stamp stamp_; // Same as image_raw
-    std::string frame_id_; // The frame id of the camera that produced the image that these observations came from.
+    std::string camera_frame_id_; // The frame id of the camera that produced the image that these observations came from.
 
   public:
-    Observations(Stamp stamp, std::string frame_id) :
-      stamp_(stamp), frame_id_{frame_id}
+    Observations(Stamp stamp, std::string camera_frame_id) :
+      stamp_(stamp), camera_frame_id_{std::move(camera_frame_id)}
     {}
 
     auto &stamp() const
     { return stamp_; }
 
-    auto &frame_id() const
-    { return frame_id_; }
+    auto &camera_frame_id() const
+    { return camera_frame_id_; }
 
     template<typename T>
     static Observations from(T &other);
@@ -184,18 +184,18 @@ namespace fvlam
   class ObservationsSynced : public std::vector<Observations>
   {
     Stamp stamp_; // The average of the image raw stamps.
-    std::string frame_id_; // Of the base of the group of cameras.
+    std::string cambase_frame_id_; // Of the base of the group of cameras.
 
   public:
-    ObservationsSynced(Stamp stamp, std::string frame_id) :
-      stamp_(stamp), frame_id_{std::move(frame_id)}
+    ObservationsSynced(Stamp stamp, std::string cambase_frame_id) :
+      stamp_(stamp), cambase_frame_id_{std::move(cambase_frame_id)}
     {}
 
     auto &stamp() const
     { return stamp_; }
 
-    auto &frame_id() const
-    { return frame_id_; }
+    auto &cambase_frame_id() const
+    { return cambase_frame_id_; }
 
     template<typename T>
     static ObservationsSynced from(T &other);

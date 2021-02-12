@@ -117,7 +117,7 @@ namespace fvlam
           }
 
           // Add the marker initial value.
-          auto t_world_marker = marker_ptr->t_world_marker().tf().to<gtsam::Pose3>();
+          auto t_world_marker = marker_ptr->t_map_marker().tf().to<gtsam::Pose3>();
           initial.insert(marker_key, t_world_marker);
 
           // Add the marker prior with a noise model. NOTE: using the marker covariance
@@ -126,15 +126,15 @@ namespace fvlam
           // they move around to find lower optimums with the camera also moving.
           bool use_constrained = marker_ptr->is_fixed() ||
                                  !lc_context_.use_marker_covariance_ ||
-                                 marker_ptr->t_world_marker().cov()(0, 0) == 0.0;
+                                 marker_ptr->t_map_marker().cov()(0, 0) == 0.0;
 
           // Create the appropriate marker pose prior noise model.
           auto noise_model = use_constrained ?
                              gtsam::noiseModel::Constrained::MixedSigmas(gtsam::Z_6x1) :
                              gtsam::noiseModel::Gaussian::Covariance(
                                GtsamUtil::cov_gtsam_from_ros(
-                                 marker_ptr->t_world_marker().tf().to<gtsam::Pose3>(),
-                                 marker_ptr->t_world_marker().cov()));
+                                 marker_ptr->t_map_marker().tf().to<gtsam::Pose3>(),
+                                 marker_ptr->t_map_marker().cov()));
 
 //          auto noise_model = gtsam::noiseModel::Diagonal::Sigmas(
 //            (gtsam::Vector(6) << gtsam::Vector3::Constant(0.1), gtsam::Vector3::Constant(0.3)).finished());
@@ -217,6 +217,24 @@ namespace fvlam
       lc_cv_{make_localize_camera(fvlam::LocalizeCameraCvContext(), logger)}
     {
       logger_.debug() << "Construct LocalizeCameraResectioning";
+    }
+
+    Transform3WithCovariance solve_t_map_cambase(const ObservationsSynced &observations_synced,
+                                                 const CameraInfoMap &camera_info_map,
+                                                 const MarkerMap &map) override
+    {
+      if (observations_synced.size() == 1) {
+        auto &observations = observations_synced[0];
+        auto ci = camera_info_map.find(observations.camera_frame_id());
+        if (ci != camera_info_map.end()) {
+          auto &camera_info = ci->second;
+          auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
+          return Transform3WithCovariance{
+            t_map_camera.tf() * camera_info.t_cambase_camera().inverse(),
+            t_map_camera.cov()};
+        }
+      }
+      return Transform3WithCovariance{};
     }
 
     // Given observations of fiducial markers and a map of world locations of those
