@@ -229,9 +229,11 @@ namespace fvlam
         if (ci != camera_info_map.end()) {
           auto &camera_info = ci->second;
           auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
-          return Transform3WithCovariance{
-            t_map_camera.tf() * camera_info.t_cambase_camera().inverse(),
-            t_map_camera.cov()};
+          if (t_map_camera.is_valid()) {
+            return Transform3WithCovariance{
+              t_map_camera.tf() * camera_info.t_cambase_camera().inverse(),
+              t_map_camera.cov()};
+          }
         }
       }
       return Transform3WithCovariance{};
