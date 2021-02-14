@@ -11,6 +11,20 @@ namespace fvlam
 
 namespace fiducial_vlam
 {
+  // Frames
+  //  map - world frame that markers are located relative to
+  //  marker_n - frame of the marker symbol
+  //    When looking at upright marker:
+  //      x - to right side of marker in marker plane,
+  //      y - to top of marker in marker plane
+  //      x - Out of the marker plane toward the observer
+  //  camera_0 - frame of image n of the multi image camera
+  //    When looking from behind the camera at the subject it is viewing
+  //      x - to right along rows of pixels
+  //      y - down the images across rows of pixels
+  //      z - pointed in the direction the camera is viewing
+  //  camera
+  //
   // The following parameters control how vloc_node publishes messages and subscribes to messages
   // Subscriptions:
   //  Marker Map - The pose of fiducial markers in a world frame. Published and created by vmap_node.
