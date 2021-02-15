@@ -13,17 +13,18 @@ namespace fiducial_vlam
 {
   // Frames
   //  map - world frame that markers are located relative to
-  //  marker_n - frame of the marker symbol
+  //  markerN - frame of the Nth marker.
   //    When looking at upright marker:
   //      x - to right side of marker in marker plane,
   //      y - to top of marker in marker plane
   //      x - Out of the marker plane toward the observer
-  //  camera_0 - frame of image n of the multi image camera
+  //  camera - frame of the complete imaging unit (may have multiple imagers)
   //    When looking from behind the camera at the subject it is viewing
   //      x - to right along rows of pixels
-  //      y - down the images across rows of pixels
+  //      y - down the image across rows of pixels
   //      z - pointed in the direction the camera is viewing
-  //  camera
+  //  imagerN, ... - frame of a the Nth individual sensor in a camera unit.
+  //    Has the same axis conventions as a camera.
   //
   // The following parameters control how vloc_node publishes messages and subscribes to messages
   // Subscriptions:
