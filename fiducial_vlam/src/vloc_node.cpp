@@ -112,8 +112,8 @@ namespace fiducial_vlam
 
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_image_marked_{};
     rclcpp::Publisher<fiducial_vlam_msgs::msg::Observations>::SharedPtr pub_observations_{};
-    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_cambase_pose_{};
-    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_cambase_odom_{};
+    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_camera_pose_{};
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_camera_odom_{};
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_base_pose_{};
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_base_odom_{};
     rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr pub_tf_{};
@@ -289,58 +289,58 @@ namespace fiducial_vlam
                                  const fvlam::ObservationsSynced &observations_synced)
     {
       // Find the camera pose from the observations.
-      auto t_map_cambase = get_lc().solve_t_map_cambase(observations_synced, camera_info_map, marker_map_);
+      auto t_map_camera = get_lc().solve_t_map_camera(observations_synced, camera_info_map, marker_map_);
 
-      if (!t_map_cambase.is_valid()) {
+      if (!t_map_camera.is_valid()) {
         diagnostics_.invalid_t_map_camera_count_ += 1;
       }
 
-      if (t_map_cambase.is_valid()) {
+      if (t_map_camera.is_valid()) {
 
         // Header to use with pose, odometry, and tf messages
         auto map_frame_id = cxt_.loc_pub_map_frame_id_.empty() ?
-                            observations_synced.cambase_frame_id() : cxt_.loc_pub_map_frame_id_;
+                            observations_synced.camera_frame_id() : cxt_.loc_pub_map_frame_id_;
         auto po_header = std_msgs::msg::Header{}
           .set__frame_id(map_frame_id)
           .set__stamp(observations_synced.stamp().to<builtin_interfaces::msg::Time>());
 
-        // Publish the cambase pose/odometry in the map frame
-        if (cxt_.loc_pub_cambase_pose_enable_) {
+        // Publish the camera pose/odometry in the map frame
+        if (cxt_.loc_pub_camera_pose_enable_) {
           auto msg = geometry_msgs::msg::PoseWithCovarianceStamped{}
             .set__header(po_header)
-            .set__pose(t_map_cambase.to<geometry_msgs::msg::PoseWithCovariance>());
-          if (!pub_cambase_pose_) {
-            pub_cambase_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-              cxt_.loc_pub_cambase_pose_topic_, 2);
+            .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+          if (!pub_camera_pose_) {
+            pub_camera_pose_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+              cxt_.loc_pub_camera_pose_topic_, 2);
           }
-          pub_cambase_pose_->publish(msg);
-          diagnostics_.pub_cambase_pose_count_ += 1;
+          pub_camera_pose_->publish(msg);
+          diagnostics_.pub_camera_pose_count_ += 1;
         }
-        if (cxt_.loc_pub_cambase_odom_enable_) {
+        if (cxt_.loc_pub_camera_odom_enable_) {
           auto msg = nav_msgs::msg::Odometry{}
             .set__header(po_header)
-            .set__child_frame_id(cxt_.loc_pub_cambase_odom_child_frame_id_)
-            .set__pose(t_map_cambase.to<geometry_msgs::msg::PoseWithCovariance>());
-          if (!pub_cambase_odom_) {
-            pub_cambase_odom_ = create_publisher<nav_msgs::msg::Odometry>(
-              cxt_.loc_pub_cambase_odom_topic_, 2);
+            .set__child_frame_id(cxt_.loc_pub_camera_odom_child_frame_id_)
+            .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
+          if (!pub_camera_odom_) {
+            pub_camera_odom_ = create_publisher<nav_msgs::msg::Odometry>(
+              cxt_.loc_pub_camera_odom_topic_, 2);
           }
-          pub_cambase_odom_->publish(msg);
-          diagnostics_.pub_cambase_odom_count_ += 1;
+          pub_camera_odom_->publish(msg);
+          diagnostics_.pub_camera_odom_count_ += 1;
         }
 
         // Find the transform from the base of the robot to the map. Also include the covariance.
         // Note: the covariance values are with respect to the map frame so both t_map_camera and
         // t_map_base have the same covariance.
         auto t_map_base = fvlam::Transform3WithCovariance{
-          t_map_cambase.tf() * fvlam::Transform3{
-            fvlam::Rotate3::RzRyRx(cxt_.loc_t_base_cambase_yaw_,
-                                   cxt_.loc_t_base_cambase_pitch_,
-                                   cxt_.loc_t_base_cambase_roll_),
-            fvlam::Translate3{cxt_.loc_t_base_cambase_x_,
-                              cxt_.loc_t_base_cambase_y_,
-                              cxt_.loc_t_base_cambase_z_}}.inverse(),
-          t_map_cambase.cov()};
+          t_map_camera.tf() * fvlam::Transform3{
+            fvlam::Rotate3::RzRyRx(cxt_.loc_t_base_camera_yaw_,
+                                   cxt_.loc_t_base_camera_pitch_,
+                                   cxt_.loc_t_base_camera_roll_),
+            fvlam::Translate3{cxt_.loc_t_base_camera_x_,
+                              cxt_.loc_t_base_camera_y_,
+                              cxt_.loc_t_base_camera_z_}}.inverse(),
+          t_map_camera.cov()};
 
         // Publish the base pose/odometry in the map frame
         if (cxt_.loc_pub_base_pose_enable_) {
@@ -753,10 +753,10 @@ namespace fiducial_vlam
 
     logger.info() << "Published observations: " << pub_observations_count_
                   << " (" << per_sec * pub_observations_count_ << " /sec)";
-    logger.info() << "Published cambase_pose: " << pub_cambase_pose_count_
-                  << " (" << per_sec * pub_cambase_pose_count_ << " /sec)";
-    logger.info() << "Published cambase_odom: " << pub_cambase_odom_count_
-                  << " (" << per_sec * pub_cambase_odom_count_ << " /sec)";
+    logger.info() << "Published camera_pose: " << pub_camera_pose_count_
+                  << " (" << per_sec * pub_camera_pose_count_ << " /sec)";
+    logger.info() << "Published camera_odom: " << pub_camera_odom_count_
+                  << " (" << per_sec * pub_camera_odom_count_ << " /sec)";
     logger.info() << "Published base_pose: " << pub_base_pose_count_
                   << " (" << per_sec * pub_base_pose_count_ << " /sec)";
     logger.info() << "Published base_odom: " << pub_base_odom_count_
@@ -773,8 +773,8 @@ namespace fiducial_vlam
     empty_observations_count_ = 0;
     invalid_t_map_camera_count_ = 0;
     pub_observations_count_ = 0;
-    pub_cambase_pose_count_ = 0;
-    pub_cambase_odom_count_ = 0;
+    pub_camera_pose_count_ = 0;
+    pub_camera_odom_count_ = 0;
     pub_base_pose_count_ = 0;
     pub_base_odom_count_ = 0;
     pub_tf_count_ = 0;

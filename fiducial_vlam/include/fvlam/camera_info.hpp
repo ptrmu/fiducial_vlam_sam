@@ -24,6 +24,9 @@ namespace fvlam
 // CameraInfo class
 // ==============================================================================
 
+// This should really be called an ImagerInfo structure. But in the case where there
+// is only one imager calling it a CameraInfo is equivalent. Cases that have multiple
+// imagers will have to remember that this structure is named incorrectly.
   class CameraInfo
   {
   public:
@@ -31,70 +34,70 @@ namespace fvlam
     using DistCoeffs = Eigen::Matrix<double, 5, 1>; // k1, k2, p1, p2 [, k3 [, k4, k5, k6]]
 
   private:
-    std::string camera_frame_id_;
+    std::string imager_frame_id_;
     std::uint32_t width_;
     std::uint32_t height_;
     CameraMatrix camera_matrix_;
     DistCoeffs dist_coeffs_;
-    Transform3 t_cambase_camera_;
+    Transform3 t_camera_imager_;
 
   public:
     CameraInfo() :
-      camera_frame_id_{},
+      imager_frame_id_{},
       width_{0}, height_{0},
       camera_matrix_{CameraMatrix::Identity()},
       dist_coeffs_{DistCoeffs::Zero()},
-      t_cambase_camera_{}
+      t_camera_imager_{}
     {}
 
     CameraInfo(std::uint32_t width, std::uint32_t height, CameraMatrix camera_matrix, DistCoeffs dist_coeffs) :
-      camera_frame_id_{},
+      imager_frame_id_{},
       width_{width}, height_{height},
       camera_matrix_{std::move(camera_matrix)},
       dist_coeffs_{std::move(dist_coeffs)},
-      t_cambase_camera_{}
+      t_camera_imager_{}
     {}
 
     CameraInfo(double fx, double fy, double s, double u0, double v0) :
-      camera_frame_id_{},
+      imager_frame_id_{},
       width_{std::uint32_t(std::ceil(u0 * 2))}, height_{std::uint32_t(std::ceil(v0 * 2))},
       camera_matrix_{(CameraMatrix() << fx, s, u0, 0.0, fy, v0, 0.0, 0.0, 1.0).finished()},
       dist_coeffs_{DistCoeffs::Zero()},
-      t_cambase_camera_{}
+      t_camera_imager_{}
     {}
 
     CameraInfo(double fx, double fy, double s, double u0, double v0,
                double k1, double k2, double p1, double p2, double k3) :
-      camera_frame_id_{},
+      imager_frame_id_{},
       width_{std::uint32_t(std::ceil(u0 * 2))}, height_{std::uint32_t(std::ceil(v0 * 2))},
       camera_matrix_{(CameraMatrix() << fx, s, u0, 0.0, fy, v0, 0.0, 0.0, 1.0).finished()},
       dist_coeffs_{(DistCoeffs() << k1, k2, p1, p2, k3).finished()},
-      t_cambase_camera_{}
+      t_camera_imager_{}
     {}
 
-    CameraInfo(std::string camera_frame_id,
+    CameraInfo(std::string imager_frame_id,
                std::uint32_t width, std::uint32_t height,
                CameraMatrix camera_matrix, DistCoeffs dist_coeffs,
-               Transform3 t_cambase_camera) :
-      camera_frame_id_{std::move(camera_frame_id)},
+               Transform3 t_camera_imager) :
+      imager_frame_id_{std::move(imager_frame_id)},
       width_{width}, height_{height},
       camera_matrix_{std::move(camera_matrix)},
       dist_coeffs_{std::move(dist_coeffs)},
-      t_cambase_camera_{std::move(t_cambase_camera)}
+      t_camera_imager_{std::move(t_camera_imager)}
     {}
 
-    CameraInfo(std::string camera_frame_id,
+    CameraInfo(std::string imager_frame_id,
                const CameraInfo &base,
-               Transform3 t_cambase_camera) :
-      camera_frame_id_{std::move(camera_frame_id)},
+               Transform3 t_camera_imager) :
+      imager_frame_id_{std::move(imager_frame_id)},
       width_{base.width_}, height_{base.height_},
       camera_matrix_{base.camera_matrix_},
       dist_coeffs_{base.dist_coeffs_},
-      t_cambase_camera_{std::move(t_cambase_camera)}
+      t_camera_imager_{std::move(t_camera_imager)}
     {}
 
-    auto &camera_frame_id() const
-    { return camera_frame_id_; }
+    auto &imager_frame_id() const
+    { return imager_frame_id_; }
 
     auto &width() const
     { return width_; }
@@ -108,8 +111,8 @@ namespace fvlam
     const auto &dist_coeffs() const
     { return dist_coeffs_; }
 
-    const auto &t_cambase_camera() const
-    { return t_cambase_camera_; }
+    const auto &t_camera_imager() const
+    { return t_camera_imager_; }
 
     template<class T>
     static CameraInfo from(T &other);

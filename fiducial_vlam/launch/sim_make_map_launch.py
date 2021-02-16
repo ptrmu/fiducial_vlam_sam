@@ -23,8 +23,7 @@ corner_measurement_sigma = 2.0
 
 vloc_args = [{
     'loc_camera_algorithm': 1,
-    'loc_corner_refinement_method': 2,
-    'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'det_corner_refinement_method': 2,
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
     'psl_sub_camera_info_best_effort_not_reliable': True,

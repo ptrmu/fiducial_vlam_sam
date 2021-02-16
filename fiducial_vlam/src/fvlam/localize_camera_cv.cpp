@@ -27,19 +27,19 @@ namespace fvlam
       lc_context_{lc_context}, logger_{logger}
     {}
 
-    Transform3WithCovariance solve_t_map_cambase(const ObservationsSynced &observations_synced,
-                                                 const CameraInfoMap &camera_info_map,
-                                                 const MarkerMap &map) override
+    Transform3WithCovariance solve_t_map_camera(const ObservationsSynced &observations_synced,
+                                                const CameraInfoMap &camera_info_map,
+                                                const MarkerMap &map) override
     {
       if (observations_synced.size() == 1) {
         auto &observations = observations_synced[0];
-        auto ci = camera_info_map.find(observations.camera_frame_id());
+        auto ci = camera_info_map.find(observations.imager_frame_id());
         if (ci != camera_info_map.end()) {
           auto &camera_info = ci->second;
           auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
           if (t_map_camera.is_valid()) {
             return Transform3WithCovariance{
-              t_map_camera.tf() * camera_info.t_cambase_camera().inverse(),
+              t_map_camera.tf() * camera_info.t_camera_imager().inverse(),
               t_map_camera.cov()};
           }
         }

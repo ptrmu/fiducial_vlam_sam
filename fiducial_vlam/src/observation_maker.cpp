@@ -80,13 +80,13 @@ namespace fiducial_vlam
       auto msg = fiducial_vlam_msgs::msg::ObservationsSynced{}
         .set__header(std_msgs::msg::Header{}
                        .set__stamp(observations_synced.stamp().to<builtin_interfaces::msg::Time>())
-                       .set__frame_id(observations_synced.cambase_frame_id()))
+                       .set__frame_id(observations_synced.camera_frame_id()))
         .set__map_environment(map_environment_msg);
 
       // Add the observattions
       for (auto &observations : observations_synced) {
         // Find the camera info for these observations.
-        auto ci = camera_info_map.find(observations.camera_frame_id());
+        auto ci = camera_info_map.find(observations.imager_frame_id());
         if (ci == camera_info_map.end()) {
           continue;
         }
@@ -252,13 +252,13 @@ namespace fiducial_vlam
 
       // Detect the markers in this image and create a list of
       // observations.
-      auto camera_info_frame_id = cxt_.det_pub_camera_info_frame_id_.empty() ?
-                                  image_msg->header.frame_id : cxt_.det_pub_camera_info_frame_id_;
-      auto observations = fiducial_marker_->detect_markers(gray->image, camera_info_frame_id, stamp);
+      auto imager_frame_id = cxt_.det_pub_imager_frame_id_.empty() ?
+                             image_msg->header.frame_id : cxt_.det_pub_imager_frame_id_;
+      auto observations = fiducial_marker_->detect_markers(gray->image, imager_frame_id, stamp);
 
-      auto observations_frame_id = cxt_.det_pub_observations_frame_id_.empty() ?
-                                   image_msg->header.frame_id : cxt_.det_pub_observations_frame_id_;
-      auto observations_synced = fvlam::ObservationsSynced(stamp, observations_frame_id);
+      auto camera_frame_id = cxt_.det_pub_camera_frame_id_.empty() ?
+                             image_msg->header.frame_id : cxt_.det_pub_camera_frame_id_;
+      auto observations_synced = fvlam::ObservationsSynced(stamp, camera_frame_id);
       observations_synced.emplace_back(observations);
 
       if (observations.empty()) {
@@ -289,18 +289,18 @@ namespace fiducial_vlam
 
       // Create our CameraInfo message by first creating a CameraInfo structure
       // from a ROS2 CameraIndo message.
-      auto t_cambase_camera = fvlam::Transform3{
-        fvlam::Rotate3::RzRyRx(cxt_.det_t_cambase_camera_yaw_,
-                               cxt_.det_t_cambase_camera_pitch_,
-                               cxt_.det_t_cambase_camera_roll_),
-        fvlam::Translate3{cxt_.det_t_cambase_camera_x_,
-                          cxt_.det_t_cambase_camera_y_,
-                          cxt_.det_t_cambase_camera_z_}};
-      auto camera_info = fvlam::CameraInfo{camera_info_frame_id,
+      auto t_camera_imager = fvlam::Transform3{
+        fvlam::Rotate3::RzRyRx(cxt_.det_t_camera_imager_yaw_,
+                               cxt_.det_t_camera_imager_pitch_,
+                               cxt_.det_t_camera_imager_roll_),
+        fvlam::Translate3{cxt_.det_t_camera_imager_x_,
+                          cxt_.det_t_camera_imager_y_,
+                          cxt_.det_t_camera_imager_z_}};
+      auto camera_info = fvlam::CameraInfo{imager_frame_id,
                                            fvlam::CameraInfo::from(sensor_ci_msg),
-                                           t_cambase_camera};
+                                           t_camera_imager};
       auto camera_info_map = fvlam::CameraInfoMap{};
-      camera_info_map.emplace(camera_info.camera_frame_id(), camera_info);
+      camera_info_map.emplace(camera_info.imager_frame_id(), camera_info);
 
 
       // publish the observations if requested

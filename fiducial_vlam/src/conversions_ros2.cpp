@@ -120,7 +120,7 @@ namespace fvlam
   fiducial_vlam_msgs::msg::CameraInfo CameraInfo::to<fiducial_vlam_msgs::msg::CameraInfo>() const
   {
     return fiducial_vlam_msgs::msg::CameraInfo{}
-      .set__camera_frame_id(camera_frame_id_)
+      .set__imager_frame_id(imager_frame_id_)
       .set__width(width_)
       .set__height(height_)
       .set__fx(camera_matrix_(0, 0))
@@ -132,7 +132,7 @@ namespace fvlam
       .set__p1(dist_coeffs_(2))
       .set__p2(dist_coeffs_(3))
       .set__k3(dist_coeffs_(4))
-      .set__t_cambase_camera(t_cambase_camera_.to<geometry_msgs::msg::Transform>());
+      .set__t_camera_imager(t_camera_imager_.to<geometry_msgs::msg::Transform>());
   }
 
 // ==============================================================================

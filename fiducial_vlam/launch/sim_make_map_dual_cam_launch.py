@@ -26,7 +26,7 @@ corner_measurement_sigma = 2.0
 vdet_left_args = [{
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'det_marker_length': 0.1775,  # Marker length
-    'det_t_cambase_camera_y': 0.2,
+    'det_t_camera_imager_y': 0.2,
     'det_pub_observations_frame_id': 'base_link',
     'det_pub_camera_info_frame_id': 'left_camera',
     'det_pub_image_marked_frame_id': 'left_camera'
@@ -35,7 +35,7 @@ vdet_left_args = [{
 vdet_right_args = [{
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'det_marker_length': 0.1775,  # Marker length
-    'det_t_cambase_camera_y': -0.2,
+    'det_t_camera_imager_y': -0.2,
     'det_pub_observations_frame_id': 'base_link',
     'det_pub_camera_info_frame_id': 'right_camera',
     'det_pub_image_marked_frame_id': 'right_camera'
@@ -72,7 +72,7 @@ vmap_args = [{
 def generate_launch_description():
     entities = [
         ExecuteProcess(cmd=[
-            'gazebo',
+            'gzserver',
             '--verbose',
             '-s', 'libgazebo_ros_init.so',  # Publish /clock
             '-s', 'libgazebo_ros_factory.so',  # Provide injection endpoints

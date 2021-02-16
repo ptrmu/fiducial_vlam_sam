@@ -270,7 +270,7 @@ namespace fvlam
   template<>
   CameraInfo CameraInfo::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    auto camera_frame_id = other()["camera_frame_id"].string();
+    auto imager_frame_id = other()["imager_frame_id"].string();
     auto width = uint32_from_string(other()["width"].string());
     auto height = uint32_from_string(other()["height"].string());
 
@@ -288,18 +288,18 @@ namespace fvlam
       d_cxt()[2], d_cxt()[3],
       d_cxt()[4]).finished();
 
-    auto tbc_node = other()["t_cambase_camera"];
-    auto tbc_cxt = other.make(tbc_node);
-    auto tbc = Transform3::from(tbc_cxt);
+    auto tci_node = other()["t_camera_imager"];
+    auto tci_cxt = other.make(tci_node);
+    auto tci = Transform3::from(tci_cxt);
 
-    return CameraInfo{camera_frame_id, width, height, k, d, tbc};
+    return CameraInfo{imager_frame_id, width, height, k, d, tci};
   }
 
   template<>
   void CameraInfo::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "camera_frame_id" << camera_frame_id_;
+    other << "imager_frame_id" << imager_frame_id_;
     other << "width" << string_from_uint32(width_);
     other << "height" << string_from_uint32(height_);
     other << "k" << "["
@@ -310,8 +310,8 @@ namespace fvlam
           << dist_coeffs_(0) << dist_coeffs_(1)
           << dist_coeffs_(2) << dist_coeffs_(3)
           << dist_coeffs_(4) << "]";
-    other << "t_cambase_camera";
-    t_cambase_camera_.to(other);
+    other << "t_camera_imager";
+    t_camera_imager_.to(other);
     other << "}";
   }
 
@@ -489,11 +489,11 @@ namespace fvlam
   template<>
   Observations Observations::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    std::string frame_id = other()["camera_frame_id"].string();
+    std::string imager_frame_id = other()["imager_frame_id"].string();
     auto stamp_node = other()["stamp"];
     auto stamp_context = other.make(stamp_node);
     auto stamp = Stamp::from(stamp_context);
-    Observations observations{stamp, frame_id};
+    Observations observations{stamp, imager_frame_id};
 
     auto observations_node = other()["observations"];
     for (auto it = observations_node.begin(); it != observations_node.end(); ++it) {
@@ -509,7 +509,7 @@ namespace fvlam
   void Observations::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "camera_frame_id" << camera_frame_id_;
+    other << "imager_frame_id" << imager_frame_id_;
     other << "stamp";
     stamp_.to(other);
     other << "observations" << "[";

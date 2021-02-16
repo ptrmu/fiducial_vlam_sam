@@ -439,7 +439,7 @@ namespace fvlam
   bool Observations::equals(const Observations &other,
                             double tol, bool check_relative_also) const
   {
-    return camera_frame_id_ == other.camera_frame_id_ &&
+    return imager_frame_id_ == other.imager_frame_id_ &&
            stamp_.equals(other.stamp_, tol, check_relative_also) &&
            equals_vector(*this, other, tol, check_relative_also);
   }

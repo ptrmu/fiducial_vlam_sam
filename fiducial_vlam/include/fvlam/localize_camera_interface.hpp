@@ -45,9 +45,9 @@ namespace fvlam
 
     // Given observations of fiducial markers and a map of world locations of those
     // markers, figure out the bass pose in the world frame.
-    virtual Transform3WithCovariance solve_t_map_cambase(const ObservationsSynced &observations_synced,
-                                                         const CameraInfoMap &camera_info_map,
-                                                         const MarkerMap &map) = 0;
+    virtual Transform3WithCovariance solve_t_map_camera(const ObservationsSynced &observations_synced,
+                                                        const CameraInfoMap &camera_info_map,
+                                                        const MarkerMap &map) = 0;
   };
 
   template<class TLcContext>

@@ -36,18 +36,18 @@ namespace fiducial_vlam
   //    message: fiducial_vlam_msgs::msg::ObservationsSynced
   //    enable parameter: loc_pub_observations_enable (true)
   //    topic parameter: loc_pub_observations_topic ("/fiducial_observations")
-  //    frame_id parameter: loc_pub_observations_frame_id ("map")
-  //  Cambase Pose - The pose of the camera base as determined by viewing fiducial markers in the map frame
+  //    frame_id parameter: loc_pub_map_frame_id ("map")
+  //  Camera Pose - The pose of the camera as determined by viewing fiducial markers in the map frame
   //    message: geometry_msgs::msg::PoseWithCovarianceStamped
-  //    enable parameter: loc_pub_cambase_pose_enable (true)
-  //    topic parameter: loc_pub_cambase_pose_topic ("cambase_pose")
+  //    enable parameter: loc_pub_camera_pose_enable (true)
+  //    topic parameter: loc_pub_camera_pose_topic ("camera_pose")
   //    frame_id parameter: loc_pub_map_frame_id ("map")
-  //  Cambase Odom - The odometry of the camera base as determined by viewing fiducial markers in the map frame
+  //  Camera Odom - The odometry of the camera as determined by viewing fiducial markers in the map frame
   //    message: nav_msgs::msg::Odometry
-  //    enable parameter: loc_pub_cambase_odom_enable (true)
-  //    topic parameter: loc_pub_cambase_odom_topic ("cambase_odom")
+  //    enable parameter: loc_pub_camera_odom_enable (true)
+  //    topic parameter: loc_pub_camera_odom_topic ("camera_odom")
   //    frame_id parameter: loc_pub_map_frame_id ("map")
-  //    frame_id of the twist components: loc_pub_cambase_odom_child_frame_id ("cambase_frame")
+  //    frame_id of the twist components: loc_pub_camera_odom_child_frame_id ("camera_frame")
   //  Base Pose - The pose of the Base - a fixed transform from the camera base
   //    message: geometry_msgs::msg::PoseWithCovarianceStamped
   //    enable parameter: loc_pub_base_pose_enable (true)
@@ -62,11 +62,11 @@ namespace fiducial_vlam
   //  Marker Transformations - publish the transformations to each of the markers
   //    message: tf2_msgs::msg::TFMessage
   //    enable parameter:
-  //      loc_pub_tf_camera_enable (true) publish tf to camera(s) frame
-  //      loc_pub_tf_cambase_enable (true) publish tf to cambase frame
+  //      loc_pub_tf_imager_enable (true) publish tf to imager(s) frame
+  //      loc_pub_tf_camera_enable (true) publish tf to camera frame
   //      loc_pub_tf_base_enable (true) publish tf to base frame
+  //      loc_pub_tf_imager_per_marker_enable (false)
   //      loc_pub_tf_camera_per_marker_enable (false)
-  //      loc_pub_tf_cambase_per_marker_enable (false)
   //      loc_pub_tf_marker_per_marker_enable (false)
   //    topic: "tf"
   //    frame_id: loc_pub_map_frame_id ("map")
@@ -75,13 +75,13 @@ namespace fiducial_vlam
   /* vlocnode flags */\
   PAMA_PARAM(loc_camera_algorithm, int, 0)                /* 0 - OpenCV SolvePnp, 1 - GTSAM factor */\
   PAMA_PARAM(loc_cmd, std::string, "")                    /* commands to vloc_node (diagnostics, ...) */\
-   /* CamBase frame -> base link frame transform */\
-  PAMA_PARAM(loc_t_base_cambase_x, double, 0.)            /* cambase=>baselink transform component */\
-  PAMA_PARAM(loc_t_base_cambase_y, double, 0.)            /* cambase=>baselink transform component */\
-  PAMA_PARAM(loc_t_base_cambase_z, double, 0)             /* cambase=>baselink transform component */\
-  PAMA_PARAM(loc_t_base_cambase_roll, double, M_PI_2)     /* cambase=>baselink transform component */\
-  PAMA_PARAM(loc_t_base_cambase_pitch, double, -M_PI_2)   /* cambase=>baselink transform component */\
-  PAMA_PARAM(loc_t_base_cambase_yaw, double, 0.)          /* cambase=>baselink transform component */\
+   /* Camera frame -> base link frame transform */\
+  PAMA_PARAM(loc_t_base_camera_x, double, 0.)            /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_y, double, 0.)            /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_z, double, 0)             /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_roll, double, M_PI_2)     /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_pitch, double, -M_PI_2)   /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_yaw, double, 0.)          /* camera->base transform component */\
   /* Parameters for GTSAM localization techniques */\
   PAMA_PARAM(loc_gtsam_factor_type, int, 2)               /* 0 - Resectioning, 1 - ProjectBetween, 2 - QuadResectioning, 3 - PoseBetween */ \
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
@@ -90,29 +90,30 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_sub_map_topic, std::string, "/fiducial_map") /* topic for subscription to fiducial_vlam_msgs::msg::Map (launch only)  */\
   /* Messages to publish */\
   PAMA_PARAM(loc_pub_observations_enable, bool, true)     /* publish the observations at every frame  */\
-  PAMA_PARAM(loc_pub_cambase_pose_enable, bool, true)     /* publish the pose of the camera at every frame  */\
-  PAMA_PARAM(loc_pub_cambase_odom_enable, bool, true)     /* publish the odometry of the camera at every frame  */\
+  PAMA_PARAM(loc_pub_camera_pose_enable, bool, true)      /* publish the pose of the camera at every frame  */\
+  PAMA_PARAM(loc_pub_camera_odom_enable, bool, true)      /* publish the odometry of the camera at every frame  */\
   PAMA_PARAM(loc_pub_base_pose_enable, bool, true)        /* publish the pose of the base at every frame  */\
   PAMA_PARAM(loc_pub_base_odom_enable, bool, true)        /* publish the odometry of the base at every frame  */\
+  PAMA_PARAM(loc_pub_tf_imager_enable, bool, true)        /* publish the tf of the camera at every frame  */\
   PAMA_PARAM(loc_pub_tf_camera_enable, bool, true)        /* publish the tf of the camera at every frame  */\
-  PAMA_PARAM(loc_pub_tf_cambase_enable, bool, true)       /* publish the tf of the camera at every frame  */\
   PAMA_PARAM(loc_pub_tf_base_enable, bool, true)          /* publish the tf of the base at every frame  */\
+  PAMA_PARAM(loc_pub_tf_imager_per_marker_enable, bool, false) /* publish the camera tf as determined by each visible marker  */\
   PAMA_PARAM(loc_pub_tf_camera_per_marker_enable, bool, false) /* publish the camera tf as determined by each visible marker  */\
-  PAMA_PARAM(loc_pub_tf_cambase_per_marker_enable, bool, false) /* publish the camera tf as determined by each visible marker  */\
   PAMA_PARAM(loc_pub_tf_marker_per_marker_enable, bool, false) /* publish each marker tf as determined by camera pose and observation  */\
   /* Publish topics */\
   PAMA_PARAM(loc_pub_observations_topic, std::string, "/fiducial_observations") /* topic for publishing fiducial observations  */\
-  PAMA_PARAM(loc_pub_cambase_pose_topic, std::string, "cambase_pose") /* topic for publishing camera pose  */\
-  PAMA_PARAM(loc_pub_cambase_odom_topic, std::string, "cambase_odom") /* topic for publishing camera odometry  */\
+  PAMA_PARAM(loc_pub_camera_pose_topic, std::string, "camera_pose") /* topic for publishing camera pose  */\
+  PAMA_PARAM(loc_pub_camera_odom_topic, std::string, "camera_odom") /* topic for publishing camera odometry  */\
   PAMA_PARAM(loc_pub_base_pose_topic, std::string, "base_pose") /* topic for publishing base pose  */\
   PAMA_PARAM(loc_pub_base_odom_topic, std::string, "base_odom") /* topic for publishing base odometry  */\
   /* Frame ids for published messages */\
   PAMA_PARAM(loc_pub_map_frame_id, std::string, "map")    /* frame_id for marker and tf messages - normally "map"  */\
-  PAMA_PARAM(loc_pub_cambase_odom_child_frame_id, std::string, "cambase_frame") /* frame_id for cambase frame  */\
+  PAMA_PARAM(loc_pub_camera_odom_child_frame_id, std::string, "camera_frame") /* frame_id for camera frame  */\
   PAMA_PARAM(loc_pub_base_odom_child_frame_id, std::string, "base_frame") /* frame_id for base frame  */\
   PAMA_PARAM(loc_pub_tf_camera_per_marker_child_frame_id, std::string, "cpm_")  /* frame_id for the child in the camera_per_marker tf messages  */\
   PAMA_PARAM(loc_pub_tf_marker_per_marker_child_frame_id, std::string, "mpm_")  /* frame_id for the child in the marker_per_marker tf messages  */\
   /* End of list */
+
 
 
   // The following parameters control how vloc_node publishes messages and subscribes to messages
@@ -225,8 +226,8 @@ namespace fiducial_vlam
     std::uint64_t empty_observations_count_{0};
     std::uint64_t invalid_t_map_camera_count_{0};
     std::uint64_t pub_observations_count_{0};
-    std::uint64_t pub_cambase_pose_count_{0};
-    std::uint64_t pub_cambase_odom_count_{0};
+    std::uint64_t pub_camera_pose_count_{0};
+    std::uint64_t pub_camera_odom_count_{0};
     std::uint64_t pub_base_pose_count_{0};
     std::uint64_t pub_base_odom_count_{0};
     std::uint64_t pub_tf_count_{0};

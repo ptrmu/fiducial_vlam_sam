@@ -39,7 +39,6 @@ set(msg_files
   "msg/Marker.msg"
   "msg/Observation.msg"
   "msg/Observations.msg"
-  "msg/ObservationsStamped.msg"
   "msg/ObservationsSynced.msg"
   )
 
