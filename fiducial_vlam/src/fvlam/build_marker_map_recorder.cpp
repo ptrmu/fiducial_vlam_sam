@@ -34,10 +34,10 @@ namespace fvlam
 
     // Take the location of markers in one image and add them to the marker map
     // building algorithm.
-    void process(const fvlam::Observations &observations,
-                 const fvlam::CameraInfo &camera_info) override
+    void process(const ObservationsSynced &observations_synced,
+                 const CameraInfoMap &camera_info_map) override
     {
-      observations_bundles_.add_bundle(ObservationsBundle{camera_info, observations});
+//      observations_bundles_.add_bundle(ObservationsBundle{camera_info_map, observations_synced}); // ToDo fix this
     }
 
     // Given the observations that have been added so far, create and return a marker_map.

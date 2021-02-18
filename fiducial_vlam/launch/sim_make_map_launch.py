@@ -5,6 +5,20 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
 
+
+# A camera scanning markers
+#   Messages:
+#       /forward_camera/camera_info, gazebo->vloc_node, msg::CameraInfo, frame_id: base_link
+#       /forward_camera/image_raw, gazebo->vloc_node, msg::Image, frame_id: base_link
+#       /fiducial_map, vmap_node->vloc_node, msg::Map, frame_id: map
+#       /fiducial_visuals, vmap_node->, msg::Markers, frame_id: map
+#           /fiducial_observations, vloc_node->vmap_node, msg::ObservationsSynced, frame_id: map
+#           /forward_camera/image_marked, vloc_node->, msg::Image, frame_id: base_link
+#           /forward_camera/camera_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
+#           /forward_camera/camera_odom, vloc_node->, msg::Odometry, frame_id: map, camera_frame
+#           /forward_camera/base_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
+#           /forward_camera/base_odom, vloc_node->, msg::Odometry, frame_id: map, base_frame
+
 vlam_package_share_directory = get_package_share_directory('fiducial_vlam')
 sim_package_share_directory = get_package_share_directory('sim_fiducial')
 
@@ -25,6 +39,7 @@ vloc_args = [{
     'loc_camera_algorithm': 1,
     'det_corner_refinement_method': 2,
     'det_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'det_pub_observations_topic': '/fiducial_observations',
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
     'psl_sub_camera_info_best_effort_not_reliable': True,
     'psl_sub_image_raw_best_effort_not_reliable': True,

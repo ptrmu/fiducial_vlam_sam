@@ -149,16 +149,12 @@ namespace fvlam
 
   class Observations : public std::vector<Observation>
   {
-    Stamp stamp_; // Same as image_raw
     std::string imager_frame_id_; // One or more imagers are components of a camera.
 
   public:
-    Observations(Stamp stamp, std::string imager_frame_id) :
-      stamp_(stamp), imager_frame_id_{std::move(imager_frame_id)}
+    Observations(std::string imager_frame_id) :
+      imager_frame_id_{std::move(imager_frame_id)}
     {}
-
-    auto &stamp() const
-    { return stamp_; }
 
     auto &imager_frame_id() const
     { return imager_frame_id_; }

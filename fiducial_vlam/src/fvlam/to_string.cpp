@@ -137,6 +137,18 @@ namespace fvlam
     return ss.str();
   }
 
+  std::string MapEnvironment::to_string() const
+  {
+    std::stringstream ss{};
+    NumFmt nf(9, 3);
+
+    ss << "Map description: '" << description_
+    << "', dictionary id: " << marker_dictionary_id_
+    << ", marker_length: " << nf(marker_length_);
+
+    return ss.str();
+  }
+
   std::string MarkerMap::to_string(bool also_cov) const
   {
     std::stringstream ss{};
@@ -440,7 +452,6 @@ namespace fvlam
                             double tol, bool check_relative_also) const
   {
     return imager_frame_id_ == other.imager_frame_id_ &&
-           stamp_.equals(other.stamp_, tol, check_relative_also) &&
            equals_vector(*this, other, tol, check_relative_also);
   }
 

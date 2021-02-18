@@ -134,6 +134,7 @@ namespace fvlam
 
   class CameraInfoMap : public std::map<std::string, CameraInfo>
   {
+  public:
     template<class T>
     static CameraInfoMap from(T &other);
 

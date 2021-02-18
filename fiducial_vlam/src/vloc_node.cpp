@@ -249,6 +249,7 @@ namespace fiducial_vlam
           last_image_stamp_ = stamp;
           diagnostics_.sub_image_raw_count_ += 1;
         });
+#endif
 
       sub_map_ = create_subscription<fiducial_vlam_msgs::msg::Map>(
         psl_cxt_.psl_sub_map_topic_,
@@ -258,7 +259,6 @@ namespace fiducial_vlam
           marker_map_ = fvlam::MarkerMap::from(*msg);
           diagnostics_.sub_map_count_ += 1;
         });
-#endif
 
       // Timer for publishing map info
       timer_ = create_wall_timer(
@@ -271,12 +271,12 @@ namespace fiducial_vlam
       logger_.info()
         << "Using opencv " << CV_VERSION_MAJOR << "."
         << CV_VERSION_MINOR << "." << CV_VERSION_REVISION << "\n"
-        << "To calibrate camera - set cal_cmd parameter.\n"
-        << "  cal_cmd capture - Capture an image and add it to the set of calibration images.\n"
-        << "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.\n"
-        << "  cal_cmd status - Report on the number of images in the set of calibration images.\n"
-        << "  cal_cmd load_images - Load the set of calibration images from files.\n"
-        << "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.\n"
+//        << "To calibrate camera - set cal_cmd parameter.\n"
+//        << "  cal_cmd capture - Capture an image and add it to the set of calibration images.\n"
+//        << "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.\n"
+//        << "  cal_cmd status - Report on the number of images in the set of calibration images.\n"
+//        << "  cal_cmd load_images - Load the set of calibration images from files.\n"
+//        << "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.\n"
         << "vloc_node ready";
 
       (void) sub_camera_info_;

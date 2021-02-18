@@ -490,10 +490,7 @@ namespace fvlam
   Observations Observations::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
     std::string imager_frame_id = other()["imager_frame_id"].string();
-    auto stamp_node = other()["stamp"];
-    auto stamp_context = other.make(stamp_node);
-    auto stamp = Stamp::from(stamp_context);
-    Observations observations{stamp, imager_frame_id};
+    Observations observations{imager_frame_id};
 
     auto observations_node = other()["observations"];
     for (auto it = observations_node.begin(); it != observations_node.end(); ++it) {
@@ -510,8 +507,6 @@ namespace fvlam
   {
     other << "{";
     other << "imager_frame_id" << imager_frame_id_;
-    other << "stamp";
-    stamp_.to(other);
     other << "observations" << "[";
 
     for (auto &observation : *this) {

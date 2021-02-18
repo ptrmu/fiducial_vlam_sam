@@ -456,26 +456,33 @@ namespace fvlam
       error_{}
     {}
 
-    void process(const Observations &observations,
-                 const CameraInfo &camera_info) override
+    void process(const ObservationsSynced &observations_synced,
+                 const CameraInfoMap &camera_info_map) override
     {
-      // Walk through all pairs of observations
-      for (std::size_t m0 = 0; m0 < observations.size(); m0 += 1)
-        for (std::size_t m1 = m0 + 1; m1 < observations.size(); m1 += 1) {
-          std::size_t m0r{m0};
-          std::size_t m1r{m1};
+      // Walk through all the imagers
+      for (auto &observations : observations_synced) {
+        // Find the camera_info for this imager
+        auto camera_info_it = camera_info_map.find(observations.imager_frame_id());
+        if (camera_info_it != camera_info_map.end()) {
+          // Walk through all pairs of observations
+          for (std::size_t m0 = 0; m0 < observations.size(); m0 += 1)
+            for (std::size_t m1 = m0 + 1; m1 < observations.size(); m1 += 1) {
+              std::size_t m0r{m0};
+              std::size_t m1r{m1};
 
-          // Alawys do the transform calculation with the lower id first.
-          if (observations[m1r].id() < observations[m0r].id()) {
-            m0r = m1;
-            m1r = m0;
-          }
+              // Alawys do the transform calculation with the lower id first.
+              if (observations[m1r].id() < observations[m0r].id()) {
+                m0r = m1;
+                m1r = m0;
+              }
 
-          // Find the appropriate SolveTmmInterface
-          auto &solve_tmm = solve_tmm_graph_.add_or_lookup(observations[m0r].id(), observations[m1r].id(),
-                                                           tmm_context_.solve_tmm_factory_);
-          solve_tmm->accumulate(observations[m0r], observations[m1r], camera_info);
+              // Find the appropriate SolveTmmInterface
+              auto &solve_tmm = solve_tmm_graph_.add_or_lookup(observations[m0r].id(), observations[m1r].id(),
+                                                               tmm_context_.solve_tmm_factory_);
+              solve_tmm->accumulate(observations[m0r], observations[m1r], camera_info_it->second);
+            }
         }
+      }
     }
 
     std::unique_ptr<MarkerMap> build() override

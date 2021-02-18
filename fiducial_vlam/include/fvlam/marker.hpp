@@ -186,10 +186,9 @@ namespace fvlam
     template<class T>
     void to(T &other) const;
 
-    std::string to_string(bool also_cov = false) const;
+    std::string to_string() const;
 
     bool equals(const MapEnvironment &other, double tol = 1.0e-9, bool check_relative_also = true) const;
-
   };
 
 // ==============================================================================

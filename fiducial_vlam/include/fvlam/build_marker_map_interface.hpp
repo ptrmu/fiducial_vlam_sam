@@ -13,9 +13,11 @@ namespace fvlam
 {
   class Logger; //
   class CameraInfo; //
+  class CameraInfoMap; //
   class MarkerMap; //
   class Observation; //
   class Observations; //
+  class ObservationsSynced; //
 
 // ==============================================================================
 // BuildMarkerMapInterface class
@@ -30,8 +32,8 @@ namespace fvlam
 
     // Take the location of markers in one image and add them to the marker map
     // building algorithm.
-    virtual void process(const Observations &observations,
-                         const CameraInfo &camera_info) = 0;
+    virtual void process(const ObservationsSynced &observations_synced,
+                         const CameraInfoMap &camera_info_map) = 0;
 
     // Given the observations that have been added so far, create and return a marker_map.
     virtual std::unique_ptr<MarkerMap> build() = 0;

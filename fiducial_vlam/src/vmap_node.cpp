@@ -5,7 +5,7 @@
 
 #include "fiducial_vlam/fiducial_vlam.hpp"
 #include "fiducial_vlam_msgs/msg/map.hpp"
-#include "fiducial_vlam_msgs/msg/observations.hpp"
+#include "fiducial_vlam_msgs/msg/observations_synced.hpp"
 #include "fvlam/build_marker_map_interface.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/logger.hpp"
@@ -96,8 +96,10 @@ namespace fiducial_vlam
     int bmm_cnt_every_n_msg_{0};
     std::unique_ptr<fvlam::MarkerMap> map_initial_;
     std::unique_ptr<fvlam::BuildMarkerMapInterface> bmm_interface_{};
-    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr observations_sub_{};
+    rclcpp::Subscription<fiducial_vlam_msgs::msg::ObservationsSynced>::SharedPtr sub_observations_{};
     bool pause_capture_{false};
+    bool map_environment_inited{false};
+    fvlam::MapEnvironment map_environment_{};
 
   public:
     BuildMarkerMapController(rclcpp::Node &node, fvlam::Logger &logger, VmapDiagnostics &diagnostics,
@@ -129,12 +131,25 @@ namespace fiducial_vlam
       }
 
       // Set up a subscriber for observations messages
-      (void) observations_sub_;
-      observations_sub_ = node_.create_subscription<fiducial_vlam_msgs::msg::Observations>(
+      (void) sub_observations_;
+      sub_observations_ = node_.create_subscription<fiducial_vlam_msgs::msg::ObservationsSynced>(
         psm_cxt.psm_sub_observations_topic_,
         rclcpp::QoS{rclcpp::ServicesQoS()},
-        [this](fiducial_vlam_msgs::msg::Observations::UniquePtr msg) -> void
+        [this](fiducial_vlam_msgs::msg::ObservationsSynced::UniquePtr msg) -> void
         {
+          // Check that these observations are from the same environment. We only work with
+          // one environment at a time.
+          auto map_environment = fvlam::MapEnvironment::from(msg->map_environment);
+          if (!map_environment_inited) {
+            map_environment_ = map_environment;
+          }
+          if (!map_environment_.equals(map_environment)) {
+            logger_.error() << "Map Environment has changed - Ignoring message\n"
+                            << "Expected: " << map_environment_.to_string() << "\n"
+                            << "Actual: " << map_environment.to_string();
+            return;
+          }
+
           diagnostics_.sub_observations_count_ += 1;
           bmm_cnt_every_n_msg_ += 1;
 
@@ -143,12 +158,11 @@ namespace fiducial_vlam
             bmm_cnt_every_n_msg_ = 0;
 
             // From the observations message, pick out the CameraInfo and Observations
-//            auto camera_info = fvlam::CameraInfo::from(msg->camera_info); todo Fix This
-            auto camera_info = fvlam::CameraInfo{};
-            auto observations = fvlam::Observations::from(*msg);
+            auto camera_info_map = fvlam::CameraInfoMap::from(*msg);
+            auto observations_synced = fvlam::ObservationsSynced::from(*msg);
 
             // Send these observations off for processing
-            bmm_interface_->process(observations, camera_info);
+            bmm_interface_->process(observations_synced, camera_info_map);
           }
         });
     }
@@ -217,8 +231,6 @@ namespace fiducial_vlam
     rclcpp::Publisher<fiducial_vlam_msgs::msg::Map>::SharedPtr pub_map_{};
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_visuals_{};
     rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr pub_tf_{};
-
-    rclcpp::Subscription<fiducial_vlam_msgs::msg::Observations>::SharedPtr sub_observations_{};
 
     rclcpp::TimerBase::SharedPtr map_pub_timer_{};
 
@@ -290,7 +302,6 @@ namespace fiducial_vlam
           timer_msg_callback();
         });
 
-      (void) sub_observations_;
       (void) map_pub_timer_;
       logger_.info()
         << "To build a map of markers - set the map_cmd parameter." << std::endl

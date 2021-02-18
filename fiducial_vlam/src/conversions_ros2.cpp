@@ -1,6 +1,7 @@
 
 #include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations.hpp"
+#include "fiducial_vlam_msgs/msg/observations_synced.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
@@ -33,6 +34,14 @@ namespace fvlam
     tf2::Quaternion q{r_.q().x(), r_.q().y(), r_.q().z(), r_.q().w()};
     tf2::Vector3 t{t_.x(), t_.y(), t_.z()};
     return tf2::Transform{q, t};
+  }
+
+  template<>
+  Transform3 Transform3::from<geometry_msgs::msg::Transform>(geometry_msgs::msg::Transform &other)
+  {
+    tf2::Transform tf;
+    tf2::fromMsg(other, tf);
+    return Transform3::from(tf);
   }
 
   template<>
@@ -117,6 +126,18 @@ namespace fvlam
   }
 
   template<>
+  CameraInfo CameraInfo::from<fiducial_vlam_msgs::msg::CameraInfo>(
+    fiducial_vlam_msgs::msg::CameraInfo &other)
+  {
+    auto &m = other;
+    return CameraInfo{m.imager_frame_id,
+                      m.width, m.height,
+                      (CameraMatrix() << m.fx, 0, m.cx, 0.0, m.fy, m.cy, 0.0, 0.0, 1.0).finished(),
+                      (DistCoeffs() << m.k1, m.k2, m.p1, m.p2, m.k3).finished(),
+                      Transform3::from(m.t_camera_imager)};
+  }
+
+  template<>
   fiducial_vlam_msgs::msg::CameraInfo CameraInfo::to<fiducial_vlam_msgs::msg::CameraInfo>() const
   {
     return fiducial_vlam_msgs::msg::CameraInfo{}
@@ -135,7 +156,19 @@ namespace fvlam
       .set__t_camera_imager(t_camera_imager_.to<geometry_msgs::msg::Transform>());
   }
 
-// ==============================================================================
+  template<>
+  CameraInfoMap CameraInfoMap::from<fiducial_vlam_msgs::msg::ObservationsSynced>(
+    fiducial_vlam_msgs::msg::ObservationsSynced &other)
+  {
+    auto camera_info_map = CameraInfoMap{};
+    for (auto &observations_msg : other.observations_synced) {
+      auto camera_info = CameraInfo::from(observations_msg.camera_info);
+      camera_info_map.emplace(camera_info.imager_frame_id(), camera_info);
+    }
+    return camera_info_map;
+  }
+
+  // ==============================================================================
 // from fvlam/marker.hpp
 // ==============================================================================
 
@@ -146,6 +179,13 @@ namespace fvlam
     return MapEnvironment{other.description,
                           other.marker_dictionary_id,
                           other.marker_length};
+  }
+
+  template<>
+  MapEnvironment MapEnvironment::from<fiducial_vlam_msgs::msg::ObservationsSynced>(
+    fiducial_vlam_msgs::msg::ObservationsSynced &other)
+  {
+    return MapEnvironment::from(other.map_environment);
   }
 
   template<>
@@ -232,18 +272,38 @@ namespace fvlam
   }
 
   template<>
+  Observation Observation::from<fiducial_vlam_msgs::msg::Observation>(
+    fiducial_vlam_msgs::msg::Observation &other)
+  {
+    return Observation{other.id,
+                       other.x0, other.y0,
+                       other.x1, other.y1,
+                       other.x2, other.y2,
+                       other.x3, other.y3};
+  }
+
+  template<>
   Observations Observations::from<fiducial_vlam_msgs::msg::Observations>(
     fiducial_vlam_msgs::msg::Observations &other)
   {
-    fvlam::Observations observations{fvlam::Stamp{}, ""}; // ToDo fix this
+    fvlam::Observations observations{other.camera_info.imager_frame_id};
     for (auto &obs : other.observations) {
-      observations.emplace_back(Observation(obs.id,
-                                            obs.x0, obs.y0,
-                                            obs.x1, obs.y1,
-                                            obs.x2, obs.y2,
-                                            obs.x3, obs.y3));
+      auto observation = Observation::from(obs);
+      observations.emplace_back(observation);
     }
     return observations;
+  }
+
+  template<>
+  ObservationsSynced ObservationsSynced::from<fiducial_vlam_msgs::msg::ObservationsSynced>(
+    fiducial_vlam_msgs::msg::ObservationsSynced &other)
+  {
+    auto stamp = Stamp::from(other.header.stamp);
+    auto observations_synced = ObservationsSynced{stamp, other.header.frame_id};
+    for (auto &observations_msg : other.observations_synced) {
+      observations_synced.emplace_back(Observations::from(observations_msg));
+    }
+    return observations_synced;
   }
 
   template<>
