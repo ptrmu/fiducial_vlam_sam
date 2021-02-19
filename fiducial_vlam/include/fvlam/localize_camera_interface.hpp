@@ -100,8 +100,7 @@ namespace fvlam
 
     // Look for fiducial markers in a gray image.
     virtual Observations detect_markers(cv::Mat &gray_image,
-                                        const std::string &camera_frame_id,
-                                        const Stamp &stamp) = 0;
+                                        const std::string &camera_frame_id) = 0;
 
     // Draw the boundary around detected markers.
     virtual void annotate_image_with_detected_markers(cv::Mat &color_image,

@@ -254,7 +254,7 @@ namespace fiducial_vlam
       // observations.
       auto imager_frame_id = cxt_.det_pub_imager_frame_id_.empty() ?
                              image_msg->header.frame_id : cxt_.det_pub_imager_frame_id_;
-      auto observations = fiducial_marker_->detect_markers(gray->image, imager_frame_id, stamp);
+      auto observations = fiducial_marker_->detect_markers(gray->image, imager_frame_id);
 
       auto camera_frame_id = cxt_.det_pub_camera_frame_id_.empty() ?
                              image_msg->header.frame_id : cxt_.det_pub_camera_frame_id_;
