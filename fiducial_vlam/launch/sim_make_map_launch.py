@@ -8,16 +8,16 @@ from launch_ros.actions import Node
 
 # A camera scanning markers
 #   Messages:
-#       /forward_camera/camera_info, gazebo->vloc_node, msg::CameraInfo, frame_id: base_link
-#       /forward_camera/image_raw, gazebo->vloc_node, msg::Image, frame_id: base_link
+#       /forward_camera/camera_info, gazebo->vloc_node, msg::CameraInfo, frame_id: camera_frame
+#       /forward_camera/image_raw, gazebo->vloc_node, msg::Image, frame_id: camera_frame
 #       /fiducial_map, vmap_node->vloc_node, msg::Map, frame_id: map
 #       /fiducial_visuals, vmap_node->, msg::Markers, frame_id: map
-#           /fiducial_observations, vloc_node->vmap_node, msg::ObservationsSynced, frame_id: map
-#           /forward_camera/image_marked, vloc_node->, msg::Image, frame_id: base_link
+#           /fiducial_observations, vloc_node->vmap_node, msg::ObservationsSynced, frame_id: camera_frame, imager_frame
+#           /forward_camera/image_marked, vloc_node->, msg::Image, frame_id: camera_frame
 #           /forward_camera/camera_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
 #           /forward_camera/camera_odom, vloc_node->, msg::Odometry, frame_id: map, camera_frame
 #           /forward_camera/base_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
-#           /forward_camera/base_odom, vloc_node->, msg::Odometry, frame_id: map, base_frame
+#           /forward_camera/base_odom, vloc_node->, msg::Odometry, frame_id: map, base_link
 
 vlam_package_share_directory = get_package_share_directory('fiducial_vlam')
 sim_package_share_directory = get_package_share_directory('sim_fiducial')

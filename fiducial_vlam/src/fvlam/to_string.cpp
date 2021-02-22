@@ -5,7 +5,7 @@
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
-#include "fvlam/observations_bundle.hpp"
+#include "fvlam/observations_series.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
 
 namespace fvlam
@@ -143,8 +143,8 @@ namespace fvlam
     NumFmt nf(9, 3);
 
     ss << "Map description: '" << description_
-    << "', dictionary id: " << marker_dictionary_id_
-    << ", marker_length: " << nf(marker_length_);
+       << "', dictionary id: " << marker_dictionary_id_
+       << ", marker_length: " << nf(marker_length_);
 
     return ss.str();
   }
@@ -185,12 +185,11 @@ namespace fvlam
   }
 
 // ==============================================================================
-// from fvlam/observations_bundle.hpp
+// from fvlam/observations_series.hpp
 // ==============================================================================
 
-  std::string ObservationsBundles::to_string(bool also_cov) const
+  std::string ObservationsSeries::to_string() const
   {
-    (void) also_cov;
     std::stringstream ss{};
     NumFmt nf(9, 3);
 
@@ -404,6 +403,13 @@ namespace fvlam
            test_fixed_matrices(dist_coeffs_, other.dist_coeffs_, tol, check_relative_also);
   }
 
+  bool CameraInfoMap::equals(const CameraInfoMap &other,
+                             double tol, bool check_relative_also) const
+  {
+    return equals_map(*this, other, tol, check_relative_also);
+
+  }
+
   bool Marker::equals(const Marker &other,
                       double tol, bool check_relative_also) const
   {
@@ -455,19 +461,19 @@ namespace fvlam
            equals_vector(*this, other, tol, check_relative_also);
   }
 
-  bool ObservationsBundle::equals(const ObservationsBundle &other,
+  bool ObservationsSynced::equals(const ObservationsSynced &other,
                                   double tol, bool check_relative_also) const
   {
-    return camera_info_.equals(other.camera_info_, tol, check_relative_also) &&
-           observations_.equals(other.observations_, tol, check_relative_also);
-
+    return stamp_.equals(other.stamp_, tol, check_relative_also) &&
+           camera_frame_id_ == other.camera_frame_id_ &&
+           equals_vector(*this, other, tol, check_relative_also);
   }
 
-  bool ObservationsBundles::equals(const ObservationsBundles &other,
-                                   double tol, bool check_relative_also) const
+  bool ObservationsSeries::equals(const ObservationsSeries &other,
+                                  double tol, bool check_relative_also) const
   {
     return map_.equals(other.map_, tol, check_relative_also) &&
-           equals_vector(bundles_, other.bundles_, tol, check_relative_also);
-
+           camera_info_map_.equals(other.camera_info_map_, tol, check_relative_also) &&
+           equals_vector(v(), other.v(), tol, check_relative_also);
   }
 }

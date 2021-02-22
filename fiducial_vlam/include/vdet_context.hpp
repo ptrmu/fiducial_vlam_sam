@@ -63,8 +63,8 @@ namespace fiducial_vlam
   PAMA_PARAM(det_pub_observations_topic, std::string, "observations") /* topic for publishing observations from this imager  */\
   /* Frame ids for published messages */\
   PAMA_PARAM(det_pub_image_marked_frame_id, std::string, "") /* frame_id for image_marked message if non-empty otherwise same as image_raw */\
-  PAMA_PARAM(det_pub_imager_frame_id, std::string, "") /* frame_id for CameraInfo message if non-empty otherwise same as image_raw */\
-  PAMA_PARAM(det_pub_camera_frame_id, std::string, "camera")  /* frame_id for ObservationSynced message if non-empty otherwise same as image_raw */\
+  PAMA_PARAM(det_pub_imager_frame_id, std::string, "imager_frame") /* frame_id for CameraInfo message if non-empty otherwise same as image_raw */\
+  PAMA_PARAM(det_pub_camera_frame_id, std::string, "")  /* frame_id for ObservationSynced message if non-empty otherwise same as image_raw */\
   /* End of list */
 
   struct VdetContext

@@ -204,6 +204,6 @@ namespace fvlam
 
     std::string to_string() const;
 
-    bool equals(const Observations &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+    bool equals(const ObservationsSynced &other, double tol = 1.0e-9, bool check_relative_also = true) const;
   };
 }

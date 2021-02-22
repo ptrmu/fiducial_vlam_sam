@@ -4,7 +4,7 @@
 #include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
-#include "fvlam/observations_bundle.hpp"
+#include "fvlam/observations_series.hpp"
 #include "fvlam/transform3_with_covariance.hpp"
 #include "opencv2/core/persistence.hpp"
 
@@ -316,6 +316,33 @@ namespace fvlam
   }
 
   template<>
+  CameraInfoMap CameraInfoMap::from<FileStorageContext::Node>(FileStorageContext::Node &other)
+  {
+    auto camera_info_map = CameraInfoMap{};
+
+    auto ci_node = other()["camera_infos"];
+    for (auto it = ci_node.begin(); it != ci_node.end(); ++it) {
+      auto ci_context = other.make(*it);
+      auto ci = CameraInfo::from(ci_context);
+      camera_info_map.emplace(ci.imager_frame_id(), ci);
+    }
+
+    return camera_info_map;
+  }
+
+  template<>
+  void CameraInfoMap::to<cv::FileStorage>(cv::FileStorage &other) const
+  {
+    other << "{";
+    other << "camera_infos" << "[";
+    for (auto &ci_pair : *this) {
+      ci_pair.second.to(other);
+    }
+    other << "]";
+    other << "}";
+  }
+
+  template<>
   Marker Marker::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
     // There are two formats for the serialization of markers. The original format
@@ -506,66 +533,93 @@ namespace fvlam
   void Observations::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "imager_frame_id" << imager_frame_id_;
-    other << "observations" << "[";
 
+    other << "imager_frame_id" << imager_frame_id_;
+
+    other << "observations" << "[";
     for (auto &observation : *this) {
       observation.to(other);
     }
-
     other << "]";
+
     other << "}";
   }
 
   template<>
-  ObservationsBundle ObservationsBundle::from<FileStorageContext::Node>(FileStorageContext::Node &other)
+  ObservationsSynced ObservationsSynced::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    auto camera_info_node = other.make(other()["camera_info"]);
-    auto camera_info = CameraInfo::from(camera_info_node);
-    auto observations_node = other.make(other()["observations"]);
-    auto observations = Observations::from(observations_node);
+    auto stamp_node = other()["stamp"];
+    auto stamp_context = other.make(stamp_node);
+    auto stamp = Stamp::from(stamp_context);
 
-    return ObservationsBundle{camera_info, observations};
-  }
+    std::string camera_frame_id = other()["camera_frame_id"].string();
 
-  template<>
-  void ObservationsBundle::to<cv::FileStorage>(cv::FileStorage &other) const
-  {
-    other << "{";
-    other << "camera_info";
-    camera_info_.to(other);
-    other << "observations";
-    observations_.to(other);
-    other << "}";
-  }
+    auto observations_synced = ObservationsSynced{stamp, camera_frame_id};
 
-  template<>
-  ObservationsBundles ObservationsBundles::from<FileStorageContext::Node>(FileStorageContext::Node &other)
-  {
-    auto map_node = other.make(other()["map"]);
-    auto map = MarkerMap::from(map_node);
-
-    ObservationsBundles bundles{map};
-    auto bundles_node = other()["bundles"];
-    for (auto it = bundles_node.begin(); it != bundles_node.end(); ++it) {
-      auto bundle_context = other.make(*it);
-      auto bundle = ObservationsBundle::from(bundle_context);
-      bundles.add_bundle(bundle);
+    auto v_node = other()["v"];
+    for (auto it = v_node.begin(); it != v_node.end(); ++it) {
+      auto v_context = other.make(*it);
+      auto v_item = Observations::from(v_context);
+      observations_synced.emplace_back(v_item);
     }
 
-    return bundles;
+    return observations_synced;
   }
 
   template<>
-  void ObservationsBundles::to<cv::FileStorage>(cv::FileStorage &other) const
+  void ObservationsSynced::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "map";
-    map_.to(other);
-    other << "bundles" << "[";
 
-    for (auto &bundle : bundles_) {
-      bundle.to(other);
+    other << "stamp";
+    stamp_.to(other);
+
+    other << "camera_frame_id" << camera_frame_id_;
+
+    other << "v" << "[";
+    for (auto &observations : *this) {
+      observations.to(other);
+    }
+    other << "]";
+
+    other << "}";
+  }
+
+  template<>
+  ObservationsSeries ObservationsSeries::from<FileStorageContext::Node>(FileStorageContext::Node &other)
+  {
+    auto map_node = other()["marker_map"];
+    auto map_context = other.make(map_node);
+    auto map = MarkerMap::from(map_context);
+
+    auto cim_node = other()["camera_info_map"];
+    auto cim_context = other.make(cim_node);
+    auto cim = CameraInfoMap::from(cim_context);
+
+    auto observations_series = ObservationsSeries{map, cim};
+
+    auto vector_node = other()["v"];
+    for (auto it = vector_node.begin(); it != vector_node.end(); ++it) {
+      auto observations_synced_context = other.make(*it);
+      auto observations_synced = ObservationsSynced::from(observations_synced_context);
+      observations_series.v_mutable().emplace_back(observations_synced);
+    }
+
+    return observations_series;
+  }
+
+  template<>
+  void ObservationsSeries::to<cv::FileStorage>(cv::FileStorage &other) const
+  {
+    other << "{";
+    other << "marker_map";
+    map_.to(other);
+    other << "camera_info_map";
+    camera_info_map_.to(other);
+    other << "v" << "[";
+
+    for (auto &observations_synced : v_) {
+      observations_synced.to(other);
     }
 
     other << "]";
@@ -606,34 +660,34 @@ namespace fvlam
 
 
 // ==============================================================================
-// ObservationsBundles save/load
+// ObservationsSeries save/load
 // ==============================================================================
 
-  void ObservationsBundles::save(const std::string &filename, Logger &logger) const
+  void ObservationsSeries::save(const std::string &filename, Logger &logger) const
   {
     cv::FileStorage fs(filename, cv::FileStorage::WRITE | cv::FileStorage::FORMAT_YAML);
     if (!fs.isOpened()) {
-      logger.error() << "Could not create MarkerMap file :" << filename;
+      logger.error() << "Could not create ObservationsSeries file :" << filename;
       return;
     }
 
-    fs << "observations_bundles";
+    fs << "observations_series";
     to(fs);
   }
 
-  ObservationsBundles ObservationsBundles::load(const std::string &filename, Logger &logger)
+  ObservationsSeries ObservationsSeries::load(const std::string &filename, Logger &logger)
   {
     cv::FileStorage fs(filename, cv::FileStorage::READ | cv::FileStorage::FORMAT_YAML);
     if (!fs.isOpened()) {
-      logger.error() << "Could not open ObservationsBundles file :" << filename;
-      return ObservationsBundles{MarkerMap{}};
+      logger.error() << "Could not open ObservationsSeries file :" << filename;
+      return ObservationsSeries{MarkerMap{}, CameraInfoMap{}};
     }
 
     FileStorageContext context{logger};
     auto root_node = context.make(fs.root());
-    auto observations_bundles_node = root_node.make(root_node()["observations_bundles"]);
+    auto observations_series_node = root_node.make(root_node()["observations_series"]);
 
-    auto map = ObservationsBundles::from(observations_bundles_node);
-    return context.success() ? map : ObservationsBundles{MarkerMap{}};
+    auto os = ObservationsSeries::from(observations_series_node);
+    return context.success() ? os : ObservationsSeries{MarkerMap{}, CameraInfoMap{}};
   }
 }
