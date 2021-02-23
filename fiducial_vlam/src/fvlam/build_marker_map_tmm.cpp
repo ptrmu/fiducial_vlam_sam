@@ -497,12 +497,12 @@ namespace fvlam
       // Prepare for full Pose optimization
       auto pose_graph = load_pose_graph(idix_list);
       if (logger_.output_debug()) {
-        pose_graph.print("pose_graph\n");
+//        pose_graph.print("pose_graph\n");
       }
 
       auto pose_initial = load_pose_initial(idix_list, pose_graph);
       if (logger_.output_debug()) {
-        pose_initial.print("pose_initial");
+//        pose_initial.print("pose_initial");
       }
       // Do the pose optimization
       gtsam::GaussNewtonParams params;

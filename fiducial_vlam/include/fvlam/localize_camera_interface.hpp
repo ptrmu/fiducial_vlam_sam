@@ -28,7 +28,7 @@ namespace fvlam
   class MarkerMap; //
 
 // ==============================================================================
-// BuildMarkerMapInterface class
+// LocalizeCameraInterface class
 // ==============================================================================
 
 // An interface used to localize a camera from fiducial marker observations.
