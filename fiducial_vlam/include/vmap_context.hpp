@@ -25,7 +25,10 @@ namespace fiducial_vlam
   PAMA_PARAM(map_init_pose_roll, double, M_PI_2)          /* pose component for map initialization */\
   PAMA_PARAM(map_init_pose_pitch, double, 0.)             /* pose component for map initialization */\
   PAMA_PARAM(map_init_pose_yaw, double, -M_PI_2)          /* pose component for map initialization */\
-  PAMA_PARAM(map_marker_length, double, 0.2100)           /* length of a side of a marker in meters */\
+  \
+  PAMA_PARAM(map_map_description, std::string, "A map")   /* Description of the map environment */ \
+  PAMA_PARAM(map_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \
+  PAMA_PARAM(map_marker_length, double, 0.2)              /* length of a side of a marker in meters */\
   \
   PAMA_PARAM(map_cmd, std::string, )                      /* commands to the build_marker_map system  */\
   PAMA_PARAM(map_corner_measurement_sigma, double, 2.0)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\

@@ -393,8 +393,7 @@ namespace fvlam
                                         const gtsam::NonlinearFactorGraph &pose_graph,
                                         const gtsam::Values &pose_result)
     {
-//      auto map = std::make_unique<MarkerMap>(map_initial_.marker_length()); todo: Fix this
-      auto map = std::make_unique<MarkerMap>();
+      auto map = std::make_unique<MarkerMap>(map_initial_.map_environment());
       gtsam::Marginals marginals{GtsamUtil::construct_marginals(pose_graph, pose_result)};
 
       for (const auto &key_value : pose_result) {

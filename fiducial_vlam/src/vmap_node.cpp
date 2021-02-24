@@ -454,10 +454,11 @@ namespace fiducial_vlam
     }
 
     // Copy markers from one map to another
-    std::unique_ptr<fvlam::MarkerMap> copy_markers(const fvlam::MarkerMap &map_from_file,
+    std::unique_ptr<fvlam::MarkerMap> copy_markers(const fvlam::MapEnvironment &me,
+                                                   const fvlam::MarkerMap &map_from_file,
                                                    bool copy_one_fixed_marker)
     {
-      auto map = std::make_unique<fvlam::MarkerMap>(map_from_file.map_environment());
+      auto map = std::make_unique<fvlam::MarkerMap>(me);
 
       for (auto &id_marker_pair : map_from_file) {
         if (!copy_one_fixed_marker ||
@@ -496,7 +497,12 @@ namespace fiducial_vlam
 
         // If we successfully read the map, then return it or just the fixed nodes.
         if (map_from_file.marker_length() != 0.0) {
-          auto map = copy_markers(map_from_file, map_is_new_not_existing);
+          auto me = map_from_file.map_environment().description().empty() ?
+                    fvlam::MapEnvironment{cxt_.map_map_description_,
+                                          cxt_.map_aruco_dictionary_id_,
+                                          map_from_file.map_environment().marker_length()} :
+                    map_from_file.map_environment();
+          auto map = copy_markers(me, map_from_file, map_is_new_not_existing);
           if (map) {
             return map;
           }
@@ -508,8 +514,11 @@ namespace fiducial_vlam
       }
 
       // Create a map with one marker defined by the parameters.
-//      auto map = std::make_unique<fvlam::MarkerMap>(cxt_.map_marker_length_); // Todo Fix this
-      auto map = std::make_unique<fvlam::MarkerMap>();
+      auto map = std::make_unique<fvlam::MarkerMap>(fvlam::MapEnvironment{
+        cxt_.map_map_description_,
+        cxt_.map_aruco_dictionary_id_,
+        cxt_.map_marker_length_});
+
       auto marker_new = fvlam::Marker(
         cxt_.map_init_id_, fvlam::Transform3WithCovariance{fvlam::Transform3{
           fvlam::Rotate3::RzRyRx(cxt_.map_init_pose_yaw_,
