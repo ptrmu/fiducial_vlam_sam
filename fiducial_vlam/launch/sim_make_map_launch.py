@@ -53,6 +53,7 @@ vloc_args = [{
 
 vmap_args = [{
     'map_marker_length': 0.1775,  # Marker length
+    'map_aruco_dictionary_id': 9,  # aruco marker dictionary
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
@@ -83,8 +84,8 @@ def generate_launch_description():
 
         Node(package='fiducial_vlam', executable='vloc_main', output='screen',
              parameters=vloc_args, namespace='forward_camera'),
-        # Node(package='fiducial_vlam', executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)
