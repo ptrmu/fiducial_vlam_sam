@@ -1,5 +1,6 @@
 
 #include "cv_bridge/cv_bridge.h"
+#include "fiducial_vlam_msgs/msg/map.hpp"
 #include "fiducial_vlam_msgs/msg/observations_synced.hpp"
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
@@ -48,6 +49,19 @@ namespace fiducial_vlam
 
     void report(fvlam::Logger &logger, const rclcpp::Time &end_time);
   };
+
+  struct SmmDiagnostics
+  {
+    std::uint64_t sub_map_count_{0};
+    rclcpp::Time start_time_;
+
+    explicit SmmDiagnostics(const rclcpp::Time &start_time) :
+      start_time_{start_time}
+    {}
+
+    void report(fvlam::Logger &logger, const rclcpp::Time &end_time);
+  };
+
 
 // ==============================================================================
 // ObservationPublisher class
@@ -135,7 +149,7 @@ namespace fiducial_vlam
 
   public:
     SingleObservationMaker(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
-                           ObservationMakerInterface::OnObservationCallback on_observation_callback) :
+                           const ObservationMakerInterface::OnObservationCallback &on_observation_callback) :
       node_{node}, logger_{logger}, cxt_{cxt},
       on_observation_callback_{on_observation_callback},
       diagnostics_{node.now()},
@@ -199,7 +213,7 @@ namespace fiducial_vlam
     }
 
     void report_diagnostics(fvlam::Logger &logger,
-                            const rclcpp::Time &end_time)
+                            const rclcpp::Time &end_time) override
     {
       (void) logger;
       (void) end_time;
@@ -314,12 +328,74 @@ namespace fiducial_vlam
   };
 
   template<>
-  std::unique_ptr<ObservationMakerInterface> make_observation_maker<class VdetContext>(
+  std::unique_ptr<ObservationMakerInterface> make_observation_maker<struct VdetContext>(
     VdetContext &cxt,
     rclcpp::Node &node,
     fvlam::Logger &logger,
-    ObservationMakerInterface::OnObservationCallback on_observation_callback)
+    const ObservationMakerInterface::OnObservationCallback &on_observation_callback)
   {
     return std::make_unique<SingleObservationMaker>(node, logger, cxt, on_observation_callback);
   }
+
+// ==============================================================================
+// MarkerMapSubscriber class
+// ==============================================================================
+
+  class MarkerMapSubscriber : public MarkerMapSubscriberInterface
+  {
+    rclcpp::Node &node_;
+    fvlam::Logger &logger_;
+    VdetContext &cxt_;
+    MarkerMapSubscriberInterface::OnMapEnvironmentChanged on_map_environment_changed_;
+
+    SmmDiagnostics diagnostics_;
+    fvlam::MarkerMap marker_map_{};
+    fvlam::MapEnvironment map_environment_{};
+
+    rclcpp::Subscription<fiducial_vlam_msgs::msg::Map>::SharedPtr sub_map_{};
+
+  public:
+    MarkerMapSubscriber(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
+                        const MarkerMapSubscriberInterface::OnMapEnvironmentChanged &on_map_environment_changed) :
+      node_{node}, logger_{logger}, cxt_{cxt},
+      on_map_environment_changed_{on_map_environment_changed},
+      diagnostics_{node.now()}
+    {
+      sub_map_ = node.create_subscription<fiducial_vlam_msgs::msg::Map>(
+        cxt_.det_sub_map_topic_,
+        1,
+        [this](const fiducial_vlam_msgs::msg::Map::UniquePtr msg) -> void
+        {
+          marker_map_ = fvlam::MarkerMap::from(*msg);
+          diagnostics_.sub_map_count_ += 1;
+          if (!map_environment_.equals(marker_map_.map_environment())) {
+            map_environment_ = marker_map_.map_environment();
+            on_map_environment_changed_(marker_map_);
+          }
+        });
+    }
+
+    fvlam::MarkerMap const &marker_map() const override
+    {
+      return marker_map_;
+    }
+
+    void report_diagnostics(fvlam::Logger &logger,
+                            const rclcpp::Time &end_time) override
+    {
+      (void) logger;
+      (void) end_time;
+    }
+  };
+
+  template<>
+  std::unique_ptr<MarkerMapSubscriberInterface> make_marker_map_subscriber<struct VdetContext>(
+    VdetContext &cxt,
+    rclcpp::Node &node,
+    fvlam::Logger &logger,
+    const MarkerMapSubscriberInterface::OnMapEnvironmentChanged &on_map_environment_changed)
+  {
+    return std::make_unique<MarkerMapSubscriber>(node, logger, cxt, on_map_environment_changed);
+  }
+
 }

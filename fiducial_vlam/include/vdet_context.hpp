@@ -52,7 +52,8 @@ namespace fiducial_vlam
   /* Subscription topics */\
   PAMA_PARAM(det_sub_image_raw_topic, std::string, "image_raw") /* topic for subscription to sensor_msgs::msg::Image (launch only) */\
   PAMA_PARAM(det_sub_camera_info_topic, std::string, "camera_info") /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  (launch only) */\
-  /* Subscription message quality */\
+  PAMA_PARAM(det_sub_map_topic, std::string, "/fiducial_map") /* topic for subscription to fiducial_vlam_msgs::msg::Map (launch only)  */\
+/* Subscription message quality */\
   PAMA_PARAM(det_sub_image_raw_best_effort_not_reliable, bool, true) /* subscribe to image_ros message with best_effort (gazebo camera) not reliable (tello_ros) (launch only) */\
   PAMA_PARAM(det_sub_camera_info_best_effort_not_reliable, bool, true) /* subscribe to camera_info message with best_effort (gazebo camera) not reliable (tello_ros) (launch only) */\
   /* Messages to publish */\

@@ -407,7 +407,6 @@ namespace fvlam
                              double tol, bool check_relative_also) const
   {
     return equals_map(*this, other, tol, check_relative_also);
-
   }
 
   bool Marker::equals(const Marker &other,
