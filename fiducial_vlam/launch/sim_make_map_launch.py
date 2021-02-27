@@ -38,7 +38,7 @@ corner_measurement_sigma = 2.0
 vloc_args = [{
     'loc_camera_algorithm': 0,
     'det_corner_refinement_method': 2,
-    'det_aruco_dictionary_id': 9,  # aruco marker dictionary
+    # 'det_aruco_dictionary_id': 9,  # aruco marker dictionary
     'det_pub_observations_topic': '/fiducial_observations',
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
     'psl_sub_camera_info_best_effort_not_reliable': True,
@@ -82,8 +82,8 @@ def generate_launch_description():
         Node(package='sim_fiducial', executable='inject_entity.py', output='screen',
              arguments=[elemental_camera_sdf, '0', '0', '0', '0', '0', '0']),
 
-        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
-             parameters=vloc_args, namespace='forward_camera'),
+        # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+        #      parameters=vloc_args, namespace='forward_camera'),
         Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]

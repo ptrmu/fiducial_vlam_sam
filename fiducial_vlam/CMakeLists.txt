@@ -110,6 +110,7 @@ set(VDET_NODE_SOURCES
   src/fvlam/conversions_gtsam.cpp
   src/fvlam/localize_camera_cv.cpp
   src/fvlam/localize_camera_gtsam.cpp
+  src/fvlam/to_string.cpp
   src/fvlam/transform3_with_covariance.cpp
   src/conversions_ros2.cpp
   src/vdet_node.cpp
@@ -170,6 +171,7 @@ set(VLOC_NODE_SOURCES
   src/fvlam/conversions_gtsam.cpp
   src/fvlam/localize_camera_cv.cpp
   src/fvlam/localize_camera_gtsam.cpp
+  src/fvlam/to_string.cpp
   src/fvlam/transform3_with_covariance.cpp
   src/conversions_ros2.cpp
   src/observation_maker.cpp

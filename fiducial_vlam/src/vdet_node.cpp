@@ -80,8 +80,8 @@ namespace fiducial_vlam
 
       // The observation_maker will capture the image and camera_info,
       // detect the markers in the image, and then publish the observations.
-      observation_maker_ = make_observation_maker(
-        cxt_, *this, logger_,
+      observation_maker_ = make_single_observation_maker(
+        cxt_, *this, logger_, fvlam::MapEnvironment{}, // Todo fix this
         [this](const fvlam::CameraInfoMap &,
                const fvlam::ObservationsSynced &) -> void
         {});

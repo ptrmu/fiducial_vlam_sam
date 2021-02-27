@@ -37,10 +37,7 @@ namespace fiducial_vlam
   //      det_pub_camera_frame_id - the camera frame_id
 
   #define VDET_ALL_PARAMS \
-  /* Aruco markers detection parameters - done by opencv */\
-  PAMA_PARAM(det_map_description, std::string, "the map") /* Description of the map environment */ \
-  PAMA_PARAM(det_aruco_dictionary_id, int, 0)             /* Aruco dictionary id for localization markers (launch only) */ \
-  PAMA_PARAM(det_marker_length, double, 0.2)              /* Length of sides of all the markers */ \
+  /* Aruco markers detection parameters - done by opencv */ \
   PAMA_PARAM(det_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* One or more imagers are components of a camera. This is the transform from this imager to the camera */\
   PAMA_PARAM(det_t_camera_imager_x, double, 0.)          /* imager->camera transform component */\

@@ -25,6 +25,7 @@ namespace fvlam
   class Logger; //
   class CameraInfo; //
   class CameraInfoMap; //
+  class MapEnvironment; //
   class MarkerMap; //
 
 // ==============================================================================
@@ -92,6 +93,22 @@ namespace fvlam
 // FiducialMarkerInterface class
 // ==============================================================================
 
+  struct FiducialMarkerContext
+  {
+    double border_color_red_{0.0};
+    double border_color_green_{1.0};
+    double border_color_blue_{0.0};
+//    int aruco_dictionary_id_{0};
+    int &corner_refinement_method_;
+
+    explicit FiducialMarkerContext(int &corner_refinement_method) :
+      corner_refinement_method_{corner_refinement_method}
+    {}
+
+    template<class T>
+    static FiducialMarkerContext from(T &other);
+  };
+
 // An interface used to deal with fiducial markers.
   class FiducialMarkerInterface
   {
@@ -113,27 +130,7 @@ namespace fvlam
                                                  double axis_length) = 0;
   };
 
-  template<class TFmContext>
-  std::unique_ptr<FiducialMarkerInterface> make_fiducial_marker(const TFmContext &fm_context,
+  std::unique_ptr<FiducialMarkerInterface> make_fiducial_marker(const FiducialMarkerContext &fm_context,
+                                                                const fvlam::MapEnvironment &map_environment,
                                                                 Logger &logger);
-
-// ==============================================================================
-// LocalizeCameraCvContext class
-// ==============================================================================
-
-  struct FiducialMarkerCvContext
-  {
-    double border_color_red_{0.0};
-    double border_color_green_{1.0};
-    double border_color_blue_{0.0};
-    int aruco_dictionary_id_{0};
-    int &corner_refinement_method_;
-
-    explicit FiducialMarkerCvContext(int &corner_refinement_method) :
-      corner_refinement_method_{corner_refinement_method}
-    {}
-
-    template<class T>
-    static FiducialMarkerCvContext from(T &other);
-  };
 }

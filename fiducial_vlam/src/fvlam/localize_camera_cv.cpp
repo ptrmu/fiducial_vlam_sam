@@ -126,13 +126,14 @@ namespace fvlam
   }
 
 // ==============================================================================
-// FiducialMarkerCv class
+// FiducialMarker class
 // ==============================================================================
 
 
-  class FiducialMarkerCv : public FiducialMarkerInterface
+  class FiducialMarker : public FiducialMarkerInterface
   {
-    FiducialMarkerCvContext fm_context_;
+    FiducialMarkerContext fm_context_;
+    fvlam::MapEnvironment map_environment_;
     Logger &logger_;
     cv::Ptr<cv::aruco::Dictionary> localization_aruco_dictionary_;
     cv::Scalar border_color_;
@@ -140,10 +141,12 @@ namespace fvlam
     cv::Scalar corner_color_;
 
   public:
-    FiducialMarkerCv(const FiducialMarkerCvContext &fm_context, Logger &logger) :
-      fm_context_{fm_context}, logger_{logger},
+    FiducialMarker(const FiducialMarkerContext &fm_context,
+                   const fvlam::MapEnvironment &map_environment,
+                   Logger &logger) :
+      fm_context_{fm_context}, map_environment_{map_environment}, logger_{logger},
       localization_aruco_dictionary_{cv::aruco::getPredefinedDictionary(
-        cv::aruco::PREDEFINED_DICTIONARY_NAME(fm_context.aruco_dictionary_id_))},
+        cv::aruco::PREDEFINED_DICTIONARY_NAME(map_environment.marker_dictionary_id()))},
       border_color_{fm_context_.border_color_red_ * 255,
                     fm_context_.border_color_green_ * 255,
                     fm_context_.border_color_blue_ * 255},
@@ -239,10 +242,11 @@ namespace fvlam
   };
 
 
-  template<>
-  std::unique_ptr<FiducialMarkerInterface> make_fiducial_marker<FiducialMarkerCvContext>(
-    const FiducialMarkerCvContext &fm_context, Logger &logger)
+  std::unique_ptr<FiducialMarkerInterface> make_fiducial_marker(
+    const FiducialMarkerContext &fm_context,
+    const fvlam::MapEnvironment &map_environment,
+    Logger &logger)
   {
-    return std::make_unique<FiducialMarkerCv>(fm_context, logger);
+    return std::make_unique<FiducialMarker>(fm_context, map_environment, logger);
   }
 }

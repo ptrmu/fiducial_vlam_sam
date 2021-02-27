@@ -20,14 +20,13 @@ namespace fvlam
 // ==============================================================================
 
   template<>
-  FiducialMarkerCvContext FiducialMarkerCvContext::from<fiducial_vlam::VdetContext>(
+  FiducialMarkerContext FiducialMarkerContext::from<fiducial_vlam::VdetContext>(
     fiducial_vlam::VdetContext &other)
   {
-    FiducialMarkerCvContext cxt{other.det_corner_refinement_method_};
+    FiducialMarkerContext cxt{other.det_corner_refinement_method_};
     cxt.border_color_red_ = 0;
     cxt.border_color_green_ = 1.0;
     cxt.border_color_blue_ = 0.;
-    cxt.aruco_dictionary_id_ = other.det_aruco_dictionary_id_;
     return cxt;
   }
 }
@@ -72,23 +71,23 @@ namespace fiducial_vlam
     rclcpp::Node &node_;
     fvlam::Logger &logger_;
     VdetContext &cxt_;
+    const fvlam::MapEnvironment &map_environment_;
     SomDiagnostics &diagnostics_;
 
     rclcpp::Publisher<fiducial_vlam_msgs::msg::ObservationsSynced>::SharedPtr pub_observations_{};
 
   public:
     ObservationPublisher(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
-                         SomDiagnostics &diagnostics) :
-      node_{node}, logger_{logger}, cxt_{cxt}, diagnostics_{diagnostics}
+                         const fvlam::MapEnvironment &map_environment, SomDiagnostics &diagnostics) :
+      node_{node}, logger_{logger}, cxt_{cxt},
+      map_environment_{map_environment}, diagnostics_{diagnostics}
     {}
 
     void publish_observations_synced(const fvlam::CameraInfoMap &camera_info_map,
                                      const fvlam::ObservationsSynced &observations_synced)
     {
       // Start by creating a MapEnvironment
-      auto map_environment_msg = fvlam::MapEnvironment{
-        cxt_.det_map_description_, cxt_.det_aruco_dictionary_id_, cxt_.det_marker_length_}
-        .to<fiducial_vlam_msgs::msg::MapEnvironment>();
+      auto map_environment_msg = map_environment_.to<fiducial_vlam_msgs::msg::MapEnvironment>();
 
       // Create the ObservationSynced message.
       auto msg = fiducial_vlam_msgs::msg::ObservationsSynced{}
@@ -131,6 +130,7 @@ namespace fiducial_vlam
     rclcpp::Node &node_;
     fvlam::Logger &logger_;
     VdetContext &cxt_;
+    fvlam::MapEnvironment map_environment_;
     ObservationMakerInterface::OnObservationCallback on_observation_callback_;
 
     SomDiagnostics diagnostics_;
@@ -149,15 +149,16 @@ namespace fiducial_vlam
 
   public:
     SingleObservationMaker(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
+                           const fvlam::MapEnvironment &map_environment,
                            const ObservationMakerInterface::OnObservationCallback &on_observation_callback) :
-      node_{node}, logger_{logger}, cxt_{cxt},
+      node_{node}, logger_{logger}, cxt_{cxt}, map_environment_{map_environment},
       on_observation_callback_{on_observation_callback},
       diagnostics_{node.now()},
-      observation_publisher_{node, logger, cxt, diagnostics_}
+      observation_publisher_{node, logger, cxt, map_environment_, diagnostics_}
     {
       // Initialize work objects after parameters have been loaded.
-      auto fiducial_marker_context = fvlam::FiducialMarkerCvContext::from(cxt_);
-      fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, logger_);
+      auto fiducial_marker_context = fvlam::FiducialMarkerContext::from(cxt_);
+      fiducial_marker_ = make_fiducial_marker(fiducial_marker_context, map_environment_, logger_);
 
       // ROS subscriptions
       auto camera_info_qos = cxt_.det_sub_camera_info_best_effort_not_reliable_ ?
@@ -327,14 +328,14 @@ namespace fiducial_vlam
     }
   };
 
-  template<>
-  std::unique_ptr<ObservationMakerInterface> make_observation_maker<struct VdetContext>(
+  std::unique_ptr<ObservationMakerInterface> make_single_observation_maker(
     VdetContext &cxt,
     rclcpp::Node &node,
     fvlam::Logger &logger,
+    const fvlam::MapEnvironment &map_environment,
     const ObservationMakerInterface::OnObservationCallback &on_observation_callback)
   {
-    return std::make_unique<SingleObservationMaker>(node, logger, cxt, on_observation_callback);
+    return std::make_unique<SingleObservationMaker>(node, logger, cxt, map_environment, on_observation_callback);
   }
 
 // ==============================================================================
@@ -370,7 +371,7 @@ namespace fiducial_vlam
           diagnostics_.sub_map_count_ += 1;
           if (!map_environment_.equals(marker_map_.map_environment())) {
             map_environment_ = marker_map_.map_environment();
-            on_map_environment_changed_(marker_map_);
+            on_map_environment_changed_(marker_map_.map_environment());
           }
         });
     }
@@ -388,8 +389,7 @@ namespace fiducial_vlam
     }
   };
 
-  template<>
-  std::unique_ptr<MarkerMapSubscriberInterface> make_marker_map_subscriber<struct VdetContext>(
+  std::unique_ptr<MarkerMapSubscriberInterface> make_marker_map_subscriber(
     VdetContext &cxt,
     rclcpp::Node &node,
     fvlam::Logger &logger,

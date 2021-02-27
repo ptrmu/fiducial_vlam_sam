@@ -99,11 +99,12 @@ namespace fiducial_vlam
     VdetContext det_cxt_{};
     PslContext psl_cxt_{};
 
+    std::unique_ptr<MarkerMapSubscriberInterface> marker_map_subscriber_{};
     std::unique_ptr<ObservationMakerInterface> observation_maker_{};
 
     std::unique_ptr<fvlam::LocalizeCameraInterface> localize_camera_{};
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
-    fvlam::MarkerMap marker_map_{};
+//    fvlam::MarkerMap marker_map_{};
 
     bool current_loc_camera_algorithm_{};
 
@@ -185,12 +186,17 @@ namespace fiducial_vlam
       // Get parameters from the command line
       setup_parameters();
 
-      observation_maker_ = make_observation_maker(
+      marker_map_subscriber_ = make_marker_map_subscriber(
         det_cxt_, *this, logger_,
-        [this](const fvlam::CameraInfoMap &camera_info_map,
-               const fvlam::ObservationsSynced &observations_synced) -> void
+        [this](const fvlam::MapEnvironment &map_environment) -> void
         {
-          on_observation_callback(camera_info_map, observations_synced);
+          observation_maker_ = make_single_observation_maker(
+            det_cxt_, *this, logger_, map_environment,
+            [this](const fvlam::CameraInfoMap &camera_info_map,
+                   const fvlam::ObservationsSynced &observations_synced) -> void
+            {
+              on_observation_callback(camera_info_map, observations_synced);
+            });
         });
 
 #if 0
@@ -249,7 +255,6 @@ namespace fiducial_vlam
           last_image_stamp_ = stamp;
           diagnostics_.sub_image_raw_count_ += 1;
         });
-#endif
 
       sub_map_ = create_subscription<fiducial_vlam_msgs::msg::Map>(
         psl_cxt_.psl_sub_map_topic_,
@@ -259,6 +264,7 @@ namespace fiducial_vlam
           marker_map_ = fvlam::MarkerMap::from(*msg);
           diagnostics_.sub_map_count_ += 1;
         });
+#endif
 
       // Timer for publishing map info
       timer_ = create_wall_timer(
@@ -271,12 +277,12 @@ namespace fiducial_vlam
       logger_.info()
         << "Using opencv " << CV_VERSION_MAJOR << "."
         << CV_VERSION_MINOR << "." << CV_VERSION_REVISION << "\n"
-//        << "To calibrate camera - set cal_cmd parameter.\n"
-//        << "  cal_cmd capture - Capture an image and add it to the set of calibration images.\n"
-//        << "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.\n"
-//        << "  cal_cmd status - Report on the number of images in the set of calibration images.\n"
-//        << "  cal_cmd load_images - Load the set of calibration images from files.\n"
-//        << "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.\n"
+        //        << "To calibrate camera - set cal_cmd parameter.\n"
+        //        << "  cal_cmd capture - Capture an image and add it to the set of calibration images.\n"
+        //        << "  cal_cmd calibrate - Take the set of calibration images, do a calibration, and save images, calibration and a report to files.\n"
+        //        << "  cal_cmd status - Report on the number of images in the set of calibration images.\n"
+        //        << "  cal_cmd load_images - Load the set of calibration images from files.\n"
+        //        << "  cal_cmd reset - first time: clear the calibration, second time: clear the set of calibration images.\n"
         << "vloc_node ready";
 
       (void) sub_camera_info_;
@@ -289,7 +295,8 @@ namespace fiducial_vlam
                                  const fvlam::ObservationsSynced &observations_synced)
     {
       // Find the camera pose from the observations.
-      auto t_map_camera = get_lc().solve_t_map_camera(observations_synced, camera_info_map, marker_map_);
+      auto t_map_camera = get_lc().solve_t_map_camera(
+        observations_synced, camera_info_map, marker_map_subscriber_->marker_map());
 
       if (!t_map_camera.is_valid()) {
         diagnostics_.invalid_t_map_camera_count_ += 1;

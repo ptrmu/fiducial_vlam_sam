@@ -17,11 +17,14 @@ namespace fvlam
   class CameraInfoMap;//
   class Logger; //
   class ObservationsSynced; //
+  class MapEnvironment; //
   class MarkerMap; //
 }
 
 namespace fiducial_vlam
 {
+  class VdetContext;
+
 // ==============================================================================
 // ObservationMakerInterface class
 // ==============================================================================
@@ -38,6 +41,14 @@ namespace fiducial_vlam
                                     const rclcpp::Time &end_time) = 0;
   };
 
+  std::unique_ptr<ObservationMakerInterface> make_single_observation_maker(
+    VdetContext &cxt,
+    rclcpp::Node &node,
+    fvlam::Logger &logger,
+    const fvlam::MapEnvironment &map_environment,
+    const ObservationMakerInterface::OnObservationCallback &on_observation_callback);
+
+
   template<class TContext>
   std::unique_ptr<ObservationMakerInterface> make_observation_maker(
     TContext &cxt,
@@ -52,7 +63,7 @@ namespace fiducial_vlam
   class MarkerMapSubscriberInterface
   {
   public:
-    using OnMapEnvironmentChanged = std::function<void(const fvlam::MarkerMap &marker_map)>;
+    using OnMapEnvironmentChanged = std::function<void(const fvlam::MapEnvironment &map_environment)>;
 
     virtual ~MarkerMapSubscriberInterface() = default;
 
@@ -62,9 +73,8 @@ namespace fiducial_vlam
                                     const rclcpp::Time &end_time) = 0;
   };
 
-  template<class TContext>
   std::unique_ptr<MarkerMapSubscriberInterface> make_marker_map_subscriber(
-    TContext &cxt,
+    VdetContext &cxt,
     rclcpp::Node &node,
     fvlam::Logger &logger,
     const MarkerMapSubscriberInterface::OnMapEnvironmentChanged &on_map_environment_changed);
