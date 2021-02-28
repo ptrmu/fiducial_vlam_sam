@@ -182,13 +182,6 @@ namespace fvlam
   }
 
   template<>
-  MapEnvironment MapEnvironment::from<fiducial_vlam_msgs::msg::ObservationsSynced>(
-    fiducial_vlam_msgs::msg::ObservationsSynced &other)
-  {
-    return MapEnvironment::from(other.map_environment);
-  }
-
-  template<>
   fiducial_vlam_msgs::msg::MapEnvironment MapEnvironment::to<fiducial_vlam_msgs::msg::MapEnvironment>() const
   {
     return fiducial_vlam_msgs::msg::MapEnvironment{}

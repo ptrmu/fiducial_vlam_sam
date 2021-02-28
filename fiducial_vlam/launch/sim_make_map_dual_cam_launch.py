@@ -5,6 +5,24 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
 
+# Two cameras scanning markers
+#   Messages:
+#       /dual_camera/left/camera_info, gazebo->vdet_node, msg::CameraInfo, frame_id: left_imager_frame
+#       /dual_camera/left/image_raw, gazebo->vdet_node, msg::Image, frame_id: left_imager_frame
+#       /dual_camera/right/camera_info, gazebo->vdet_node, msg::CameraInfo, frame_id: right_imager_frame
+#       /dual_camera/right/image_raw, gazebo->vdet_node, msg::Image, frame_id: right_imager_frame
+#       /fiducial_map, vmap_node->vloc_node, msg::Map, frame_id: map
+#       /fiducial_visuals, vmap_node->, msg::Markers, frame_id: map
+#           /dual_camera/left/image_marked, vdet_node->, msg::Image, frame_id: left_imager_frame
+#           /dual_camera/left/observations, vdet_node->vloc_node, msg::ObservationsSynced, frame_id: camera_frame, left_imager_frame
+#           /dual_camera/right/image_marked, vdet_node->, msg::Image, frame_id: right_imager_frame
+#           /dual_camera/right/observations, vdet_node->vloc_node, msg::ObservationsSynced, frame_id: camera_frame, right_imager_frame
+#               /fiducial_observations, vloc_node->vmap_node, msg::ObservationsSynced, frame_id: camera_frame, left_imager_frame, right_imager_frame
+#               /dual_camera/camera_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
+#               /dual_camera/camera_odom, vloc_node->, msg::Odometry, frame_id: map, camera_frame
+#               /dual_camera/base_pose, vloc_node->, msg::PoseWithCovariance, frame_id: map
+#               /dual_camera/base_odom, vloc_node->, msg::Odometry, frame_id: map, base_link
+
 vlam_package_share_directory = get_package_share_directory('fiducial_vlam')
 sim_package_share_directory = get_package_share_directory('sim_fiducial')
 
@@ -24,21 +42,17 @@ camera_sdf = os.path.join(sdf_directory, 'dual_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vdet_left_args = [{
-    'det_aruco_dictionary_id': 9,  # aruco marker dictionary
-    'det_marker_length': 0.1775,  # Marker length
     'det_t_camera_imager_y': 0.2,
-    'det_pub_observations_frame_id': 'base_link',
-    'det_pub_camera_info_frame_id': 'left_camera',
-    'det_pub_image_marked_frame_id': 'left_camera'
+    'det_pub_camera_frame_id': 'camera_frame',
+    'det_pub_imager_frame_id': 'left_image_frame',
+    'det_pub_image_marked_frame_id': 'left_image_frame'
 }]
 
 vdet_right_args = [{
-    'det_aruco_dictionary_id': 9,  # aruco marker dictionary
-    'det_marker_length': 0.1775,  # Marker length
     'det_t_camera_imager_y': -0.2,
-    'det_pub_observations_frame_id': 'base_link',
-    'det_pub_camera_info_frame_id': 'right_camera',
-    'det_pub_image_marked_frame_id': 'right_camera'
+    'det_pub_camera_frame_id': 'camera_frame',
+    'det_pub_imager_frame_id': 'right_image_frame',
+    'det_pub_image_marked_frame_id': 'right_image_frame'
 }]
 
 vloc_args = [{
@@ -60,6 +74,7 @@ vloc_args = [{
 
 vmap_args = [{
     'map_marker_length': 0.1775,  # Marker length
+    'map_aruco_dictionary_id': 9,  # aruco marker dictionary
     'map_save_filename': created_map_filename,
     'map_load_filename': existing_map_filename,
     'map_corner_measurement_sigma': corner_measurement_sigma,
@@ -93,8 +108,8 @@ def generate_launch_description():
 
         # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
         #      parameters=vloc_args, namespace='dual_camera_x'),
-        # Node(package='fiducial_vlam', executable='vmap_main', output='screen',
-        #      parameters=vmap_args),
+        Node(package='fiducial_vlam', executable='vmap_main', output='screen',
+             parameters=vmap_args),
     ]
 
     return LaunchDescription(entities)

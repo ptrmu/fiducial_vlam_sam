@@ -45,6 +45,7 @@ namespace fiducial_vlam
 
     VdetContext cxt_{};
 
+    std::unique_ptr<MarkerMapSubscriberInterface> marker_map_subscriber_{};
     std::unique_ptr<ObservationMakerInterface> observation_maker_{};
 
     void validate_parameters()
@@ -78,13 +79,19 @@ namespace fiducial_vlam
       // Get parameters from the command line
       setup_parameters();
 
-      // The observation_maker will capture the image and camera_info,
-      // detect the markers in the image, and then publish the observations.
-      observation_maker_ = make_single_observation_maker(
-        cxt_, *this, logger_, fvlam::MapEnvironment{}, // Todo fix this
-        [this](const fvlam::CameraInfoMap &,
-               const fvlam::ObservationsSynced &) -> void
-        {});
+      marker_map_subscriber_ = make_marker_map_subscriber(
+        cxt_, *this, logger_,
+        [this](const fvlam::MapEnvironment &map_environment) -> void
+        {
+          // The observation_maker will capture the image and camera_info,
+          // detect the markers in the image, and then publish the observations.
+          observation_maker_ = make_single_observation_maker(
+            cxt_, *this, logger_, map_environment,
+            [this](const fvlam::CameraInfoMap &,
+                   const fvlam::ObservationsSynced &) -> void
+            {});
+        });
+
 
       logger_.info() << "vdet_node ready";
     }

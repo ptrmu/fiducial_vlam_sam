@@ -106,7 +106,7 @@ namespace fiducial_vlam
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
 //    fvlam::MarkerMap marker_map_{};
 
-    bool current_loc_camera_algorithm_{};
+    int current_loc_camera_algorithm_{};
 
     std::unique_ptr<sensor_msgs::msg::CameraInfo> camera_info_msg_{};
     std_msgs::msg::Header::_stamp_type last_image_stamp_{};

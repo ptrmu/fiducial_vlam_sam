@@ -137,19 +137,6 @@ namespace fiducial_vlam
         rclcpp::QoS{rclcpp::ServicesQoS()},
         [this](fiducial_vlam_msgs::msg::ObservationsSynced::UniquePtr msg) -> void
         {
-          // Check that these observations are from the same environment. We only work with
-          // one environment at a time.
-          auto map_environment = fvlam::MapEnvironment::from(msg->map_environment);
-          if (!map_environment_inited) {
-            map_environment_ = map_environment;
-          }
-          if (!map_environment_.equals(map_environment)) {
-            logger_.error() << "Map Environment has changed - Ignoring message\n"
-                            << "Expected: " << map_environment_.to_string() << "\n"
-                            << "Actual: " << map_environment.to_string();
-            return;
-          }
-
           diagnostics_.sub_observations_count_ += 1;
           bmm_cnt_every_n_msg_ += 1;
 

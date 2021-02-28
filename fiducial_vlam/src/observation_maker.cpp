@@ -86,15 +86,11 @@ namespace fiducial_vlam
     void publish_observations_synced(const fvlam::CameraInfoMap &camera_info_map,
                                      const fvlam::ObservationsSynced &observations_synced)
     {
-      // Start by creating a MapEnvironment
-      auto map_environment_msg = map_environment_.to<fiducial_vlam_msgs::msg::MapEnvironment>();
-
       // Create the ObservationSynced message.
       auto msg = fiducial_vlam_msgs::msg::ObservationsSynced{}
         .set__header(std_msgs::msg::Header{}
                        .set__stamp(observations_synced.stamp().to<builtin_interfaces::msg::Time>())
-                       .set__frame_id(observations_synced.camera_frame_id()))
-        .set__map_environment(map_environment_msg);
+                       .set__frame_id(observations_synced.camera_frame_id()));
 
       // Add the observattions
       for (auto &observations : observations_synced) {
