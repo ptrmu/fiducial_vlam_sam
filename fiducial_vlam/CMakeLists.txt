@@ -56,6 +56,7 @@ find_package(class_loader REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(fiducial_vlam_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(message_filters REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
@@ -175,6 +176,7 @@ set(VLOC_NODE_SOURCES
   src/fvlam/transform3_with_covariance.cpp
   src/conversions_ros2.cpp
   src/observation_maker.cpp
+  src/observation_maker_multi.cpp
   src/vloc_node.cpp
   )
 
@@ -183,6 +185,7 @@ set(VLOC_NODE_DEPS
   class_loader
   cv_bridge
   fiducial_vlam_msgs
+  message_filters
   ${MY_GTSAM_LIB}
   nav_msgs
   OpenCV

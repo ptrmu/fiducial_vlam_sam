@@ -23,7 +23,8 @@ namespace fvlam
 
 namespace fiducial_vlam
 {
-  class VdetContext;
+  class VdetContext; //
+  class VlocContext; //
 
 // ==============================================================================
 // ObservationMakerInterface class
@@ -48,6 +49,11 @@ namespace fiducial_vlam
     const fvlam::MapEnvironment &map_environment,
     const ObservationMakerInterface::OnObservationCallback &on_observation_callback);
 
+  std::unique_ptr<ObservationMakerInterface> make_multi_observation_maker(
+    VlocContext &cxt,
+    rclcpp::Node &node,
+    fvlam::Logger &logger,
+    const ObservationMakerInterface::OnObservationCallback &on_observation_callback);
 
   template<class TContext>
   std::unique_ptr<ObservationMakerInterface> make_observation_maker(

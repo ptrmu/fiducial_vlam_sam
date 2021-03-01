@@ -87,6 +87,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\
   PAMA_PARAM(loc_use_marker_covariance, bool, false)      /* When localizing a camera, use the covariance stored in the marker. */\
   /* Subscription topics */\
+  PAMA_PARAM(loc_sub_multi_observations_topic, std::string, "") /* topic for subscription to observations from vdet_nodes. separate with ":" (launch_only)  */\
   PAMA_PARAM(loc_sub_map_topic, std::string, "/fiducial_map") /* topic for subscription to fiducial_vlam_msgs::msg::Map (launch only)  */\
   /* Messages to publish */\
   PAMA_PARAM(loc_pub_observations_enable, bool, true)     /* publish the observations at every frame  */\

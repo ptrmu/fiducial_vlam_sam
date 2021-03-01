@@ -190,13 +190,27 @@ namespace fiducial_vlam
         det_cxt_, *this, logger_,
         [this](const fvlam::MapEnvironment &map_environment) -> void
         {
-          observation_maker_ = make_single_observation_maker(
-            det_cxt_, *this, logger_, map_environment,
-            [this](const fvlam::CameraInfoMap &camera_info_map,
-                   const fvlam::ObservationsSynced &observations_synced) -> void
-            {
-              on_observation_callback(camera_info_map, observations_synced);
-            });
+          // Create an observation_maker single or multi depending on whether the
+          // loc_sub_multi_observations_topic_ parameter is blank.
+          if (cxt_.loc_sub_multi_observations_topic_.empty()) {
+            observation_maker_ = make_single_observation_maker(
+              det_cxt_, *this, logger_, map_environment,
+              [this](const fvlam::CameraInfoMap &camera_info_map,
+                     const fvlam::ObservationsSynced &observations_synced) -> void
+              {
+                on_observation_callback(camera_info_map, observations_synced);
+              });
+          }
+
+          else {
+            observation_maker_ = make_multi_observation_maker(
+              cxt_, *this, logger_,
+              [this](const fvlam::CameraInfoMap &camera_info_map,
+                     const fvlam::ObservationsSynced &observations_synced) -> void
+              {
+                on_observation_callback(camera_info_map, observations_synced);
+              });
+          }
         });
 
 #if 0
