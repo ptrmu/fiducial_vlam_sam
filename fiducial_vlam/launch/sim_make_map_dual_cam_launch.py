@@ -56,9 +56,8 @@ vdet_right_args = [{
 }]
 
 vloc_args = [{
-    'loc_camera_algorithm': 1,
-    'loc_corner_refinement_method': 2,
-    'loc_aruco_dictionary_id': 9,  # aruco marker dictionary
+    'loc_camera_algorithm': 0,
+    'loc_sub_multi_observations_topic': '/dual_camera/left/observations:/dual_camera/right/observations',
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
     'psl_sub_camera_info_topic': 'right/camera_info',
     'psl_sub_camera_info_best_effort_not_reliable': True,
@@ -106,8 +105,8 @@ def generate_launch_description():
         Node(package='fiducial_vlam', executable='vdet_main', output='screen',
              parameters=vdet_right_args, namespace='/dual_camera/right'),
 
-        # Node(package='fiducial_vlam', executable='vloc_main', output='screen',
-        #      parameters=vloc_args, namespace='dual_camera_x'),
+        Node(package='fiducial_vlam', executable='vloc_main', output='screen',
+             parameters=vloc_args),
         Node(package='fiducial_vlam', executable='vmap_main', output='screen',
              parameters=vmap_args),
     ]
