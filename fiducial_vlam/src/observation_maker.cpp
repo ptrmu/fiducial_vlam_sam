@@ -66,21 +66,18 @@ namespace fiducial_vlam
 // ObservationPublisher class
 // ==============================================================================
 
-  class ObservationPublisher
+  class ObservationPublisher : public ObservationPublisherInterface
   {
     rclcpp::Node &node_;
     fvlam::Logger &logger_;
-    VdetContext &cxt_;
-    const fvlam::MapEnvironment &map_environment_;
-    SomDiagnostics &diagnostics_;
+    const std::string &pub_observations_synced_topic_;
 
     rclcpp::Publisher<fiducial_vlam_msgs::msg::ObservationsSynced>::SharedPtr pub_observations_{};
 
   public:
-    ObservationPublisher(rclcpp::Node &node, fvlam::Logger &logger, VdetContext &cxt,
-                         const fvlam::MapEnvironment &map_environment, SomDiagnostics &diagnostics) :
-      node_{node}, logger_{logger}, cxt_{cxt},
-      map_environment_{map_environment}, diagnostics_{diagnostics}
+    ObservationPublisher(rclcpp::Node &node, fvlam::Logger &logger,
+                         const std::string &pub_observations_synced_topic) :
+      node_{node}, logger_{logger}, pub_observations_synced_topic_{pub_observations_synced_topic}
     {}
 
     void publish_observations_synced(const fvlam::CameraInfoMap &camera_info_map,
@@ -110,12 +107,28 @@ namespace fiducial_vlam
       // Publish the message.
       if (!pub_observations_) {
         pub_observations_ = node_.create_publisher<fiducial_vlam_msgs::msg::ObservationsSynced>(
-          cxt_.det_pub_observations_topic_, 2);
+          pub_observations_synced_topic_, 2);
       }
       pub_observations_->publish(msg);
-      diagnostics_.pub_observations_count_ += 1;
+//      diagnostics_.pub_observations_count_ += 1;
+    }
+
+    void report_diagnostics(fvlam::Logger &logger,
+                            const rclcpp::Time &end_time) override
+    {
+      (void) logger;
+      (void) end_time;
     }
   };
+
+
+  std::unique_ptr<ObservationPublisherInterface> make_observation_publisher(
+    rclcpp::Node &node,
+    fvlam::Logger &logger,
+    const std::string &pub_observations_synced_topic)
+  {
+    return std::make_unique<ObservationPublisher>(node, logger, pub_observations_synced_topic);
+  }
 
 // ==============================================================================
 // SingleObservationMaker class
@@ -131,7 +144,7 @@ namespace fiducial_vlam
 
     SomDiagnostics diagnostics_;
 
-    ObservationPublisher observation_publisher_;
+    std::unique_ptr<ObservationPublisherInterface> observation_publisher_;
 
     std::unique_ptr<fvlam::FiducialMarkerInterface> fiducial_marker_{};
 
@@ -150,7 +163,7 @@ namespace fiducial_vlam
       node_{node}, logger_{logger}, cxt_{cxt}, map_environment_{map_environment},
       on_observation_callback_{on_observation_callback},
       diagnostics_{node.now()},
-      observation_publisher_{node, logger, cxt, map_environment_, diagnostics_}
+      observation_publisher_{make_observation_publisher(node, logger, cxt.det_pub_observations_topic_)}
     {
       // Initialize work objects after parameters have been loaded.
       auto fiducial_marker_context = fvlam::FiducialMarkerContext::from(cxt_);
@@ -170,7 +183,7 @@ namespace fiducial_vlam
           // the next camera_info message is received. Due to the timing of image_raw
           // and camera_info messages, this message may be used for processing zero,
           // one, or two image_raw messages.
-          camera_info_msg_ = msg;
+          camera_info_msg_ = std::move(msg);
           diagnostics_.sub_camera_info_count_ += 1;
         });
 
@@ -316,7 +329,7 @@ namespace fiducial_vlam
 
       // publish the observations if requested
       if (cxt_.det_pub_observations_enable_) {
-        observation_publisher_.publish_observations_synced(camera_info_map, observations_synced);
+        observation_publisher_->publish_observations_synced(camera_info_map, observations_synced);
       }
 
       // Callback with the observations.

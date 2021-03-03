@@ -63,6 +63,27 @@ namespace fiducial_vlam
     const ObservationMakerInterface::OnObservationCallback &on_observation_callback);
 
 // ==============================================================================
+// ObservationMakerInterface class
+// ==============================================================================
+
+  class ObservationPublisherInterface
+  {
+  public:
+    virtual ~ObservationPublisherInterface() = default;
+
+    virtual void publish_observations_synced(const fvlam::CameraInfoMap &camera_info_map,
+                                             const fvlam::ObservationsSynced &observations_synced) = 0;
+
+    virtual void report_diagnostics(fvlam::Logger &logger,
+                                    const rclcpp::Time &end_time) = 0;
+  };
+
+  std::unique_ptr<ObservationPublisherInterface> make_observation_publisher(
+    rclcpp::Node &node,
+    fvlam::Logger &logger,
+    const std::string &pub_observations_synced_topic);
+
+// ==============================================================================
 // MarkerMapSubscriberInterface class
 // ==============================================================================
 
