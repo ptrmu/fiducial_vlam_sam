@@ -195,9 +195,10 @@ namespace fvlam
 // MarkerMap class
 // ==============================================================================
 
-  class MarkerMap : public std::map<std::uint64_t, Marker>
+  class MarkerMap
   {
     MapEnvironment map_environment_;
+    std::map<std::uint64_t, Marker> m_{};
 
   public:
     explicit MarkerMap() :
@@ -214,6 +215,18 @@ namespace fvlam
     auto marker_length() const
     { return map_environment_.marker_length(); }
 
+    auto &m_mutable()
+    { return m_; }
+
+    auto &m() const
+    { return m_; }
+
+    auto size() const
+    { return m_.size(); }
+
+    auto empty() const
+    { return m_.empty(); }
+
     template<class T>
     static MarkerMap from(T &other);
 
@@ -229,19 +242,19 @@ namespace fvlam
 
     Marker *find_marker(int id)
     {
-      auto marker_pair = this->find(id);
-      return marker_pair == this->end() ? nullptr : &marker_pair->second;
+      auto marker_pair = m_.find(id);
+      return marker_pair == m_.end() ? nullptr : &marker_pair->second;
     }
 
     const Marker *find_marker_const(std::uint64_t id) const
     {
-      auto marker_pair = this->find(id);
-      return marker_pair == this->end() ? nullptr : &marker_pair->second;
+      auto marker_pair = m_.find(id);
+      return marker_pair == m_.end() ? nullptr : &marker_pair->second;
     }
 
     void add_marker(Marker marker)
     {
-      this->emplace(marker.id(), std::move(marker));
+      m_.emplace(marker.id(), std::move(marker));
     }
 
     void save(const std::string &filename, Logger &logger) const; //

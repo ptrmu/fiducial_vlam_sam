@@ -324,7 +324,7 @@ namespace fvlam
     for (auto it = ci_node.begin(); it != ci_node.end(); ++it) {
       auto ci_context = other.make(*it);
       auto ci = CameraInfo::from(ci_context);
-      camera_info_map.emplace(ci.imager_frame_id(), ci);
+      camera_info_map.m_mutable().emplace(ci.imager_frame_id(), ci);
     }
 
     return camera_info_map;
@@ -335,7 +335,7 @@ namespace fvlam
   {
     other << "{";
     other << "camera_infos" << "[";
-    for (auto &ci_pair : *this) {
+    for (auto &ci_pair : m_) {
       ci_pair.second.to(other);
     }
     other << "]";
@@ -442,7 +442,7 @@ namespace fvlam
     map_environment_.to(other);
 
     other << "markers" << "[";
-    for (auto &marker : *this) {
+    for (auto &marker : m_) {
       marker.second.to(other);
     }
     other << "]";
@@ -523,7 +523,7 @@ namespace fvlam
     for (auto it = observations_node.begin(); it != observations_node.end(); ++it) {
       auto observation_context = other.make(*it);
       auto observation = Observation::from(observation_context);
-      observations.emplace_back(observation);
+      observations.v_mutable().emplace_back(observation);
     }
 
     return observations;
@@ -537,7 +537,7 @@ namespace fvlam
     other << "imager_frame_id" << imager_frame_id_;
 
     other << "observations" << "[";
-    for (auto &observation : *this) {
+    for (auto &observation : v_) {
       observation.to(other);
     }
     other << "]";
@@ -560,7 +560,7 @@ namespace fvlam
     for (auto it = v_node.begin(); it != v_node.end(); ++it) {
       auto v_context = other.make(*it);
       auto v_item = Observations::from(v_context);
-      observations_synced.emplace_back(v_item);
+      observations_synced.v_mutable().emplace_back(v_item);
     }
 
     return observations_synced;
@@ -577,7 +577,7 @@ namespace fvlam
     other << "camera_frame_id" << camera_frame_id_;
 
     other << "v" << "[";
-    for (auto &observations : *this) {
+    for (auto &observations : v_) {
       observations.to(other);
     }
     other << "]";

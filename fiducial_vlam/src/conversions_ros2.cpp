@@ -163,7 +163,7 @@ namespace fvlam
     auto camera_info_map = CameraInfoMap{};
     for (auto &observations_msg : other.observations_synced) {
       auto camera_info = CameraInfo::from(observations_msg.camera_info);
-      camera_info_map.emplace(camera_info.imager_frame_id(), camera_info);
+      camera_info_map.m_mutable().emplace(camera_info.imager_frame_id(), camera_info);
     }
     return camera_info_map;
   }
@@ -237,7 +237,7 @@ namespace fvlam
     auto msg = fiducial_vlam_msgs::msg::Map{}
       .set__map_environment(map_environment().to<fiducial_vlam_msgs::msg::MapEnvironment>());
 
-    for (auto &id_marker_pair : *this) {
+    for (auto &id_marker_pair : m_) {
       msg.markers.emplace_back(id_marker_pair.second.to<fiducial_vlam_msgs::msg::Marker>());
     }
 
@@ -282,7 +282,7 @@ namespace fvlam
     fvlam::Observations observations{other.camera_info.imager_frame_id};
     for (auto &obs : other.observations) {
       auto observation = Observation::from(obs);
-      observations.emplace_back(observation);
+      observations.v_mutable().emplace_back(observation);
     }
     return observations;
   }
@@ -294,7 +294,7 @@ namespace fvlam
     auto stamp = Stamp::from(other.header.stamp);
     auto observations_synced = ObservationsSynced{stamp, other.header.frame_id};
     for (auto &observations_msg : other.observations_synced) {
-      observations_synced.emplace_back(Observations::from(observations_msg));
+      observations_synced.v_mutable().emplace_back(Observations::from(observations_msg));
     }
     return observations_synced;
   }
@@ -304,17 +304,17 @@ namespace fvlam
     <std::vector<fiducial_vlam_msgs::msg::Observation>>() const
   {
     std::vector<fiducial_vlam_msgs::msg::Observation> msgs;
-    for (auto observation: *this) {
+    for (auto observation : v_) {
       fiducial_vlam_msgs::msg::Observation msg;
       msg.id = observation.id();
-      msg.x0 = observation.corners_f_image_[0].x();
-      msg.x1 = observation.corners_f_image_[1].x();;
-      msg.x2 = observation.corners_f_image_[2].x();;
-      msg.x3 = observation.corners_f_image_[3].x();;
-      msg.y0 = observation.corners_f_image_[0].y();;
-      msg.y1 = observation.corners_f_image_[1].y();;
-      msg.y2 = observation.corners_f_image_[2].y();;
-      msg.y3 = observation.corners_f_image_[3].y();;
+      msg.x0 = observation.corners_f_image()[0].x();
+      msg.x1 = observation.corners_f_image()[1].x();;
+      msg.x2 = observation.corners_f_image()[2].x();;
+      msg.x3 = observation.corners_f_image()[3].x();;
+      msg.y0 = observation.corners_f_image()[0].y();;
+      msg.y1 = observation.corners_f_image()[1].y();;
+      msg.y2 = observation.corners_f_image()[2].y();;
+      msg.y3 = observation.corners_f_image()[3].y();;
       msgs.emplace_back(msg);
     }
     return msgs;

@@ -63,7 +63,7 @@ namespace fvlam
   public:
     explicit MarkerMarkerGraph(const MarkerMap &map_initial)
     {
-      for (auto &marker : map_initial) {
+      for (auto &marker : map_initial.m()) {
         if (marker.second.is_fixed()) {
           fixed_markers_.emplace(marker);
         }
@@ -227,7 +227,7 @@ namespace fvlam
 
     static fvlam::Marker find_fixed_marker(const MarkerMap &map)
     {
-      for (auto &marker : map) {
+      for (auto &marker : map.m()) {
         if (marker.second.is_fixed()) {
           return marker.second;
         }
@@ -302,6 +302,8 @@ namespace fvlam
             auto ix0_bf = interchange ? ix1 : ix0;
             auto ix1_bf = interchange ? ix0 : ix1;
 
+            logger_.debug() << ix0_bf << " " << ix1_bf << " " << t_marker0_marker1.tf().to_string();
+
             pose_graph.emplace_shared<gtsam::BetweenFactor<gtsam::Pose3>>(
               ix0_bf, ix1_bf, t_marker0_marker1.tf().to<gtsam::Pose3>(),
               noise_model);
@@ -319,7 +321,8 @@ namespace fvlam
       return pose_graph;
     }
 
-    static gtsam::ShonanAveraging3::Measurements load_shonan_measurements(const gtsam::NonlinearFactorGraph &pose_graph)
+    static gtsam::ShonanAveraging3::Measurements load_shonan_measurements(
+      const gtsam::NonlinearFactorGraph &pose_graph)
     {
       gtsam::ShonanAveraging3::Measurements measurements{};
 
@@ -420,8 +423,8 @@ namespace fvlam
       double t_sum{0.0};
       uint64_t n{0};
 
-      for (auto it0 = map.begin(); it0 != map.end(); ++it0)
-        for (auto it1 = map.upper_bound(it0->first); it1 != map.end(); ++it1) {
+      for (auto it0 = map.m().begin(); it0 != map.m().end(); ++it0)
+        for (auto it1 = map.m().upper_bound(it0->first); it1 != map.m().end(); ++it1) {
           auto solve_tmm = solve_tmm_graph_.lookup(it0->first, it1->first);
           if (solve_tmm != nullptr) {
             auto tmm_meas = (*solve_tmm)->t_marker0_marker1().tf();
@@ -459,10 +462,10 @@ namespace fvlam
                  const CameraInfoMap &camera_info_map) override
     {
       // Walk through all the imagers
-      for (auto &observations : observations_synced) {
+      for (auto &observations : observations_synced.v()) {
         // Find the camera_info for this imager
-        auto camera_info_it = camera_info_map.find(observations.imager_frame_id());
-        if (camera_info_it != camera_info_map.end()) {
+        auto camera_info_it = camera_info_map.m().find(observations.imager_frame_id());
+        if (camera_info_it != camera_info_map.m().end()) {
           // Walk through all pairs of observations
           for (std::size_t m0 = 0; m0 < observations.size(); m0 += 1)
             for (std::size_t m1 = m0 + 1; m1 < observations.size(); m1 += 1) {
@@ -470,15 +473,15 @@ namespace fvlam
               std::size_t m1r{m1};
 
               // Alawys do the transform calculation with the lower id first.
-              if (observations[m1r].id() < observations[m0r].id()) {
+              if (observations.v()[m1r].id() < observations.v()[m0r].id()) {
                 m0r = m1;
                 m1r = m0;
               }
 
               // Find the appropriate SolveTmmInterface
-              auto &solve_tmm = solve_tmm_graph_.add_or_lookup(observations[m0r].id(), observations[m1r].id(),
+              auto &solve_tmm = solve_tmm_graph_.add_or_lookup(observations.v()[m0r].id(), observations.v()[m1r].id(),
                                                                tmm_context_.solve_tmm_factory_);
-              solve_tmm->accumulate(observations[m0r], observations[m1r], camera_info_it->second);
+              solve_tmm->accumulate(observations.v()[m0r], observations.v()[m1r], camera_info_it->second);
             }
         }
       }
@@ -496,16 +499,17 @@ namespace fvlam
       // Prepare for full Pose optimization
       auto pose_graph = load_pose_graph(idix_list);
       if (logger_.output_debug()) {
-//        pose_graph.print("pose_graph\n");
+        pose_graph.print("pose_graph\n");
       }
 
       auto pose_initial = load_pose_initial(idix_list, pose_graph);
       if (logger_.output_debug()) {
-//        pose_initial.print("pose_initial");
+        pose_initial.print("pose_initial");
       }
+
       // Do the pose optimization
       gtsam::GaussNewtonParams params;
-      if (logger_.output_debug()) {
+      if (logger_.output_info()) {
         params.setVerbosity("TERMINATION");
       }
 
@@ -557,15 +561,15 @@ namespace fvlam
   {
     const SolveTmmContextCvSolvePnp solve_tmm_context_;
     double marker_length_;
-    EstimateTransform3MeanAndCovariance emac_algebra_; // Averaging in the vector space
-    EstimateMeanAndCovariance<Transform3::MuVector> emac_group_; // Averaging on the manifold
+    EstimateTransform3MeanAndCovarianceOnManifold emac_manifold_; // Averaging in the vector space
+    EstimateTransform3MeanAndCovarianceOnVectorSpace emac_space_; // Averaging on the manifold
 
   public:
     SolveTmmCvSolvePnp(const SolveTmmContextCvSolvePnp &solve_tmm_context,
                        double marker_length) :
       solve_tmm_context_{solve_tmm_context},
       marker_length_{marker_length},
-      emac_algebra_{}, emac_group_{}
+      emac_manifold_{}, emac_space_{}
     {}
 
     void accumulate(const Observation &observation0,
@@ -576,9 +580,9 @@ namespace fvlam
       auto t_camera_marker1 = observation1.solve_t_camera_marker(camera_info, marker_length_);
       auto t_marker0_marker1 = t_camera_marker0.inverse() * t_camera_marker1;
       if (solve_tmm_context_.average_on_space_not_manifold_) {
-        emac_algebra_.accumulate(t_marker0_marker1);
+        emac_space_.accumulate(t_marker0_marker1);
       } else {
-        emac_group_.accumulate(t_marker0_marker1.mu());
+        emac_manifold_.accumulate(t_marker0_marker1);
       }
     }
 
@@ -586,17 +590,16 @@ namespace fvlam
     Transform3WithCovariance t_marker0_marker1() override
     {
       return Transform3WithCovariance{
-        solve_tmm_context_.average_on_space_not_manifold_ ? emac_algebra_.mean() : Transform3(emac_group_.mean()),
-        solve_tmm_context_.average_on_space_not_manifold_ ? emac_algebra_.cov() : emac_group_.cov()};
+        solve_tmm_context_.average_on_space_not_manifold_ ? emac_space_.mean() : emac_manifold_.mean(),
+        solve_tmm_context_.average_on_space_not_manifold_ ? emac_space_.cov() : emac_manifold_.cov()};
     }
   };
 
   template<>
-  SolveTMarker0Marker1Factory make_solve_tmm_factory<SolveTmmContextCvSolvePnp>
-    (const SolveTmmContextCvSolvePnp &solve_tmm_context,
-     double marker_length)
+  SolveTMarker0Marker1Factory make_solve_tmm_factory<SolveTmmContextCvSolvePnp>(
+    const SolveTmmContextCvSolvePnp &solve_tmm_context,
+    double marker_length)
   {
-
     return [
       solve_tmm_context{solve_tmm_context},
       marker_length

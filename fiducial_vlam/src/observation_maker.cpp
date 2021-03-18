@@ -90,10 +90,10 @@ namespace fiducial_vlam
                        .set__frame_id(observations_synced.camera_frame_id()));
 
       // Add the observattions
-      for (auto &observations : observations_synced) {
+      for (auto &observations : observations_synced.v()) {
         // Find the camera info for these observations.
-        auto ci = camera_info_map.find(observations.imager_frame_id());
-        if (ci == camera_info_map.end()) {
+        auto ci = camera_info_map.m().find(observations.imager_frame_id());
+        if (ci == camera_info_map.m().end()) {
           continue;
         }
 
@@ -283,7 +283,7 @@ namespace fiducial_vlam
       auto camera_frame_id = cxt_.det_pub_camera_frame_id_.empty() ?
                              image_msg->header.frame_id : cxt_.det_pub_camera_frame_id_;
       auto observations_synced = fvlam::ObservationsSynced(stamp, camera_frame_id);
-      observations_synced.emplace_back(observations);
+      observations_synced.v_mutable().emplace_back(observations);
 
       if (observations.empty()) {
         diagnostics_.empty_observations_count_ += 1;
@@ -324,7 +324,7 @@ namespace fiducial_vlam
                                            fvlam::CameraInfo::from(sensor_ci_msg),
                                            t_camera_imager};
       auto camera_info_map = fvlam::CameraInfoMap{};
-      camera_info_map.emplace(camera_info.imager_frame_id(), camera_info);
+      camera_info_map.m_mutable().emplace(camera_info.imager_frame_id(), camera_info);
 
 
       // publish the observations if requested

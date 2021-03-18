@@ -21,6 +21,49 @@ namespace cv
 namespace fvlam
 {
 // ==============================================================================
+// Camera class
+// ==============================================================================
+
+  class Camera
+  {
+  private:
+    // The id of the camera
+    std::uint64_t id_;
+
+    std::string imager_frame_id_;
+
+    // The pose of the camera in some world frame. Which frame is world depends on the context.
+    Transform3WithCovariance t_map_camera_;
+
+  public:
+    Camera() = delete;
+
+    Camera(std::uint64_t id, std::string imager_frame_id, Transform3WithCovariance t_map_camera) :
+      id_(id), imager_frame_id_{std::move(imager_frame_id)}, t_map_camera_(std::move(t_map_camera))
+    {}
+
+    auto id() const
+    { return id_; }
+
+    const auto &t_map_camera() const
+    { return t_map_camera_; }
+
+    const auto &imager_frame_id() const
+    { return imager_frame_id_; }
+
+    template<class T>
+    static Camera from(T &other);
+
+    template<class T>
+    T to() const;
+
+    template<class T>
+    void to(T &other) const;
+
+    bool equals(const Camera &other, double tol = 1.0e-9, bool check_relative_also = true) const;
+  };
+
+// ==============================================================================
 // CameraInfo class
 // ==============================================================================
 
@@ -132,9 +175,23 @@ namespace fvlam
 // CameraInfo class
 // ==============================================================================
 
-  class CameraInfoMap : public std::map<std::string, CameraInfo>
+  class CameraInfoMap
   {
+    std::map<std::string, CameraInfo> m_{};
+
   public:
+    auto &m_mutable()
+    { return m_; }
+
+    auto &m() const
+    { return m_; }
+
+    auto size() const
+    { return m_.size(); }
+
+    auto empty() const
+    { return m_.empty(); }
+
     template<class T>
     static CameraInfoMap from(T &other);
 

@@ -63,6 +63,7 @@ namespace fvlam
     using Array = std::array<Element, ArraySize>;
     using MuVector = Eigen::Matrix<double, Element::MuVector::MaxRowsAtCompileTime * ArraySize, 1>;
 
+  private:
     bool is_valid_;
 
     // The id of the marker that we observed.
@@ -119,6 +120,9 @@ namespace fvlam
     auto &corners_f_image() const
     { return corners_f_image_; }
 
+    auto &cov() const
+    { return cov_; }
+
     template<class T>
     static Observation from(T &other);
 
@@ -147,9 +151,10 @@ namespace fvlam
 // Observations class
 // ==============================================================================
 
-  class Observations : public std::vector<Observation>
+  class Observations
   {
     std::string imager_frame_id_; // One or more imagers are components of a camera.
+    std::vector<Observation> v_;
 
   public:
     Observations(std::string imager_frame_id) :
@@ -158,6 +163,18 @@ namespace fvlam
 
     auto &imager_frame_id() const
     { return imager_frame_id_; }
+
+    auto &v_mutable()
+    { return v_; }
+
+    auto &v() const
+    { return v_; }
+
+    auto size() const
+    { return v_.size(); }
+
+    auto empty() const
+    { return v_.empty(); }
 
     template<typename T>
     static Observations from(T &other);
@@ -177,10 +194,11 @@ namespace fvlam
 // ObservationsSynced class
 // ==============================================================================
 
-  class ObservationsSynced : public std::vector<Observations>
+  class ObservationsSynced
   {
     Stamp stamp_; // The stamp for the synced observations.
-    std::string camera_frame_id_; // A camera ahs one of more imagers..
+    std::string camera_frame_id_; // A camera has one of more imagers..
+    std::vector<Observations> v_{};
 
   public:
     ObservationsSynced(Stamp stamp, std::string camera_frame_id) :
@@ -192,6 +210,18 @@ namespace fvlam
 
     auto &camera_frame_id() const
     { return camera_frame_id_; }
+
+    auto &v_mutable()
+    { return v_; }
+
+    auto &v() const
+    { return v_; }
+
+    auto size() const
+    { return v_.size(); }
+
+    auto empty() const
+    { return v_.empty(); }
 
     template<typename T>
     static ObservationsSynced from(T &other);

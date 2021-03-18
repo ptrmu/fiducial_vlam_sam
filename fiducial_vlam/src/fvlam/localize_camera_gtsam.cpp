@@ -49,7 +49,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors to the graph
-      for (auto &observation : observations) {
+      for (auto &observation : observations.v()) {
 
         // See if this is a known marker by looking it up in the map.
         auto marker_ptr = map.find_marker_const(observation.id());
@@ -95,7 +95,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors, known marker priors, and marker initial estimates to the graph
-      for (auto &observation : observations) {
+      for (auto &observation : observations.v()) {
         gtsam::Symbol marker_key{'m', observation.id()};
 
         // See if this is a known marker by looking it up in the map.
@@ -171,7 +171,7 @@ namespace fvlam
       initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
 
       // Add measurement factors to the graph
-      for (auto &observation : observations) {
+      for (auto &observation : observations.v()) {
 
         // See if this is a known marker by looking it up in the map.
         auto marker_ptr = map.find_marker_const(observation.id());
@@ -224,9 +224,9 @@ namespace fvlam
                                                 const MarkerMap &map) override
     {
       if (observations_synced.size() == 1) {
-        auto &observations = observations_synced[0];
-        auto ci = camera_info_map.find(observations.imager_frame_id());
-        if (ci != camera_info_map.end()) {
+        auto &observations = observations_synced.v()[0];
+        auto ci = camera_info_map.m().find(observations.imager_frame_id());
+        if (ci != camera_info_map.m().end()) {
           auto &camera_info = ci->second;
           auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
           if (t_map_camera.is_valid()) {

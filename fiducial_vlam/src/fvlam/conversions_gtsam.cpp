@@ -178,6 +178,10 @@ namespace fvlam
     double marker_length)
   {
     // can optimize this later
+//    std::cout << camera_calibration.fx() << " " << camera_calibration.fy() << std::endl;
+//    std::cout << camera_calibration.px() << " " << camera_calibration.py() << std::endl;
+//    std::cout << camera_calibration.k1() << " " << camera_calibration.k2() << " "
+//              << camera_calibration.p1() << " " << camera_calibration.p1() << std::endl;
 
     return [
       camera_calibration,

@@ -32,9 +32,9 @@ namespace fvlam
                                                 const MarkerMap &map) override
     {
       if (observations_synced.size() == 1) {
-        auto &observations = observations_synced[0];
-        auto ci = camera_info_map.find(observations.imager_frame_id());
-        if (ci != camera_info_map.end()) {
+        auto &observations = observations_synced.v()[0];
+        auto ci = camera_info_map.m().find(observations.imager_frame_id());
+        if (ci != camera_info_map.m().end()) {
           auto &camera_info = ci->second;
           auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
           if (t_map_camera.is_valid()) {
@@ -57,7 +57,7 @@ namespace fvlam
       std::vector<cv::Point3d> all_corners_f_map;
       std::vector<cv::Point2d> all_corners_f_image;
 
-      for (const auto &observation : observations) {
+      for (auto &observation : observations.v()) {
         auto marker_ptr = map.find_marker_const(observation.id());
         if (marker_ptr != nullptr) {
           marker_ptr->corners_f_world(map.marker_length(), all_corners_f_map);
@@ -174,7 +174,7 @@ namespace fvlam
       // return the corners as an observations structure.
       auto observations = fvlam::Observations{frame_id};
       for (size_t i = 0; i < ids.size(); i += 1) {
-        observations.emplace_back(Observation(ids[i],
+        observations.v_mutable().emplace_back(Observation(ids[i],
                                               corners[i][0].x, corners[i][0].y,
                                               corners[i][1].x, corners[i][1].y,
                                               corners[i][2].x, corners[i][2].y,
@@ -187,7 +187,7 @@ namespace fvlam
     void annotate_image_with_detected_markers(cv::Mat &color_image,
                                               const Observations &observations) override
     {
-      for (auto &observation : observations) {
+      for (auto &observation : observations.v()) {
 
         // draw marker sides
         for (int j = 0; j < 4; j++) {

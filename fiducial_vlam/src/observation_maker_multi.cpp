@@ -46,14 +46,14 @@ namespace fiducial_vlam
       auto camera_info0 = fvlam::CameraInfo::from(m0->observations_synced[0].camera_info);
       auto camera_info1 = fvlam::CameraInfo::from(m1->observations_synced[0].camera_info);
       auto camera_info_map = fvlam::CameraInfoMap{};
-      camera_info_map.emplace(camera_info0.imager_frame_id(), camera_info0);
-      camera_info_map.emplace(camera_info1.imager_frame_id(), camera_info1);
+      camera_info_map.m_mutable().emplace(camera_info0.imager_frame_id(), camera_info0);
+      camera_info_map.m_mutable().emplace(camera_info1.imager_frame_id(), camera_info1);
 
       auto observations0 = fvlam::Observations::from(m0->observations_synced[0]);
       auto observations1 = fvlam::Observations::from(m1->observations_synced[0]);
       auto observations_synced = fvlam::ObservationsSynced{stamp, camera_frame_id};
-      observations_synced.emplace_back(observations0);
-      observations_synced.emplace_back(observations1);
+      observations_synced.v_mutable().emplace_back(observations0);
+      observations_synced.v_mutable().emplace_back(observations1);
 
       // Publish these observations so that vmap can listen to them to create maps
       observation_publisher_->publish_observations_synced(camera_info_map, observations_synced);

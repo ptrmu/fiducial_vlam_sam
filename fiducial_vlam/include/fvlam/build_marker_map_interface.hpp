@@ -155,6 +155,18 @@ namespace fvlam
 // EstimateMeanAndCovariance class
 // ==============================================================================
 
+  struct Normalize
+  {
+    static void angle(double &a)
+    {
+      if (a >= M_PI) {
+        a -= M_2_PI;
+      } else if (a < -M_PI) {
+        a += M_2_PI;
+      }
+    }
+  };
+
   template<class MUVECTOR>
   class EstimateMeanAndCovarianceSimple
   {
@@ -188,7 +200,32 @@ namespace fvlam
     { return n_; }
   };
 
-  class EstimateTransform3MeanAndCovariance
+  template<class MUVECTOR>
+  class EstimateMeanAndCovariance
+  {
+    EstimateMeanAndCovarianceSimple<MUVECTOR> base_{};
+    MUVECTOR first_sample_{MUVECTOR::Zero()};
+
+  public:
+    void accumulate(const MUVECTOR &mu)
+    {
+      if (base_.n() == 0) {
+        first_sample_ = mu;
+      }
+      MUVECTOR mu_adj = mu - first_sample_;
+      base_.accumulate(mu_adj);
+    }
+
+    MUVECTOR mean() const
+    {
+      return base_.mean() + first_sample_;
+    }
+
+    auto cov()
+    { return base_.cov(); }
+  };
+
+  class EstimateTransform3MeanAndCovarianceOnManifold
   {
     EstimateMeanAndCovarianceSimple<fvlam::Transform3::TangentVector> base_{};
     fvlam::Rotate3 r_adj_{};
@@ -220,26 +257,36 @@ namespace fvlam
     { return base_.cov(); }
   };
 
-
-  template<class MUVECTOR>
-  class EstimateMeanAndCovariance
+  class EstimateTransform3MeanAndCovarianceOnVectorSpace
   {
-    EstimateMeanAndCovarianceSimple<MUVECTOR> base_{};
-    MUVECTOR first_sample_{MUVECTOR::Zero()};
+    EstimateMeanAndCovarianceSimple<fvlam::Transform3::MuVector> base_{};
+    fvlam::Rotate3 r_adj_{};
+    fvlam::Rotate3 r_adj_inverse_{};
+    fvlam::Translate3 t_adj_{};
+    fvlam::Translate3 t_adj_inverse_{};
 
   public:
-    void accumulate(const MUVECTOR &mu)
+    void accumulate(const Transform3 &tr)
     {
       if (base_.n() == 0) {
-        first_sample_ = mu;
+        r_adj_ = tr.r();
+        t_adj_ = tr.t();
+        r_adj_inverse_ = r_adj_.inverse();
+        t_adj_inverse_ = t_adj_ * -1;
       }
-      MUVECTOR mu_adj = mu - first_sample_;
-      base_.accumulate(mu_adj);
+      auto tr_adj = Transform3{tr.r() * r_adj_inverse_, tr.t() + t_adj_inverse_};
+      auto mu = tr_adj.mu();
+      Normalize::angle(mu(0));
+      Normalize::angle(mu(1));
+      Normalize::angle(mu(2));
+      base_.accumulate(mu);
     }
 
-    MUVECTOR mean() const
+    auto mean() const
     {
-      return base_.mean() + first_sample_;
+      auto tr_adj = fvlam::Transform3::ChartAtOrigin::retract(base_.mean());
+      auto tr = Transform3{tr_adj.r() * r_adj_, tr_adj.t() + t_adj_};
+      return tr;
     }
 
     auto cov()

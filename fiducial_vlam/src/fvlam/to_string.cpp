@@ -155,7 +155,7 @@ namespace fvlam
     bool first{true};
 
     // Assume a map keeps items sorted
-    for (auto &kvp : *this) {
+    for (auto &kvp : m_) {
       ss << (first ? "" : "\n") << "marker id:" << kvp.second.to_string(also_cov);
       first = false;
     }
@@ -406,7 +406,7 @@ namespace fvlam
   bool CameraInfoMap::equals(const CameraInfoMap &other,
                              double tol, bool check_relative_also) const
   {
-    return equals_map(*this, other, tol, check_relative_also);
+    return equals_map(m_, other.m_, tol, check_relative_also);
   }
 
   bool Marker::equals(const Marker &other,
@@ -429,7 +429,7 @@ namespace fvlam
                          double tol, bool check_relative_also) const
   {
     return map_environment_.equals(other.map_environment_, tol, check_relative_also) &&
-           equals_map(*this, other, tol, check_relative_also);
+           equals_map(m_, other.m_, tol, check_relative_also);
   }
 
   bool Observation::equals(const Observation &other,
@@ -457,7 +457,7 @@ namespace fvlam
                             double tol, bool check_relative_also) const
   {
     return imager_frame_id_ == other.imager_frame_id_ &&
-           equals_vector(*this, other, tol, check_relative_also);
+           equals_vector(v_, other.v_, tol, check_relative_also);
   }
 
   bool ObservationsSynced::equals(const ObservationsSynced &other,
@@ -465,7 +465,7 @@ namespace fvlam
   {
     return stamp_.equals(other.stamp_, tol, check_relative_also) &&
            camera_frame_id_ == other.camera_frame_id_ &&
-           equals_vector(*this, other, tol, check_relative_also);
+           equals_vector(v_, other.v_, tol, check_relative_also);
   }
 
   bool ObservationsSeries::equals(const ObservationsSeries &other,

@@ -45,10 +45,10 @@ namespace fvlam
       // Walk through the camera_info_map and add to our map and camera_infos
       // that we don't already know about. Currently all the camera_info_maps will
       // be the same, but that might loosen in the future.
-      for (auto &camera_info_pair: camera_info_map) {
-        auto camera_info_it = camera_info_map_.find(camera_info_pair.first);
-        if (camera_info_it == camera_info_map_.end()) {
-          camera_info_map_.emplace(camera_info_pair.first, camera_info_pair.second);
+      for (auto &camera_info_pair: camera_info_map.m()) {
+        auto camera_info_it = camera_info_map_.m().find(camera_info_pair.first);
+        if (camera_info_it == camera_info_map_.m().end()) {
+          camera_info_map_.m_mutable().emplace(camera_info_pair.first, camera_info_pair.second);
         }
       }
 

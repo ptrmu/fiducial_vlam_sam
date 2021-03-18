@@ -369,7 +369,7 @@ namespace fiducial_vlam
       if (psm_cxt_.psm_pub_visuals_enable_) {
         diagnostics_.pub_visuals_count_ += 1;
         auto visuals_msg = visualization_msgs::msg::MarkerArray{};
-        for (auto &id_marker_pair: *marker_map_) {
+        for (auto &id_marker_pair : marker_map_->m()) {
           auto marker_msg = id_marker_pair.second.to<visualization_msgs::msg::Marker>()
             .set__header(header); // set header after setting marker.
           visuals_msg.markers.emplace_back(marker_msg);
@@ -381,7 +381,7 @@ namespace fiducial_vlam
       if (psm_cxt_.psm_pub_tf_marker_enable_) {
         diagnostics_.pub_tf_count_ += 1;
         tf2_msgs::msg::TFMessage tfs_msg;
-        for (auto &id_marker_pair: *marker_map_) {
+        for (auto &id_marker_pair : marker_map_->m()) {
           auto &t_world_marker = id_marker_pair.second.t_map_marker().tf();
 
           std::ostringstream oss_child_frame_id;
@@ -447,7 +447,7 @@ namespace fiducial_vlam
     {
       auto map = std::make_unique<fvlam::MarkerMap>(me);
 
-      for (auto &id_marker_pair : map_from_file) {
+      for (auto &id_marker_pair : map_from_file.m()) {
         if (!copy_one_fixed_marker ||
             id_marker_pair.second.is_fixed()) {
           map->add_marker(id_marker_pair.second);
