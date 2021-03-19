@@ -335,6 +335,8 @@ namespace fvlam
     { return *this * other; } //
     Rotate3 between(const Rotate3 &other) const
     { return (*this).inverse() * other; } //
+    Rotate3 slerp(const Rotate3 &other, double t) const
+    { return compose(Expmap(t * Logmap(between(other)))); } //
 
     Rotate3 retract(const TangentVector &v) const
     { return compose(ChartAtOrigin::retract(v)); } //

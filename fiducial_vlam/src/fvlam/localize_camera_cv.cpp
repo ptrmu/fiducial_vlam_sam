@@ -3,6 +3,7 @@
 
 #include "fvlam/camera_info.hpp"
 #include "fvlam/localize_camera_interface.hpp"
+#include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
 #include "opencv2/aruco.hpp"
@@ -22,6 +23,18 @@ namespace fvlam
     LocalizeCameraCvContext lc_context_;
     Logger &logger_;
 
+    Transform3WithCovariance solve_one_t_map_camera(int i,
+                                                    const ObservationsSynced &observations_synced,
+                                                    const CameraInfoMap &camera_info_map,
+                                                    const MarkerMap &map)
+    {
+      auto &observations = observations_synced.v()[i];
+      auto ci_pair = camera_info_map.m().find(observations.imager_frame_id());
+      return (ci_pair != camera_info_map.m().end()) ?
+             solve_t_map_camera(observations, ci_pair->second, map) :
+             Transform3WithCovariance{};
+    }
+
   public:
     LocalizeCameraCv(const LocalizeCameraCvContext &lc_context, Logger &logger) :
       lc_context_{lc_context}, logger_{logger}
@@ -32,17 +45,24 @@ namespace fvlam
                                                 const MarkerMap &map) override
     {
       if (observations_synced.size() == 1) {
-        auto &observations = observations_synced.v()[0];
-        auto ci = camera_info_map.m().find(observations.imager_frame_id());
-        if (ci != camera_info_map.m().end()) {
-          auto &camera_info = ci->second;
-          auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
-          if (t_map_camera.is_valid()) {
-            return Transform3WithCovariance{
-              t_map_camera.tf() * camera_info.t_camera_imager().inverse(),
-              t_map_camera.cov()};
-          }
+        return solve_one_t_map_camera(0, observations_synced, camera_info_map, map);
+
+      } else if (observations_synced.size() == 2) {
+        auto tmc0 = solve_one_t_map_camera(0, observations_synced, camera_info_map, map);
+        auto tmc1 = solve_one_t_map_camera(1, observations_synced, camera_info_map, map);
+        if (!tmc0.is_valid()) {
+          return tmc0;
         }
+        if (!tmc1.is_valid()) {
+          return tmc1;
+        }
+
+        auto mid_r = tmc0.tf().r().slerp(tmc1.tf().r(), 0.5);
+        auto mid_t = (tmc0.tf().t() + tmc1.tf().t()) * 0.5;
+        logger_.info() << tmc0.tf().to_string() << " | "
+                       << tmc1.tf().to_string()  << " | "
+                       << Transform3{mid_r, mid_t}.to_string();
+        return Transform3WithCovariance(Transform3{mid_r, mid_t});
       }
       return Transform3WithCovariance{};
     }
@@ -106,15 +126,13 @@ namespace fvlam
         return Transform3WithCovariance{};
       }
 
-//      if (tvec[0] < 0) { // specific tests for bad pose determination
-//        int xxx = 9;
-//      }
-
       // rvec, tvec output from solvePnp "brings points from the model coordinate system to the
       // camera coordinate system". In this case the map frame is the model coordinate system.
       // So rvec, tvec are the transformation t_camera_map.
-      auto t_camera_map = Transform3(Rotate3::from(rvec), Translate3::from(tvec));
-      return Transform3WithCovariance(t_camera_map.inverse());
+      auto t_imager_map = Transform3(Rotate3::from(rvec), Translate3::from(tvec));
+
+      // Figure out the pose of the camera in the map frame.
+      return Transform3WithCovariance((camera_info.t_camera_imager() * t_imager_map).inverse());
     }
   };
 
@@ -175,10 +193,10 @@ namespace fvlam
       auto observations = fvlam::Observations{frame_id};
       for (size_t i = 0; i < ids.size(); i += 1) {
         observations.v_mutable().emplace_back(Observation(ids[i],
-                                              corners[i][0].x, corners[i][0].y,
-                                              corners[i][1].x, corners[i][1].y,
-                                              corners[i][2].x, corners[i][2].y,
-                                              corners[i][3].x, corners[i][3].y));
+                                                          corners[i][0].x, corners[i][0].y,
+                                                          corners[i][1].x, corners[i][1].y,
+                                                          corners[i][2].x, corners[i][2].y,
+                                                          corners[i][3].x, corners[i][3].y));
       }
       return observations;
     }
