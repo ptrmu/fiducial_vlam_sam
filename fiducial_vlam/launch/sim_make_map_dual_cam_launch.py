@@ -86,7 +86,7 @@ vmap_args = [{
 def generate_launch_description():
     entities = [
         ExecuteProcess(cmd=[
-            'gzserver',
+            'gazebo', # gzserver or gazebo
             '--verbose',
             '-s', 'libgazebo_ros_init.so',  # Publish /clock
             '-s', 'libgazebo_ros_factory.so',  # Provide injection endpoints
