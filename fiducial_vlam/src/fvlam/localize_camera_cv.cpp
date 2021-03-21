@@ -50,7 +50,6 @@ namespace fvlam
       } else if (observations_synced.size() == 2) {
         auto tmc0 = solve_one_t_map_camera(0, observations_synced, camera_info_map, map);
         auto tmc1 = solve_one_t_map_camera(1, observations_synced, camera_info_map, map);
-        return tmc1;
         if (!tmc0.is_valid()) {
           return tmc0;
         }
@@ -60,9 +59,11 @@ namespace fvlam
 
         auto mid_r = tmc0.tf().r().slerp(tmc1.tf().r(), 0.5);
         auto mid_t = (tmc0.tf().t() + tmc1.tf().t()) * 0.5;
-        logger_.info() << tmc0.tf().to_string() << " | "
+
+        logger_.debug() << tmc0.tf().to_string() << " | "
                        << tmc1.tf().to_string() << " | "
                        << Transform3{mid_r, mid_t}.to_string();
+
         return Transform3WithCovariance(Transform3{mid_r, mid_t});
       }
       return Transform3WithCovariance{};
