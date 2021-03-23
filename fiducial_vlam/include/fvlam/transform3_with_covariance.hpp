@@ -478,26 +478,25 @@ namespace fvlam
                                            Transform3::CovarianceMatrix::MaxSizeAtCompileTime, 1>;
 
   private:
-    bool is_valid_;
     bool is_cov_valid_;
     Transform3 tf_;
     Transform3::CovarianceMatrix cov_;
 
   public:
     Transform3WithCovariance() :
-      is_valid_{false}, is_cov_valid_{false}, tf_{}, cov_{Transform3::CovarianceMatrix::Zero()}
+      is_cov_valid_{false}, tf_{}, cov_{Transform3::CovarianceMatrix::Zero()}
     {}
 
     explicit Transform3WithCovariance(Transform3 tf) :
-      is_valid_(true), is_cov_valid_{false}, tf_(std::move(tf)), cov_(Transform3::CovarianceMatrix::Zero())
+      is_cov_valid_{false}, tf_(std::move(tf)), cov_(Transform3::CovarianceMatrix::Zero())
     {}
 
     Transform3WithCovariance(Transform3 tf, Transform3::CovarianceMatrix cov) :
-      is_valid_(true), is_cov_valid_{true}, tf_(std::move(tf)), cov_(std::move(cov))
+      is_cov_valid_{true}, tf_(std::move(tf)), cov_(std::move(cov))
     {}
 
     auto is_valid() const
-    { return is_valid_; }
+    { return tf_.is_valid(); }
 
     auto is_cov_valid() const
     { return is_cov_valid_; }

@@ -79,9 +79,9 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_t_base_camera_x, double, 0.)            /* camera->base transform component */\
   PAMA_PARAM(loc_t_base_camera_y, double, 0.)            /* camera->base transform component */\
   PAMA_PARAM(loc_t_base_camera_z, double, 0)             /* camera->base transform component */\
-  PAMA_PARAM(loc_t_base_camera_roll, double, M_PI_2)     /* camera->base transform component */\
-  PAMA_PARAM(loc_t_base_camera_pitch, double, -M_PI_2)   /* camera->base transform component */\
-  PAMA_PARAM(loc_t_base_camera_yaw, double, 0.)          /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_roll, double, -M_PI_2)     /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_pitch, double, 0.0)   /* camera->base transform component */\
+  PAMA_PARAM(loc_t_base_camera_yaw, double, -M_PI_2)          /* camera->base transform component */\
   /* Parameters for GTSAM localization techniques */\
   PAMA_PARAM(loc_gtsam_factor_type, int, 2)               /* 0 - Resectioning, 1 - ProjectBetween, 2 - QuadResectioning, 3 - PoseBetween */ \
   PAMA_PARAM(loc_corner_measurement_sigma, double, 0.5)   /* Noise model in GTSAM for marker corners in the image (sigma in pixels) */\

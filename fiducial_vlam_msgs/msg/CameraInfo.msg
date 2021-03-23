@@ -24,4 +24,5 @@ float64 p2
 float64 k3
 
 # Transform from imager frame to camera frame.
+bool is_valid
 geometry_msgs/Transform t_camera_imager

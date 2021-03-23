@@ -227,13 +227,7 @@ namespace fvlam
         auto &observations = observations_synced.v()[0];
         auto ci = camera_info_map.m().find(observations.imager_frame_id());
         if (ci != camera_info_map.m().end()) {
-          auto &camera_info = ci->second;
-          auto t_map_camera = solve_t_map_camera(observations, camera_info, map);
-          if (t_map_camera.is_valid()) {
-            return Transform3WithCovariance{
-              t_map_camera.tf() * camera_info.t_camera_imager().inverse(),
-              t_map_camera.cov()};
-          }
+          return solve_t_map_camera(observations, ci->second, map);
         }
       }
       return Transform3WithCovariance{};
@@ -273,8 +267,13 @@ namespace fvlam
 //        logger_.debug() << "initial error = " << graph.error(initial) << std::endl;
 //        logger_.debug() << "final error = " << graph.error(result) << std::endl;
 
-          // 5. Extract the result into a Transform3WithCovariance
-          return GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+          // 5. Extract the result into a Transform3WithCovariance.
+          // There is some ambiguity over the covariance frame. Here assume that it is relative
+          // to the map frame so it need not be transformed when the pose is transformed.
+          auto t_map_imager = GtsamUtil::extract_transform3_with_covariance(graph, result, camera_key_);
+          return Transform3WithCovariance{
+            t_map_imager.tf() * camera_info.t_camera_imager().inverse(),
+            t_map_imager.cov()};
 
         } catch (gtsam::CheiralityException &e) {
         }

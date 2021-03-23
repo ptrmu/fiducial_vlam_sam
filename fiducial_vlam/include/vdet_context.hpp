@@ -40,12 +40,12 @@ namespace fiducial_vlam
   /* Aruco markers detection parameters - done by opencv */ \
   PAMA_PARAM(det_corner_refinement_method, int, 2)        /* OpenCV 4.x argument to detect corners. 0 = none, 1 = subpix, 2 = contour, 3 = apriltag */\
   /* One or more imagers are components of a camera. This is the transform from this imager to the camera */\
-  PAMA_PARAM(det_t_camera_imager_x, double, 0.)          /* imager->camera transform component */\
-  PAMA_PARAM(det_t_camera_imager_y, double, 0.)          /* imager->camera transform component */\
-  PAMA_PARAM(det_t_camera_imager_z, double, 0.)          /* imager->camera transform component */\
-  PAMA_PARAM(det_t_camera_imager_roll, double, M_PI_2)   /* imager->camera transform component */\
-  PAMA_PARAM(det_t_camera_imager_pitch, double, -M_PI_2) /* imager->camera transform component */\
-  PAMA_PARAM(det_t_camera_imager_yaw, double, 0.)        /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_x, double, 0.)           /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_y, double, 0.)           /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_z, double, 0.)           /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_roll, double, 0.0)       /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_pitch, double, 0.0)      /* imager->camera transform component */\
+  PAMA_PARAM(det_t_camera_imager_yaw, double, 0.)         /* imager->camera transform component */\
   /* Subscription topics */\
   PAMA_PARAM(det_sub_image_raw_topic, std::string, "image_raw") /* topic for subscription to sensor_msgs::msg::Image (launch only) */\
   PAMA_PARAM(det_sub_camera_info_topic, std::string, "camera_info") /* topic for subscription to sensor_msgs::msg::CameraInfo associated with the image  (launch only) */\
@@ -62,7 +62,7 @@ namespace fiducial_vlam
   /* Frame ids for published messages */\
   PAMA_PARAM(det_pub_image_marked_frame_id, std::string, "") /* frame_id for image_marked message if non-empty otherwise same as image_raw */\
   PAMA_PARAM(det_pub_imager_frame_id, std::string, "imager_frame") /* frame_id for CameraInfo message if non-empty otherwise same as image_raw */\
-  PAMA_PARAM(det_pub_camera_frame_id, std::string, "")  /* frame_id for ObservationSynced message if non-empty otherwise same as image_raw */\
+  PAMA_PARAM(det_pub_camera_frame_id, std::string, "")    /* frame_id for ObservationSynced message if non-empty otherwise same as image_raw */\
   /* End of list */
 
   struct VdetContext

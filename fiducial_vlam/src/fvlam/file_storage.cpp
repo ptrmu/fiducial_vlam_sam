@@ -190,6 +190,11 @@ namespace fvlam
   template<>
   Transform3 Transform3::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
+    int is_valid = other()["is_valid"];
+    if (!is_valid) {
+      return Transform3{};
+    }
+
     auto r_node = other()["r"];
     auto r_context = other.make(r_node);
     auto r = Rotate3::from(r_context);
@@ -205,10 +210,15 @@ namespace fvlam
   void Transform3::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "r";
-    r_.to(other);
-    other << "t";
-    t_.to(other);
+    other << "is_valid" << is_valid_;
+
+    if (is_valid_) {
+      other << "r";
+      r_.to(other);
+      other << "t";
+      t_.to(other);
+    }
+
     other << "}";
   }
 
@@ -227,11 +237,6 @@ namespace fvlam
   template<>
   Transform3WithCovariance Transform3WithCovariance::from<FileStorageContext::Node>(FileStorageContext::Node &other)
   {
-    int is_valid = other()["is_valid"];
-    if (!is_valid) {
-      return Transform3WithCovariance{};
-    }
-
     auto tf_node = other()["tf"];
     auto tf_context = other.make(tf_node);
     auto tf = Transform3::from(tf_context);
@@ -252,17 +257,13 @@ namespace fvlam
   void Transform3WithCovariance::to<cv::FileStorage>(cv::FileStorage &other) const
   {
     other << "{";
-    other << "is_valid" << is_valid_;
+    other << "tf";
+    tf_.to(other);
+    other << "is_cov_valid" << is_cov_valid_;
 
-    if (is_valid_) {
-      other << "tf";
-      tf_.to(other);
-      other << "is_cov_valid" << is_cov_valid_;
-
-      if (is_cov_valid_) {
-        other << "cov";
-        Transform3::cov_to(cov_, other);
-      }
+    if (is_cov_valid_) {
+      other << "cov";
+      Transform3::cov_to(cov_, other);
     }
     other << "}";
   }

@@ -130,11 +130,12 @@ namespace fvlam
     fiducial_vlam_msgs::msg::CameraInfo &other)
   {
     auto &m = other;
+    auto t_camera_imager = m.is_valid ? Transform3::from(m.t_camera_imager) : Transform3{};
     return CameraInfo{m.imager_frame_id,
                       m.width, m.height,
                       (CameraMatrix() << m.fx, 0, m.cx, 0.0, m.fy, m.cy, 0.0, 0.0, 1.0).finished(),
                       (DistCoeffs() << m.k1, m.k2, m.p1, m.p2, m.k3).finished(),
-                      Transform3::from(m.t_camera_imager)};
+                      t_camera_imager};
   }
 
   template<>
@@ -153,6 +154,7 @@ namespace fvlam
       .set__p1(dist_coeffs_(2))
       .set__p2(dist_coeffs_(3))
       .set__k3(dist_coeffs_(4))
+      .set__is_valid(t_camera_imager_.is_valid())
       .set__t_camera_imager(t_camera_imager_.to<geometry_msgs::msg::Transform>());
   }
 

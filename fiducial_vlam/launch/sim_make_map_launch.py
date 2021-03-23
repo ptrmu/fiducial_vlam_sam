@@ -36,7 +36,8 @@ elemental_camera_sdf = os.path.join(sdf_directory, 'elemental_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vloc_args = [{
-    'loc_camera_algorithm': 0,
+    'loc_camera_algorithm': 1,
+    'loc_gtsam_factor_type': 2,
     'det_corner_refinement_method': 2,
     'det_pub_observations_topic': '/fiducial_observations',
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
