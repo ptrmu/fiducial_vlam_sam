@@ -334,7 +334,8 @@ namespace fvlam
     gtsam::Key key_camera_;
     const std::vector<gtsam::Point2> points_f_image_;
     const std::vector<gtsam::Point3> points_f_world_;
-    boost::optional<gtsam::Pose3> t_camera_imager_;
+    bool use_transform_;
+    gtsam::Pose3 t_camera_imager_;
     std::shared_ptr<const gtsam::Cal3DS2> cal3ds2_;
     Logger &logger_;
     bool throwCheirality_;     // If true, rethrows Cheirality exceptions (default: false)
@@ -345,7 +346,8 @@ namespace fvlam
                                  std::vector<gtsam::Point2> points_f_image,
                                  const gtsam::SharedNoiseModel &model,
                                  std::vector<gtsam::Point3> points_f_world,
-                                 boost::optional<gtsam::Pose3> t_camera_imager,
+                                 bool use_transform,
+                                 gtsam::Pose3 t_camera_imager,
                                  std::shared_ptr<const gtsam::Cal3DS2> &cal3ds2,
                                  Logger &logger,
                                  bool throwCheirality = false) :
@@ -353,6 +355,7 @@ namespace fvlam
       key_camera_{key_camera},
       points_f_image_{std::move(points_f_image)},
       points_f_world_{std::move(points_f_world)},
+      use_transform_{use_transform},
       t_camera_imager_{std::move(t_camera_imager)},
       cal3ds2_{cal3ds2},
       logger_{logger},
@@ -364,7 +367,7 @@ namespace fvlam
                                 boost::optional<gtsam::Matrix &> H = boost::none) const override
     {
       try {
-        if (!t_camera_imager_) {
+        if (!use_transform_) {
           auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose, *cal3ds2_};
           if (!H) {
             return (gtsam::Vector8{}
@@ -385,7 +388,7 @@ namespace fvlam
         }
 
         if (!H) {
-          auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose.compose(*t_camera_imager_), *cal3ds2_};
+          auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose.compose(t_camera_imager_), *cal3ds2_};
           return (gtsam::Vector8{}
             << camera.project(points_f_world_[0]) - points_f_image_[0],
             camera.project(points_f_world_[1]) - points_f_image_[1],
@@ -394,7 +397,7 @@ namespace fvlam
         }
 
         gtsam::Matrix HT;
-        auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose.compose(*t_camera_imager_, HT), *cal3ds2_};
+        auto camera = gtsam::PinholeCamera<gtsam::Cal3DS2>{pose.compose(t_camera_imager_, HT), *cal3ds2_};
         gtsam::Matrix26 H0, H1, H2, H3;
         gtsam::Vector2 e0 = camera.project(points_f_world_[0], H0) - points_f_image_[0];
         gtsam::Vector2 e1 = camera.project(points_f_world_[1], H1) - points_f_image_[1];

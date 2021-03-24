@@ -313,13 +313,20 @@ namespace fiducial_vlam
 
       // Create our CameraInfo message by first creating a CameraInfo structure
       // from a ROS2 CameraIndo message.
-      auto t_camera_imager = fvlam::Transform3{
-        fvlam::Rotate3::RzRyRx(cxt_.det_t_camera_imager_yaw_,
-                               cxt_.det_t_camera_imager_pitch_,
-                               cxt_.det_t_camera_imager_roll_),
-        fvlam::Translate3{cxt_.det_t_camera_imager_x_,
-                          cxt_.det_t_camera_imager_y_,
-                          cxt_.det_t_camera_imager_z_}};
+      auto t_camera_imager = (cxt_.det_t_camera_imager_yaw_ == 0.0 &&
+                              cxt_.det_t_camera_imager_pitch_ == 0.0 &&
+                              cxt_.det_t_camera_imager_roll_ == 0.0 &&
+                              cxt_.det_t_camera_imager_x_ == 0.0 &&
+                              cxt_.det_t_camera_imager_y_ == 0.0 &&
+                              cxt_.det_t_camera_imager_z_ == 0.0) ?
+                             fvlam::Transform3{} :
+                             fvlam::Transform3{
+                               fvlam::Rotate3::RzRyRx(cxt_.det_t_camera_imager_yaw_,
+                                                      cxt_.det_t_camera_imager_pitch_,
+                                                      cxt_.det_t_camera_imager_roll_),
+                               fvlam::Translate3{cxt_.det_t_camera_imager_x_,
+                                                 cxt_.det_t_camera_imager_y_,
+                                                 cxt_.det_t_camera_imager_z_}};
       auto camera_info = fvlam::CameraInfo{imager_frame_id,
                                            fvlam::CameraInfo::from(sensor_ci_msg),
                                            t_camera_imager};
