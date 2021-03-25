@@ -119,6 +119,7 @@ namespace fvlam
     }
 
     void add_factors_quad_resectioning(const Observations &observations,
+                                       const CameraInfo &camera_info,
                                        const MarkerMap &map,
                                        std::shared_ptr<const gtsam::Cal3DS2> &cal3ds2,
                                        gtsam::NonlinearFactorGraph &graph)
@@ -140,25 +141,24 @@ namespace fvlam
           auto corners_f_map = marker_ptr->corners_f_world<std::vector<gtsam::Point3>>(map.marker_length());
 
           // Add factor to the graph.
-          graph.emplace_shared<QuadResectioningFactor>(corners_f_image, corner_noise,
-                                                       camera_key_, corners_f_map, cal3ds2,
-                                                       logger_, true);
+          graph.emplace_shared<QuadResectioningOffsetFactor>(camera_key_, corners_f_image, corner_noise, corners_f_map,
+                                                             camera_info.t_camera_imager().is_valid(),
+                                                             camera_info.t_camera_imager().to<gtsam::Pose3>(),
+                                                             cal3ds2, logger_,
+                                                             std::string("m") + std::to_string(marker_ptr->id()),
+                                                             true);
         }
       }
     }
 
-    void add_pose_factors(const Observations &observations,
-                          const CameraInfo &camera_info,
-                          const MarkerMap &map,
-                          const Transform3 &t_map_camera_initial,
-                          gtsam::NonlinearFactorGraph &graph,
-                          gtsam::Values &initial)
+    void add_monocular_factors(const Observations &observations,
+                               const CameraInfo &camera_info,
+                               const MarkerMap &map,
+                               gtsam::NonlinearFactorGraph &graph,
+                               gtsam::Values &initial)
     {
       // Create a GTSAM camera calibration structure.
       auto cal3ds2 = std::make_shared<const gtsam::Cal3DS2>(camera_info.to<gtsam::Cal3DS2>());
-
-      // Add the camera initial value.
-      initial.insert(camera_key_, t_map_camera_initial.to<gtsam::Pose3>());
 
       switch (lc_context_.gtsam_factor_type_) {
         default:
@@ -169,8 +169,23 @@ namespace fvlam
           add_factors_project_between(observations, map, cal3ds2, graph, initial);
           break;
         case 2:
-          add_factors_quad_resectioning(observations, map, cal3ds2, graph);
+          add_factors_quad_resectioning(observations, camera_info, map, cal3ds2, graph);
           break;
+      }
+    }
+
+    void add_multiocular_factors(const ObservationsSynced &observations_synced,
+                                 const CameraInfoMap &camera_info_map,
+                                 const MarkerMap &map,
+                                 gtsam::NonlinearFactorGraph &graph)
+    {
+      for (auto &observations : observations_synced.v()) {
+        auto ci_pair = camera_info_map.m().find(observations.imager_frame_id());
+        if (ci_pair != camera_info_map.m().end()) {
+          auto &camera_info = ci_pair->second;
+          auto cal3ds2 = std::make_shared<const gtsam::Cal3DS2>(camera_info.to<gtsam::Cal3DS2>());
+          add_factors_quad_resectioning(observations, camera_info, map, cal3ds2, graph);
+        }
       }
     }
 
@@ -202,14 +217,19 @@ namespace fvlam
         return Transform3WithCovariance{};
       }
 
-
       // 1. Allocate the graph and initial estimate
       gtsam::NonlinearFactorGraph graph{};
       gtsam::Values initial{};
 
+
+      // Add the camera initial value.
+      initial.insert(camera_key_, t_map_camera_initial.tf().to<gtsam::Pose3>());
+
       // 2. add factors to the graph
       if (observations_synced.size() == 1 && !camera_info_0.t_camera_imager().is_valid()) {
-        add_pose_factors(observations_0, camera_info_0, map, t_map_camera_initial.tf(), graph, initial);
+        add_monocular_factors(observations_0, camera_info_0, map, graph, initial);
+      } else {
+        add_multiocular_factors(observations_synced, camera_info_map, map, graph);
       }
 
       if (initial.empty()) {

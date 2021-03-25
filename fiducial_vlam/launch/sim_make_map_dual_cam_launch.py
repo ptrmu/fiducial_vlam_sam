@@ -42,21 +42,21 @@ camera_sdf = os.path.join(sdf_directory, 'dual_camera.sdf')
 corner_measurement_sigma = 2.0
 
 vdet_left_args = [{
-    'det_t_camera_imager_x': 0.2,
+    'det_t_camera_imager_x': -0.2,
     'det_pub_camera_frame_id': 'camera_frame',
     'det_pub_imager_frame_id': 'left_image_frame',
     'det_pub_image_marked_frame_id': 'left_image_frame'
 }]
 
 vdet_right_args = [{
-    'det_t_camera_imager_x': -0.2,
+    'det_t_camera_imager_x': 0.2,
     'det_pub_camera_frame_id': 'camera_frame',
     'det_pub_imager_frame_id': 'right_image_frame',
     'det_pub_image_marked_frame_id': 'right_image_frame'
 }]
 
 vloc_args = [{
-    'loc_camera_algorithm': 0,
+    'loc_camera_algorithm': 1,
     'loc_sub_multi_observations_topic': '/dual_camera/left/observations:/dual_camera/right/observations',
     'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
     'psl_sub_camera_info_topic': 'right/camera_info',
