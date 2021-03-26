@@ -509,7 +509,7 @@ namespace fvlam
 
       // Do the pose optimization
       gtsam::GaussNewtonParams params;
-      if (logger_.output_info()) {
+      if (logger_.output_debug()) {
         params.setVerbosity("TERMINATION");
       }
 

@@ -97,7 +97,6 @@ namespace fiducial_vlam
 
     VlocContext cxt_{};
     VdetContext det_cxt_{};
-    PslContext psl_cxt_{};
 
     std::unique_ptr<MarkerMapSubscriberInterface> marker_map_subscriber_{};
     std::unique_ptr<ObservationMakerInterface> observation_maker_{};
@@ -128,32 +127,26 @@ namespace fiducial_vlam
     void validate_parameters()
     {}
 
-    void validate_psl_parameters()
-    {}
-
     void setup_parameters()
     {
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_INIT(n, t, d)
       PAMA_PARAMS_INIT((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters)
-      PAMA_PARAMS_INIT((*this), det_cxt_, , VDET_ALL_PARAMS, validate_psl_parameters)
-      PAMA_PARAMS_INIT((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters)
+      PAMA_PARAMS_INIT((*this), det_cxt_, , VDET_ALL_PARAMS, validate_parameters)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHANGED(n, t, d)
       PAMA_PARAMS_CHANGED((*this), cxt_, , VLOC_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
-      PAMA_PARAMS_CHANGED((*this), det_cxt_, , VDET_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
-      PAMA_PARAMS_CHANGED((*this), psl_cxt_, , PSL_ALL_PARAMS, validate_psl_parameters, RCLCPP_INFO)
+      PAMA_PARAMS_CHANGED((*this), det_cxt_, , VDET_ALL_PARAMS, validate_parameters, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_LOG(n, t, d)
       PAMA_PARAMS_LOG((*this), cxt_, , VLOC_ALL_PARAMS, RCLCPP_INFO)
       PAMA_PARAMS_LOG((*this), det_cxt_, , VDET_ALL_PARAMS, RCLCPP_INFO)
-      PAMA_PARAMS_LOG((*this), psl_cxt_, , PSL_ALL_PARAMS, RCLCPP_INFO)
 
 #undef PAMA_PARAM
 #define PAMA_PARAM(n, t, d) PAMA_PARAM_CHECK_CMDLINE(n, t, d)
-      PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS VDET_ALL_PARAMS PSL_ALL_PARAMS, RCLCPP_ERROR)
+      PAMA_PARAMS_CHECK_CMDLINE((*this), , VLOC_ALL_PARAMS VDET_ALL_PARAMS, RCLCPP_ERROR)
     }
 
     // Create a LocalizeCameraInterface object if one has not been created yet or
@@ -387,28 +380,29 @@ namespace fiducial_vlam
           pub_base_odom_->publish(msg);
           diagnostics_.pub_base_odom_count_ += 1;
         }
-#if 0
+
         // Publish all tfs in one message
         tf2_msgs::msg::TFMessage tfs_msg;
 
         // Publish the camera's tf
-        if (psl_cxt_.psl_pub_tf_camera_enable_) {
+        if (cxt_.loc_pub_tf_camera_enable_) {
           auto msg = geometry_msgs::msg::TransformStamped{}
             .set__header(po_header)
-            .set__child_frame_id(psl_cxt_.psl_pub_tf_camera_child_frame_id_)
+            .set__child_frame_id(cxt_.loc_pub_tf_camera_frame_id_)
             .set__transform(t_map_camera.tf().to<geometry_msgs::msg::Transform>());
           tfs_msg.transforms.emplace_back(msg);
         }
 
         // Publish the base's tf
-        if (psl_cxt_.psl_pub_tf_base_enable_) {
+        if (cxt_.loc_pub_tf_base_enable_) {
           auto msg = geometry_msgs::msg::TransformStamped{}
             .set__header(po_header)
-            .set__child_frame_id(psl_cxt_.psl_pub_tf_base_child_frame_id_)
+            .set__child_frame_id(cxt_.loc_pub_tf_base_link_id_)
             .set__transform(t_map_base.tf().to<geometry_msgs::msg::Transform>());
           tfs_msg.transforms.emplace_back(msg);
         }
 
+#if 0
         // if requested, publish the camera tf as determined from each marker in world/map coordinates.
         if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {
           for (auto &observation : observations) {
@@ -440,6 +434,7 @@ namespace fiducial_vlam
           }
         }
 
+#endif
         // If there are any transforms to publish, then publish them.
         if (!tfs_msg.transforms.empty()) {
           if (!pub_tf_) {
@@ -449,7 +444,6 @@ namespace fiducial_vlam
           pub_tf_->publish(tfs_msg);
           diagnostics_.pub_tf_count_ += 1;
         }
-#endif
       }
     }
 

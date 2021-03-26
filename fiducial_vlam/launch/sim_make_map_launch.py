@@ -40,15 +40,15 @@ vloc_args = [{
     'loc_gtsam_factor_type': 2,
     'det_corner_refinement_method': 2,
     'det_pub_observations_topic': '/fiducial_observations',
-    'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
-    'psl_sub_camera_info_best_effort_not_reliable': True,
-    'psl_sub_image_raw_best_effort_not_reliable': True,
-    'psl_pub_tf_camera_child_frame_id': 'forward_camera',
-    'psl_pub_camera_odom_enable': False,
-    'psl_pub_base_pose_enable': True,
-    'psl_pub_base_odom_enable': False,
-    'psl_pub_tf_camera_per_marker_enable': True,
-    'psl_pub_tf_marker_per_marker_enable': True,
+    # 'psl_pub_tf_camera_enable': True,  # Publish drone and camera /tf
+    # 'psl_sub_camera_info_best_effort_not_reliable': True,
+    # 'psl_sub_image_raw_best_effort_not_reliable': True,
+    # 'psl_pub_tf_camera_child_frame_id': 'camera_frame',
+    # 'psl_pub_camera_odom_enable': False,
+    # 'psl_pub_base_pose_enable': True,
+    # 'psl_pub_base_odom_enable': False,
+    # 'psl_pub_tf_camera_per_marker_enable': True,
+    # 'psl_pub_tf_marker_per_marker_enable': True,
 }]
 
 vmap_args = [{
