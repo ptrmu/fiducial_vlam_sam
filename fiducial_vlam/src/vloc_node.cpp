@@ -193,9 +193,7 @@ namespace fiducial_vlam
               {
                 on_observation_callback(camera_info_map, observations_synced);
               });
-          }
-
-          else {
+          } else {
             observation_maker_ = make_multi_observation_maker(
               cxt_, *this, logger_,
               [this](const fvlam::CameraInfoMap &camera_info_map,
@@ -333,7 +331,7 @@ namespace fiducial_vlam
         if (cxt_.loc_pub_camera_odom_enable_) {
           auto msg = nav_msgs::msg::Odometry{}
             .set__header(po_header)
-            .set__child_frame_id(cxt_.loc_pub_camera_odom_child_frame_id_)
+            .set__child_frame_id(observations_synced.camera_frame_id())
             .set__pose(t_map_camera.to<geometry_msgs::msg::PoseWithCovariance>());
           if (!pub_camera_odom_) {
             pub_camera_odom_ = create_publisher<nav_msgs::msg::Odometry>(
@@ -388,7 +386,7 @@ namespace fiducial_vlam
         if (cxt_.loc_pub_tf_camera_enable_) {
           auto msg = geometry_msgs::msg::TransformStamped{}
             .set__header(po_header)
-            .set__child_frame_id(cxt_.loc_pub_tf_camera_frame_id_)
+            .set__child_frame_id(observations_synced.camera_frame_id())
             .set__transform(t_map_camera.tf().to<geometry_msgs::msg::Transform>());
           tfs_msg.transforms.emplace_back(msg);
         }
@@ -402,6 +400,17 @@ namespace fiducial_vlam
           tfs_msg.transforms.emplace_back(msg);
         }
 
+        // Publish the imagers' tf. Walk through the camera_info_map publishing a tf for each
+        if (cxt_.loc_pub_tf_imager_enable_) {
+          for (auto &camera_info_pair : camera_info_map.m()) {
+            auto &camera_info = camera_info_pair.second;
+            auto msg = geometry_msgs::msg::TransformStamped{}
+              .set__header(po_header)
+              .set__child_frame_id(camera_info.imager_frame_id())
+              .set__transform((t_map_camera.tf() * camera_info.t_camera_imager()).to<geometry_msgs::msg::Transform>());
+            tfs_msg.transforms.emplace_back(msg);
+          }
+        }
 #if 0
         // if requested, publish the camera tf as determined from each marker in world/map coordinates.
         if (psl_cxt_.psl_pub_tf_camera_per_marker_enable_) {

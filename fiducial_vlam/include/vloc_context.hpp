@@ -109,9 +109,7 @@ namespace fiducial_vlam
   PAMA_PARAM(loc_pub_base_odom_topic, std::string, "base_odom") /* topic for publishing base odometry  */\
   /* Frame ids for published messages */\
   PAMA_PARAM(loc_pub_map_frame_id, std::string, "map")    /* frame_id for marker and tf messages - normally "map"  */\
-  PAMA_PARAM(loc_pub_camera_odom_child_frame_id, std::string, "camera_frame") /* frame_id for camera frame  */\
   PAMA_PARAM(loc_pub_base_odom_child_frame_id, std::string, "base_link") /* frame_id for base_link frame  */\
-  PAMA_PARAM(loc_pub_tf_camera_frame_id, std::string, "camera_frame") /* frame_id for the child in the camera tf message  */\
   PAMA_PARAM(loc_pub_tf_base_link_id, std::string, "base_link") /* frame_id for the child in the base tf message  */\
   PAMA_PARAM(loc_pub_tf_camera_per_marker_child_frame_id, std::string, "cpm_")  /* frame_id for the child in the camera_per_marker tf messages  */\
   PAMA_PARAM(loc_pub_tf_marker_per_marker_child_frame_id, std::string, "mpm_")  /* frame_id for the child in the marker_per_marker tf messages  */\
