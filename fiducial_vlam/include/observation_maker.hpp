@@ -23,8 +23,8 @@ namespace fvlam
 
 namespace fiducial_vlam
 {
-  class VdetContext; //
-  class VlocContext; //
+  struct VdetContext; //
+  struct VlocContext; //
 
 // ==============================================================================
 // ObservationMakerInterface class
