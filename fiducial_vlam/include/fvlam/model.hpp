@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fvlam/camera_info.hpp"
+#include "fvlam/logger.hpp"
 #include "fvlam/marker.hpp"
 #include "fvlam/observation.hpp"
 
@@ -167,5 +168,76 @@ namespace fvlam
       auto uut = uut_maker(logger_, model_);
       return test(std::move(uut));
     }
+  };
+
+  class MarkerModelRunner
+  {
+  public:
+    struct Config
+    {
+      double r_sampler_sigma_ = 0.001;
+      double t_sampler_sigma_ = 0.001;
+      double u_sampler_sigma_ = 0.001;
+
+      double equals_tolerance_ = 1.0e-2;
+
+      fvlam::Logger::Levels logger_level_ = fvlam::Logger::Levels::level_warn;
+    };
+
+  private:
+    Config cfg_;
+    LoggerCout logger_;
+    MarkerModel model_;
+    fvlam::MarkerMap map_;
+    std::vector<Marker> markers_perturbed_;
+    std::vector<fvlam::MarkerObservations> marker_observations_list_perturbed_;
+
+    static fvlam::MarkerMap gen_map(
+      const fvlam::MarkerModel &model);
+
+    static std::vector<Marker> gen_markers_perturbed(
+      const fvlam::MarkerModel &model,
+      double r_sampler_sigma,
+      double t_sampler_sigma);
+
+    static std::vector<fvlam::MarkerObservations> gen_marker_observations_list_perturbed(
+      const fvlam::MarkerModel &model,
+      double r_sampler_sigma,
+      double t_sampler_sigma,
+      double point2_sampler_sigma);
+
+  public:
+    template<class Uut>
+    using UutMaker = std::function<Uut(MarkerModelRunner &)>;
+
+    MarkerModelRunner() = delete; //
+    MarkerModelRunner(const MarkerModelRunner &) = delete; //
+    MarkerModelRunner(MarkerModelRunner &&) = delete;
+
+    MarkerModelRunner(Config cfg,
+                      MarkerModel::Maker model_maker);
+
+    template<class TestMaker, class UutMaker>
+    bool run(TestMaker test_maker, UutMaker uut_maker)
+    {
+      auto test = test_maker(*this);
+      auto uut = uut_maker(*this);
+      return test(std::move(uut));
+    }
+
+    auto &cfg() const
+    { return cfg_; }
+
+    Logger &logger()
+    { return logger_; }
+
+    auto &model() const
+    { return model_; }
+
+    auto &map() const
+    { return map_; }
+
+    auto &marker_observations_list_perturbed() const
+    { return marker_observations_list_perturbed_; }
   };
 }
