@@ -192,6 +192,12 @@ namespace fvlam
     auto empty() const
     { return m_.empty(); }
 
+    auto &first() const
+    {
+      assert(!m_.empty());
+      return m_.begin()->second;
+    }
+
     template<class T>
     static CameraInfoMap from(T &other);
 

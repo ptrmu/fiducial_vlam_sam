@@ -2,11 +2,14 @@
 
 #include "fvlam/model.hpp"
 #include <gtsam/geometry/Cal3DS2.h>
+#include "gtsam/inference/Symbol.h"
 #include <gtsam/linear/Sampler.h>
 #include "opencv2/core.hpp"
 
 namespace fvlam
 {
+  const double degree = (M_PI / 180.0);
+
   MapEnvironment MapEnvironmentGen::Default()
   {
     return fvlam::MapEnvironment{"TestMap", 0, 0.2};
@@ -46,6 +49,10 @@ namespace fvlam
     auto camera_info_base = CameraInfo{100, 100, 0, 400, 300};
     return centered_dual_camera(camera_info_base, 0.2);
   }
+
+// ==============================================================================
+// CamerasGen class
+// ==============================================================================
 
   static std::vector<fvlam::Transform3> rotate_around_z(int n, const fvlam::Transform3 &base)
   {
@@ -95,6 +102,10 @@ namespace fvlam
     return circle_in_xy_plane_facing_along_z(n, radius, z_offset, facing_z_plus_not_z_negative);
   }
 
+// ==============================================================================
+// MarkersGen class
+// ==============================================================================
+
   template<>
   std::vector<Marker> MarkersGen::TargetsFromTransform3s(std::vector<Transform3> transform3s)
   {
@@ -120,6 +131,150 @@ namespace fvlam
   {
     return markers_from_transform3s(circle_in_xy_plane_facing_along_z(
       n, radius, z_offset, facing_z_plus_not_z_negative), 0);
+  }
+
+// ==============================================================================
+// MarkerModelGen class
+// ==============================================================================
+
+  // Assuming world coordinate system is ENU
+  // Camera coordinate system is Left,down,forward (along camera axis)
+  static auto master_marker_pose_list = std::vector<fvlam::Transform3>{
+    fvlam::Transform3{0, 0, 0, 0, 0, 0},
+    fvlam::Transform3{0, 0, 0, 1, 0, 0},
+    fvlam::Transform3{5 * degree, 5 * degree, 0, 1, 1, 0},
+    fvlam::Transform3{0, 0, 5 * degree, 0, 1, 0},
+
+    fvlam::Transform3{5 * degree, 0, 0, 0, 0, 0.25},
+    fvlam::Transform3{-5 * degree, 0, 0, 1, 1, 0},
+  };
+
+  static auto master_camera_pose_list = std::vector<fvlam::Transform3>{
+    fvlam::Transform3{180 * degree, 0, 0, 0, 0, 2},
+    fvlam::Transform3{180 * degree, 0, 0, 1, 0, 2},
+    fvlam::Transform3{180 * degree, 0, 0, 1, 1, 2},
+    fvlam::Transform3{180 * degree, 0, 0, 0, 1, 2},
+    fvlam::Transform3{180 * degree, 0, 0, 0.01, 0, 2},
+
+    fvlam::Transform3{181 * degree, 0, 0, 0, 0, 2},
+    fvlam::Transform3{181 * degree, 0, 0, 1, 1, 2},
+    fvlam::Transform3{179 * degree, 0, 0, 0, 0, 2},
+    fvlam::Transform3{179 * degree, 0, 0, 1, 1, 2},
+
+    fvlam::Transform3{181 * degree, 1 * degree, 1 * degree, 0, 0, 2},
+    fvlam::Transform3{181 * degree, 1 * degree, 1 * degree, 1, 1, 2},
+    fvlam::Transform3{179 * degree, -1 * degree, -1 * degree, 0, 0, 2},
+    fvlam::Transform3{179 * degree, -1 * degree, -1 * degree, 1, 1, 2},
+  };
+
+  MarkerModel::Maker MarkerModelGen::MonoSpinCameraAtOrigin()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      int n_cameras = 32;
+      int n_markers = 32;
+      double z = 2.0;
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Simulation(),
+                                fvlam::CamerasGen::SpinAboutZAtOriginFacingOut(n_cameras),
+                                fvlam::MarkersGen::CircleInXYPlaneFacingOrigin(n_markers, z));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::DualSpinCameraAtOrigin()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      int n_cameras = 32;
+      int n_markers = 32;
+      double z = 2.0;
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Dual(),
+                                fvlam::CamerasGen::SpinAboutZAtOriginFacingOut(n_cameras),
+                                fvlam::MarkersGen::CircleInXYPlaneFacingOrigin(n_markers, z));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::MonoParallelGrid()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Simulation(),
+                                master_camera_pose_list,
+                                fvlam::MarkersGen::TargetsFromTransform3s(master_marker_pose_list));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::DualParallelGrid()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Dual(),
+                                master_camera_pose_list,
+                                fvlam::MarkersGen::TargetsFromTransform3s(master_marker_pose_list));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::MonoParallelCircles()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Simulation(),
+                                fvlam::CamerasGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 2.0, false),
+                                fvlam::MarkersGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 0.0, true));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::DualParallelCircles()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::Dual(),
+                                fvlam::CamerasGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 2.0, false),
+                                fvlam::MarkersGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 0.0, true));
+    };
+  }
+
+  MarkerModel::Maker MarkerModelGen::DualWideSingleCamera()
+  {
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::DualWideAngle(),
+                                fvlam::CamerasGen::LookingDownZ(2.0),
+                                fvlam::MarkersGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 0.0, true));
+    };
+  }
+
+  std::uint64_t ModelKey::camera(std::size_t idx)
+  {
+    return gtsam::Symbol{'c', idx}.key();
+  }
+
+  std::uint64_t ModelKey::marker(std::size_t idx)
+  {
+    return gtsam::Symbol{'m', idx}.key();
+  }
+
+  std::uint64_t ModelKey::corner(std::uint64_t marker_key, int corner_idx)
+  {
+    static char codes[] = {'i', 'j', 'k', 'l'};
+    auto marker_index = gtsam::Symbol{marker_key}.index();
+    return gtsam::Symbol(codes[corner_idx % sizeof(codes)], marker_index);
+  }
+
+  std::uint64_t ModelKey::marker_from_corner(std::uint64_t corner_key)
+  {
+    return marker(gtsam::Symbol{corner_key}.index());
   }
 
 // ==============================================================================

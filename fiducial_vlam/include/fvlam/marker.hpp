@@ -75,6 +75,7 @@ namespace fvlam
                     unit_corners3[3] * half_marker_length};
     }
 
+  public:
     inline Array3 calc_corners3_f_world(double marker_length) const
     {
       auto corners_f_marker = calc_corners3_f_marker(marker_length);
@@ -85,7 +86,7 @@ namespace fvlam
     }
 
   public:
-    Marker() :
+   Marker() :
       id_(0), t_map_marker_(), is_fixed_(false)
     {}
 

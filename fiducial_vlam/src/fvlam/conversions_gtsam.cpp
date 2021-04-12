@@ -113,13 +113,25 @@ namespace fvlam
     return gtsam::Cal3DS2{
       camera_matrix_(0, 0),  // fx
       camera_matrix_(1, 1),  // fy
-      camera_matrix_(0, 1), // s
+      camera_matrix_(0, 1),  // s
       camera_matrix_(0, 2),  // u0
       camera_matrix_(1, 2),  // v0
       dist_coeffs_(0), // k1
       dist_coeffs_(1), // k2
       dist_coeffs_(2), // p1
-      dist_coeffs_(3) // p2
+      dist_coeffs_(3)  // p2
+    };
+  }
+
+  template<>
+  gtsam::Cal3_S2 CameraInfo::to<gtsam::Cal3_S2>() const
+  {
+    return gtsam::Cal3_S2{
+      camera_matrix_(0, 0),  // fx
+      camera_matrix_(1, 1),  // fy
+      camera_matrix_(0, 1),  // s
+      camera_matrix_(0, 2),  // u0
+      camera_matrix_(1, 2)   // v0
     };
   }
 

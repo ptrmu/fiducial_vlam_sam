@@ -138,36 +138,77 @@ namespace fvlam
 
   using MarkerModel = Model<MapEnvironment, Marker, MarkerObservations>;
 
+  struct MarkerModelGen
+  {
+    static MarkerModel::Maker MonoSpinCameraAtOrigin(); //
+    static MarkerModel::Maker DualSpinCameraAtOrigin(); //
+    static MarkerModel::Maker MonoParallelGrid(); //
+    static MarkerModel::Maker DualParallelGrid(); //
+    static MarkerModel::Maker MonoParallelCircles(); //
+    static MarkerModel::Maker DualParallelCircles(); //
+    static MarkerModel::Maker DualWideSingleCamera(); //
+  };
+
+  struct ModelKey
+  {
+    static std::uint64_t camera(std::size_t idx); //
+    static std::uint64_t marker(std::size_t idx); //
+    static std::uint64_t corner(std::uint64_t marker_key, int corner_idx); //
+    static std::uint64_t marker_from_corner(std::uint64_t corner_key); //
+  };
+
 // ==============================================================================
 // Runner class
 // ==============================================================================
 
-  template<class Model, class Test, class Uut>
-  class Runner
+  class MarkerModelRunnerSimple
   {
-    Logger &logger_;
-    Model model_;
-    typename Test::Maker test_maker_;
+  public:
+    struct Config
+    {
+      double equals_tolerance_ = 1.0e-2;
+      fvlam::Logger::Levels logger_level_ = fvlam::Logger::Levels::level_warn;
+    };
+
+    template<class Uut>
+    using UutMaker = std::function<Uut(MarkerModelRunnerSimple &)>;
+
+  private:
+    Config cfg_;
+    LoggerCout logger_;
+    MarkerModel model_;
 
   public:
-    using UutMaker = std::function<Uut(Logger &, Model &)>;
+    MarkerModelRunnerSimple() = delete; //
+    MarkerModelRunnerSimple(const MarkerModelRunnerSimple &) = delete; //
+    MarkerModelRunnerSimple(MarkerModelRunnerSimple &&) = delete;
 
-    Runner() = delete; //
-    Runner(const Runner &) = delete; //
-    Runner(Runner &&) = delete;
+    MarkerModelRunnerSimple(Config cfg,
+                            MarkerModel::Maker model_maker);
 
-    Runner(Logger &logger,
-           typename Model::Maker model_maker,
-           typename Test::Maker test_maker) :
-      logger_{logger}, model_{model_maker()}, test_maker_{test_maker}
-    {}
-
-    bool operator()(UutMaker uut_maker)
+    template<class TestMaker>
+    bool run(TestMaker test_maker)
     {
-      auto test = test_maker_(logger_, model_);
-      auto uut = uut_maker(logger_, model_);
+      auto test = test_maker(*this);
+      return test();
+    }
+
+    template<class TestMaker, class UutMaker>
+    bool run(TestMaker test_maker, UutMaker uut_maker)
+    {
+      auto test = test_maker(*this);
+      auto uut = uut_maker(*this);
       return test(std::move(uut));
     }
+
+    auto &cfg() const
+    { return cfg_; }
+
+    Logger &logger()
+    { return logger_; }
+
+    auto &model() const
+    { return model_; }
   };
 
   class MarkerModelRunner
@@ -183,6 +224,9 @@ namespace fvlam
 
       fvlam::Logger::Levels logger_level_ = fvlam::Logger::Levels::level_warn;
     };
+
+    template<class Uut>
+    using UutMaker = std::function<Uut(MarkerModelRunner &)>;
 
   private:
     Config cfg_;
@@ -207,15 +251,19 @@ namespace fvlam
       double point2_sampler_sigma);
 
   public:
-    template<class Uut>
-    using UutMaker = std::function<Uut(MarkerModelRunner &)>;
-
     MarkerModelRunner() = delete; //
     MarkerModelRunner(const MarkerModelRunner &) = delete; //
     MarkerModelRunner(MarkerModelRunner &&) = delete;
 
     MarkerModelRunner(Config cfg,
                       MarkerModel::Maker model_maker);
+
+    template<class TestMaker>
+    bool run(TestMaker test_maker)
+    {
+      auto test = test_maker(*this);
+      return test();
+    }
 
     template<class TestMaker, class UutMaker>
     bool run(TestMaker test_maker, UutMaker uut_maker)
