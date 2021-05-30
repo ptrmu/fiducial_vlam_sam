@@ -1,4 +1,5 @@
 #pragma once
+#pragma ide diagnostic ignored "modernize-use-nodiscard"
 
 #include "fvlam/camera_info.hpp"
 #include "fvlam/logger.hpp"
@@ -147,14 +148,19 @@ namespace fvlam
     static MarkerModel::Maker MonoParallelCircles(); //
     static MarkerModel::Maker DualParallelCircles(); //
     static MarkerModel::Maker DualWideSingleCamera(); //
+    static MarkerModel::Maker DualWideSingleMarker(); //
   };
 
   struct ModelKey
   {
-    static std::uint64_t camera(std::size_t idx); //
-    static std::uint64_t marker(std::size_t idx); //
-    static std::uint64_t corner(std::uint64_t marker_key, int corner_idx); //
+    static std::uint64_t value(std::size_t value_idx); // Generic variable
+    static std::uint64_t camera(std::size_t camera_idx); //
+    static std::uint64_t marker(std::size_t marker_idx); //
+    static std::uint64_t camera_marker(std::size_t camera_idx, std::size_t marker_idx); //
+    static std::uint64_t corner(std::uint64_t marker_key, std::size_t corner_idx); //
     static std::uint64_t marker_from_corner(std::uint64_t corner_key); //
+    static std::size_t camera_idx_from_camera_marker(std::uint64_t camera_marker_key); //
+    static std::size_t marker_idx_from_camera_marker(std::uint64_t camera_marker_key); //
   };
 
 // ==============================================================================

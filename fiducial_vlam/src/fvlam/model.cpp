@@ -221,12 +221,15 @@ namespace fvlam
   {
     return []() -> fvlam::MarkerModel
     {
+      int n_cameras = 256;
+      int n_markers = 8;
+      double z = 2.0;
       return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
                                 fvlam::CameraInfoMapGen::Simulation(),
                                 fvlam::CamerasGen::CircleInXYPlaneFacingAlongZ(
-                                  8, 1.0, 2.0, false),
+                                  n_cameras, 1.0, z, false),
                                 fvlam::MarkersGen::CircleInXYPlaneFacingAlongZ(
-                                  8, 1.0, 0.0, true));
+                                  n_markers, 1.0, 0.0, true));
     };
   }
 
@@ -234,12 +237,15 @@ namespace fvlam
   {
     return []() -> fvlam::MarkerModel
     {
+      int n_cameras = 32;
+      int n_markers = 32;
+      double z = 2.0;
       return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
                                 fvlam::CameraInfoMapGen::Dual(),
                                 fvlam::CamerasGen::CircleInXYPlaneFacingAlongZ(
-                                  8, 1.0, 2.0, false),
+                                  n_cameras, 1.0, z, false),
                                 fvlam::MarkersGen::CircleInXYPlaneFacingAlongZ(
-                                  8, 1.0, 0.0, true));
+                                  n_markers, 1.0, 0.0, true));
     };
   }
 
@@ -255,17 +261,43 @@ namespace fvlam
     };
   }
 
-  std::uint64_t ModelKey::camera(std::size_t idx)
+  MarkerModel::Maker MarkerModelGen::DualWideSingleMarker()
   {
-    return gtsam::Symbol{'c', idx}.key();
+    return []() -> fvlam::MarkerModel
+    {
+      return fvlam::MarkerModel(fvlam::MapEnvironmentGen::Default(),
+                                fvlam::CameraInfoMapGen::DualWideAngle(),
+                                fvlam::CamerasGen::CircleInXYPlaneFacingAlongZ(
+                                  8, 1.0, 2.0, false),
+                                fvlam::MarkersGen::OriginLookingUp());
+    };
   }
 
-  std::uint64_t ModelKey::marker(std::size_t idx)
+  std::uint64_t ModelKey::value(std::size_t value_idx)
   {
-    return gtsam::Symbol{'m', idx}.key();
+    return gtsam::Symbol{'a', value_idx}.key();
   }
 
-  std::uint64_t ModelKey::corner(std::uint64_t marker_key, int corner_idx)
+  std::uint64_t ModelKey::camera(std::size_t camera_idx)
+  {
+    return gtsam::Symbol{'c', camera_idx}.key();
+  }
+
+  std::uint64_t ModelKey::marker(std::size_t marker_idx)
+  {
+    return gtsam::Symbol{'m', marker_idx}.key();
+  }
+
+  static const std::size_t camera_marker_bits = 24;
+  static const std::size_t camera_marker_stride = 1 << camera_marker_bits;
+  static const std::uint64_t camera_marker_mask = camera_marker_stride - 1;
+
+  std::uint64_t ModelKey::camera_marker(std::size_t camera_idx, std::size_t marker_idx)
+  {
+    return gtsam::Symbol{'d', camera_idx * camera_marker_stride + marker_idx}.key();
+  }
+
+  std::uint64_t ModelKey::corner(std::uint64_t marker_key, std::size_t corner_idx)
   {
     static char codes[] = {'i', 'j', 'k', 'l'};
     auto marker_index = gtsam::Symbol{marker_key}.index();
@@ -275,6 +307,18 @@ namespace fvlam
   std::uint64_t ModelKey::marker_from_corner(std::uint64_t corner_key)
   {
     return marker(gtsam::Symbol{corner_key}.index());
+  }
+
+  std::size_t ModelKey::camera_idx_from_camera_marker(std::uint64_t camera_marker_key)
+  {
+    assert(gtsam::Symbol{camera_marker_key}.chr() == 'd');
+    return (gtsam::Symbol{camera_marker_key}.index() >> camera_marker_bits) & camera_marker_mask;
+  }
+
+  std::size_t ModelKey::marker_idx_from_camera_marker(std::uint64_t camera_marker_key)
+  {
+    assert(gtsam::Symbol{camera_marker_key}.chr() == 'd');
+    return gtsam::Symbol{camera_marker_key}.index() & camera_marker_mask;
   }
 
 // ==============================================================================
@@ -322,13 +366,13 @@ namespace fvlam
     marker_observations_list_perturbed_{
       gen_marker_observations_list_perturbed(model_, cfg.r_sampler_sigma_, cfg.t_sampler_sigma_, cfg.u_sampler_sigma_)}
   {
-    logger_.info() << "Model Markers:";
-    for (auto &marker : model_.targets()) {
+    logger_.info() << "Model Markers Perturbed:";
+    for (auto &marker : markers_perturbed_) {
       logger_.info() << marker.to_string();
     }
 
-    logger_.debug() << "Model Observations:";
-    for (auto &to : model_.target_observations_list()) {
+    logger_.debug() << "Model Observations Perturbed:";
+    for (auto &to : marker_observations_list_perturbed_) {
       logger_.debug() << "ObservationsSynced " << to.camera_index() << " "
                       << to.t_map_camera().to_string();
       for (auto &os : to.observations_synced().v()) {

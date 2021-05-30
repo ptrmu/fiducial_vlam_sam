@@ -48,8 +48,9 @@ namespace fvlam
 
           // Add factors to the graph.
           for (size_t j = 0; j < corners_f_image.size(); j += 1) {
-            graph.emplace_shared<ResectioningFactor>(corners_f_image[j], corner_noise,
-                                                     camera_key_, corners_f_map[j], cal3ds2,
+            graph.emplace_shared<ResectioningFactor>(camera_key_,
+                                                     corners_f_image[j], corner_noise,
+                                                     corners_f_map[j], cal3ds2,
                                                      logger_, true);
           }
         }
